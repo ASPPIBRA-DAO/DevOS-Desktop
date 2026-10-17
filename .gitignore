@@ -76,3 +76,6 @@ blocks/
 # 9. Sistema Operacional
 .DS_Store
 Thumbs.db
+
+# 10. Regras e Instruções Locais de Agente
+AGENTS.md
