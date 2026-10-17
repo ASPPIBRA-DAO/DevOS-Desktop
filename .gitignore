@@ -1,0 +1,78 @@
+# ==========================================
+# DevOS Desktop — .gitignore (Segurança & Build)
+# ==========================================
+
+# 1. Logs e Depuração
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# 2. Dependências Node & Caches
+node_modules/
+.pnpm-store/
+.npm/
+.eslintcache
+*.tsbuildinfo
+coverage/
+.turbo/
+
+# 3. Artefatos de Build do Frontend
+dist/
+dist-node/
+dist-cockpit/
+dist-ssr/
+*.local
+
+# 4. Compilação Rust & Tauri
+src-tauri/target/
+src-tauri/gen/
+src-tauri/bin/*
+!src-tauri/bin/.gitkeep
+
+# 5. Segurança & Segredos (CRÍTICO: Zero-Trust)
+.env
+.env.*
+.env.local
+.env.*.local
+*.env
+*.pem
+*.key
+*.cert
+*.crt
+*.pfx
+*.p12
+*.keystore
+id_rsa*
+*.secret
+
+# 6. Bancos de Dados Locais e Armazenamento em Execução
+*.sqlite
+*.sqlite3
+*.db
+*.db-shm
+*.db-wal
+*.sqlite-journal
+
+# 7. Dados Locais e Caches do IPFS / Kubo
+.ipfs/
+repo.lock
+datastore/
+blocks/
+
+# 8. Ambientes de Desenvolvimento e IDEs
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+*.bak
+
+# 9. Sistema Operacional
+.DS_Store
+Thumbs.db
