@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-cancel-pending-creation"
+description = "Enables the cancel_pending_creation command without any pre-configured scope."
+commands.allow = ["cancel_pending_creation"]
+
+[[permission]]
+identifier = "deny-cancel-pending-creation"
+description = "Denies the cancel_pending_creation command without any pre-configured scope."
+commands.deny = ["cancel_pending_creation"]

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-batch-fetch-wallet-balances"
+description = "Enables the batch_fetch_wallet_balances command without any pre-configured scope."
+commands.allow = ["batch_fetch_wallet_balances"]
+
+[[permission]]
+identifier = "deny-batch-fetch-wallet-balances"
+description = "Denies the batch_fetch_wallet_balances command without any pre-configured scope."
+commands.deny = ["batch_fetch_wallet_balances"]

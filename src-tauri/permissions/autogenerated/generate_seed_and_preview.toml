@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-generate-seed-and-preview"
+description = "Enables the generate_seed_and_preview command without any pre-configured scope."
+commands.allow = ["generate_seed_and_preview"]
+
+[[permission]]
+identifier = "deny-generate-seed-and-preview"
+description = "Denies the generate_seed_and_preview command without any pre-configured scope."
+commands.deny = ["generate_seed_and_preview"]

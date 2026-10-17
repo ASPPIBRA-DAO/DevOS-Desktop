@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-restore-vault-backup"
+description = "Enables the restore_vault_backup command without any pre-configured scope."
+commands.allow = ["restore_vault_backup"]
+
+[[permission]]
+identifier = "deny-restore-vault-backup"
+description = "Denies the restore_vault_backup command without any pre-configured scope."
+commands.deny = ["restore_vault_backup"]

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-reveal-pending-mnemonic"
+description = "Enables the reveal_pending_mnemonic command without any pre-configured scope."
+commands.allow = ["reveal_pending_mnemonic"]
+
+[[permission]]
+identifier = "deny-reveal-pending-mnemonic"
+description = "Denies the reveal_pending_mnemonic command without any pre-configured scope."
+commands.deny = ["reveal_pending_mnemonic"]

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-confirm-and-save-wallets"
+description = "Enables the confirm_and_save_wallets command without any pre-configured scope."
+commands.allow = ["confirm_and_save_wallets"]
+
+[[permission]]
+identifier = "deny-confirm-and-save-wallets"
+description = "Denies the confirm_and_save_wallets command without any pre-configured scope."
+commands.deny = ["confirm_and_save_wallets"]

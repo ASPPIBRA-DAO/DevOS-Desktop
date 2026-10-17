@@ -1,0 +1,42 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "DevOS Node",
+  "version": "1.0.0",
+  "identifier": "br.aspp.devos.node",
+  "build": {
+    "frontendDist": "../dist-node",
+    "devUrl": "http://localhost:8080",
+    "beforeDevCommand": "pnpm run dev:node",
+    "beforeBuildCommand": "pnpm run build:node"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "DevOS — Node Operator",
+        "width": 1440,
+        "height": 900,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "capabilities": [
+        "desktop-vault"
+      ],
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost tauri: https://api.asppibra.com http://localhost:8787; frame-src 'none'; object-src 'none'; base-uri 'self';",
+      "devCsp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ws://localhost:8080 http://localhost:8080 ipc: http://ipc.localhost tauri: https://api.asppibra.com http://localhost:8787; frame-src 'none'; object-src 'none'; base-uri 'self';"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}
