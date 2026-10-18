@@ -23,6 +23,7 @@ export * from './search-not-found';
 export * from './scrollbar';
 export * from './custom-popover';
 export * from './custom-breadcrumbs';
+export * from './nav-section';
 export * from './progress-bar';
 
 // Grupo 4: Apresentação de Dados e Tabelas
