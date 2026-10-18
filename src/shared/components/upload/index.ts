@@ -1,5 +1,5 @@
-export * from './classes';
 export * from './types';
+export * from './classes';
 export * from './box/upload-box';
 export * from './avatar/upload-avatar';
 export * from './default/upload-default';
