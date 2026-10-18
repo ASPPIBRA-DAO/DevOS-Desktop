@@ -2,9 +2,8 @@ import './styles.css';
 
 import NProgress from 'nprogress';
 import { useRef, useEffect } from 'react';
-import { isEqualPath } from 'minimal-shared/utils';
-
 import { useLocation } from 'react-router';
+import { isEqualPath } from 'minimal-shared/utils';
 
 // ----------------------------------------------------------------------
 
