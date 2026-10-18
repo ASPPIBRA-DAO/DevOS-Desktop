@@ -6,10 +6,10 @@ import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
 
-import { CyberButton } from '../../shared/components/cyber-button';
 import { Iconify } from '../../shared/components/iconify';
+import { CyberButton } from '../../shared/components/cyber-button';
+import { varBounce, MotionContainer } from '../../shared/components/animate';
 import { PageNotFoundIllustration } from '../../shared/components/illustrations';
-import { MotionContainer, varBounce } from '../../shared/components/animate';
 
 // ----------------------------------------------------------------------
 
