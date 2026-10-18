@@ -1,0 +1,5 @@
+export { BackgroundShape } from './background-shape';
+export { default as UploadIllustration } from './upload-illustration';
+export { default as ForbiddenIllustration } from './forbidden-illustration';
+export { default as ServerErrorIllustration } from './server-error-illustration';
+export { default as PageNotFoundIllustration } from './page-not-found-illustration';
