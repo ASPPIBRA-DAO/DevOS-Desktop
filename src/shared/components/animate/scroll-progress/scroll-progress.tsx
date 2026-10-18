@@ -1,6 +1,7 @@
 import type { BoxProps } from '@mui/material/Box';
 import type { Theme, SxProps } from '@mui/material/styles';
 import type { MotionValue, MotionProps } from 'framer-motion';
+
 export type PaletteColorKey = 'primary' | 'secondary' | 'info' | 'success' | 'warning' | 'error';
 
 import { Fragment } from 'react';
