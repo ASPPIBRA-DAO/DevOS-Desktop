@@ -9,9 +9,8 @@ import { m, useInView, useAnimation } from 'framer-motion';
 import { styled } from '@mui/material/styles';
 import Typography from '@mui/material/Typography';
 
-import { createClasses } from '../../theme/create-classes';
-
 import { varFade, varContainer } from './variants';
+import { createClasses } from '../../theme/create-classes';
 
 // ----------------------------------------------------------------------
 
