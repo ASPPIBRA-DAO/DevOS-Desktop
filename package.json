@@ -6,6 +6,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev": "vite --mode node",
+    "build": "tsc && vite build --mode node",
     "dev:node": "vite --mode node",
     "dev:cockpit": "vite --mode cockpit",
     "build:node": "tsc && vite build --mode node",
@@ -30,7 +32,7 @@
     "@emotion/styled": "^11.14.1",
     "@fontsource-variable/inter": "^5.2.8",
     "@fontsource-variable/public-sans": "^5.2.7",
-    "@hookform/resolvers": "^5.2.2",
+    "@hookform/resolvers": "5.9.1",
     "@iconify/react": "^6.0.2",
     "@mui/lab": "9.0.0-beta.2",
     "@mui/material": "^9.0.0",
