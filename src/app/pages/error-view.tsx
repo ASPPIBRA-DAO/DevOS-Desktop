@@ -1,6 +1,5 @@
 import React from 'react';
 import { m } from 'framer-motion';
-import { useNavigate } from 'react-router';
 
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -20,13 +19,12 @@ interface ErrorViewProps {
 }
 
 export function ErrorView({ error, resetErrorBoundary }: ErrorViewProps) {
-  const navigate = useNavigate();
-
   const handleReset = () => {
     if (resetErrorBoundary) {
       resetErrorBoundary();
     }
-    navigate('/');
+    window.location.hash = '#/';
+    window.location.reload();
   };
 
   return (
