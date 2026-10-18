@@ -1,5 +1,5 @@
-import { alpha, styled } from '@mui/material/styles';
 import IconButton from '@mui/material/IconButton';
+import { alpha, styled } from '@mui/material/styles';
 
 import { uploadClasses } from '../classes';
 
