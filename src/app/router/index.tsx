@@ -1,7 +1,8 @@
 import React from 'react';
 import currentEdition from '@edition';
-import { Route, Routes, Navigate, HashRouter } from 'react-router';
+import { Route, Routes, HashRouter } from 'react-router';
 
+import { NotFoundView } from '../pages/not-found-view';
 import { DashboardLayout } from '../layouts/dashboard-layout';
 
 export function AppRouter() {
@@ -13,7 +14,7 @@ export function AppRouter() {
             const Component = r.component;
             return <Route key={r.path} path={r.path} element={<Component />} />;
           })}
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<NotFoundView />} />
         </Route>
       </Routes>
     </HashRouter>
