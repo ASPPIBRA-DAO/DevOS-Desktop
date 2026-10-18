@@ -2,9 +2,9 @@ import type { FileRejection } from 'react-dropzone';
 
 import { alpha, styled } from '@mui/material/styles';
 
-import { fData } from '../../../utils/format-number';
 import { uploadClasses } from '../classes';
 import { getFileMeta } from '../../file-thumbnail';
+import { fData } from '../../../utils/format-number';
 
 // ----------------------------------------------------------------------
 
