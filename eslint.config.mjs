@@ -83,13 +83,10 @@ const unusedImportsRules = () => ({
 const sortImportsRules = () => {
   const customGroups = {
     mui: ['custom-mui'],
-    auth: ['custom-auth'],
-    hooks: ['custom-hooks'],
-    utils: ['custom-utils'],
-    types: ['custom-types'],
-    routes: ['custom-routes'],
-    sections: ['custom-sections'],
-    components: ['custom-components'],
+    app: ['custom-app'],
+    modules: ['custom-modules'],
+    platform: ['custom-platform'],
+    shared: ['custom-shared'],
   };
 
   const typeGroups = [
@@ -125,14 +122,11 @@ const sortImportsRules = () => {
           ...typeGroups,
           ['builtin', 'external'],
           customGroups.mui,
-          customGroups.routes,
-          customGroups.hooks,
-          customGroups.utils,
+          customGroups.app,
+          customGroups.platform,
+          customGroups.shared,
           'internal',
-          customGroups.components,
-          customGroups.sections,
-          customGroups.auth,
-          customGroups.types,
+          customGroups.modules,
           ['parent', 'sibling', 'index'],
           'object',
           'unknown',
@@ -140,13 +134,10 @@ const sortImportsRules = () => {
         customGroups: {
           value: {
             [customGroups.mui]: ['^@mui/.+'],
-            [customGroups.auth]: ['^src/auth/.+'],
-            [customGroups.hooks]: ['^src/hooks/.+'],
-            [customGroups.utils]: ['^src/utils/.+'],
-            [customGroups.types]: ['^src/types/.+'],
-            [customGroups.routes]: ['^src/routes/.+'],
-            [customGroups.sections]: ['^src/sections/.+'],
-            [customGroups.components]: ['^src/components/.+'],
+            [customGroups.app]: ['^src/app/.+'],
+            [customGroups.platform]: ['^src/platform/.+'],
+            [customGroups.shared]: ['^src/shared/.+'],
+            [customGroups.modules]: ['^src/modules/.+'],
           },
         },
       },
@@ -198,15 +189,15 @@ export default [
   reactPlugin.configs.flat.recommended,
   customConfig,
   {
-    files: ['src/sections/**/*.{js,jsx,ts,tsx}', 'src/layouts/**/*.{js,jsx,ts,tsx}'],
+    files: ['src/modules/**/domain/**/*.{js,jsx,ts,tsx}'],
     rules: {
       'no-restricted-imports': [
         'error',
         {
           patterns: [
             {
-              group: ['**/use-auth-context', '**/context/jwt/**'],
-              message: 'Architecture Violation (ID-001): Do not bypass the Domain. Use src/auth/facades/* instead.',
+              group: ['src/shared/components/**', 'src/platform/**', '@mui/**', 'react', 'react-dom'],
+              message: 'Architecture Violation: Domain layer must be pure TypeScript and not depend on UI or Platform IPC.',
             },
           ],
         },
