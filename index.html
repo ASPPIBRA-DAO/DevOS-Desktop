@@ -1,11 +1,50 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" href="/favicon.ico" />
-    <meta name="theme-color" content="#000000" />
+    <meta name="theme-color" content="#0b0f19" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>DevOS — Control Plane v2.2.3</title>
+    <title>DevOS — Control Plane</title>
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        background-color: #0b0f19;
+        color: #f9fafb;
+        overflow: hidden;
+      }
+      #root {
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+    <script>
+      window.addEventListener('error', function(event) {
+        console.error('[DevOS Webview Error]:', event.error || event.message);
+        var errBox = document.getElementById('debug-fatal-error');
+        if (!errBox) {
+          errBox = document.createElement('div');
+          errBox.id = 'debug-fatal-error';
+          errBox.style = 'position:fixed;top:0;left:0;right:0;bottom:0;background:#1a0505;color:#ff5555;padding:24px;font-family:monospace;white-space:pre-wrap;z-index:999999;overflow:auto;font-size:14px;';
+          document.body.appendChild(errBox);
+        }
+        errBox.textContent += '\n[JS Error]: ' + (event.message || '') + ' at ' + (event.filename || '') + ':' + (event.lineno || '') + '\n' + (event.error ? event.error.stack : '');
+      });
+      window.addEventListener('unhandledrejection', function(event) {
+        console.error('[DevOS Webview Unhandled Rejection]:', event.reason);
+        var errBox = document.getElementById('debug-fatal-error');
+        if (!errBox) {
+          errBox = document.createElement('div');
+          errBox.id = 'debug-fatal-error';
+          errBox.style = 'position:fixed;top:0;left:0;right:0;bottom:0;background:#1a0505;color:#ff5555;padding:24px;font-family:monospace;white-space:pre-wrap;z-index:999999;overflow:auto;font-size:14px;';
+          document.body.appendChild(errBox);
+        }
+        errBox.textContent += '\n[Promise Rejection]: ' + (event.reason ? (event.reason.stack || event.reason.message || event.reason) : event);
+      });
+    </script>
   </head>
 
   <body>
