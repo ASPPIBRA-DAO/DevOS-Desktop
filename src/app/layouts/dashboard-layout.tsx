@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
 import currentEdition from '@edition';
+import React, { useState } from 'react';
 import { Outlet, useLocation } from 'react-router';
 
 import Box from '@mui/material/Box';
