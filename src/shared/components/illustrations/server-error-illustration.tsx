@@ -4,8 +4,6 @@ import { memo } from 'react';
 
 import SvgIcon from '@mui/material/SvgIcon';
 
-
-
 import { BackgroundShape } from './background-shape';
 
 // ----------------------------------------------------------------------
@@ -15,7 +13,7 @@ type SvgProps = SvgIconProps & { hideBackground?: boolean };
 function ServerErrorIllustration({ hideBackground, sx, ...other }: SvgProps) {
   const renderCharacterImage = () => (
     <image
-      href={`/assets/illustrations/characters/character-study.webp`}
+      href="/assets/illustrations/characters/character-study.webp"
       height="240"
       x="320"
       y="60"
