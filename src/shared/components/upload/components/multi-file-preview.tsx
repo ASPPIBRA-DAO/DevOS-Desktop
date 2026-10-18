@@ -1,13 +1,13 @@
-import type { MultiFilePreviewProps, PreviewOrientation } from '../types';
 import type { FileThumbnailProps } from '../../file-thumbnail';
+import type { PreviewOrientation, MultiFilePreviewProps } from '../types';
 
-import { alpha, styled } from '@mui/material/styles';
 import IconButton from '@mui/material/IconButton';
+import { alpha, styled } from '@mui/material/styles';
 import ListItemText from '@mui/material/ListItemText';
 
-import { fData } from '../../../utils/format-number';
 import { Iconify } from '../../iconify';
 import { uploadClasses } from '../classes';
+import { fData } from '../../../utils/format-number';
 import { getFileMeta, FileThumbnail, useFilesPreview } from '../../file-thumbnail';
 
 // ----------------------------------------------------------------------
