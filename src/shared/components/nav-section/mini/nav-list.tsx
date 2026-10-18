@@ -1,12 +1,11 @@
 import type { NavListProps, NavSubListProps } from '../types';
 
+import { useLocation } from 'react-router';
 import { useEffect, useCallback } from 'react';
 import { usePopoverHover } from 'minimal-shared/hooks';
 import { isActiveLink, isExternalLink } from 'minimal-shared/utils';
 
 import { useTheme } from '@mui/material/styles';
-
-import { useLocation } from 'react-router';
 
 import { NavItem } from './nav-item';
 import { navSectionClasses } from '../styles';
