@@ -7,10 +7,10 @@ import Button from '@mui/material/Button';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
 
-import { CyberButton } from '../../shared/components/cyber-button';
 import { Iconify } from '../../shared/components/iconify';
+import { CyberButton } from '../../shared/components/cyber-button';
+import { varBounce, MotionContainer } from '../../shared/components/animate';
 import { ServerErrorIllustration } from '../../shared/components/illustrations';
-import { MotionContainer, varBounce } from '../../shared/components/animate';
 
 // ----------------------------------------------------------------------
 
