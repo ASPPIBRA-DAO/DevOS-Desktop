@@ -7,9 +7,9 @@ import Button from '@mui/material/Button';
 import FormHelperText from '@mui/material/FormHelperText';
 import CircularProgress from '@mui/material/CircularProgress';
 
-import { UploadIllustration } from '../../illustrations';
 import { Iconify } from '../../iconify';
 import { uploadClasses } from '../classes';
+import { UploadIllustration } from '../../illustrations';
 import { RejectedFiles } from '../components/rejected-files';
 import { MultiFilePreview } from '../components/multi-file-preview';
 import { SingleFilePreview } from '../components/single-file-preview';
