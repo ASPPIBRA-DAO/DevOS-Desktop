@@ -10,6 +10,8 @@ export * from './svg-color';
 export * from './cyber-card';
 export * from './cyber-button';
 export * from './edger-lights';
+export * from './ipfs-cube';
+export * from './illustrations';
 
 // Grupo 2: Feedback, Diálogos e Estados
 export * from './label';
@@ -31,9 +33,12 @@ export * from './table';
 export * from './chart';
 export * from './filters-result';
 
-// Grupo 5: Formulários e Entradas Universais
+// Grupo 5: Formulários, Arquivos e Mídia
 export * from './hook-form';
 export * from './number-input';
+export * from './image';
+export * from './file-thumbnail';
+export * from './upload';
 
 // Animações e Transições
 export * from './animate';
