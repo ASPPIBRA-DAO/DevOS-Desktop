@@ -1,10 +1,9 @@
 import type { NavListProps, NavSubListProps } from '../types';
 
+import { useLocation } from 'react-router';
 import { useBoolean } from 'minimal-shared/hooks';
 import { useRef, useEffect, useCallback } from 'react';
 import { isActiveLink, isExternalLink } from 'minimal-shared/utils';
-
-import { useLocation } from 'react-router';
 
 import { NavItem } from './nav-item';
 import { navSectionClasses } from '../styles';
