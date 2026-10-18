@@ -79,3 +79,7 @@ Thumbs.db
 
 # 10. Regras e Instruções Locais de Agente
 AGENTS.md
+
+# 11. Documentos Internos, Estratégia e Auditoria Local
+architecture/
+audit/
