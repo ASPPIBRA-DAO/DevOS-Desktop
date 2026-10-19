@@ -1,9 +1,8 @@
 import type { Theme, CSSObject } from '@mui/material/styles';
 
 import { Toaster } from 'sonner';
-import { varAlpha } from 'minimal-shared/utils';
 
-import { styled } from '@mui/material/styles';
+import { alpha, styled } from '@mui/material/styles';
 
 import { snackbarClasses } from './classes';
 
@@ -31,7 +30,7 @@ const loadingIconStyles = (theme: Theme): CSSObject => ({
     height: 24,
     borderRadius: '50%',
     animation: 'rotate 3s infinite linear',
-    background: `conic-gradient(transparent, ${varAlpha(theme.palette.text.disabled, 0.64)})`,
+    background: `conic-gradient(transparent, ${alpha(theme.palette.text.disabled, 0.64)})`,
   },
 });
 
@@ -46,7 +45,7 @@ const iconStyles = (theme: Theme): CSSObject => ({
       width: 48,
       height: 48,
       borderRadius: 'inherit',
-      backgroundColor: varAlpha('currentColor', 0.08),
+      backgroundColor: alpha(theme.palette.text.primary, 0.08),
       [`& .${snackbarClasses.iconSvg}`]: {
         width: 24,
         height: 24,
@@ -85,11 +84,11 @@ const actionsStyles = (theme: Theme): CSSObject => ({
     display: 'inline-flex',
     justifyContent: 'center',
     backgroundColor: 'transparent',
-    border: `solid 1px ${varAlpha('currentColor', 0.16)}`,
+    border: `solid 1px ${alpha(theme.palette.text.primary, 0.16)}`,
     transition: theme.transitions.create(['background-color', 'border-color']),
     '&:hover': {
-      borderColor: varAlpha('currentColor', 0.24),
-      backgroundColor: varAlpha('currentColor', 0.08),
+      borderColor: alpha(theme.palette.text.primary, 0.24),
+      backgroundColor: alpha(theme.palette.text.primary, 0.08),
     },
   },
   [`& .${snackbarClasses.actionButton}`]: {
