@@ -2,9 +2,9 @@ import type { CSSObject } from '@mui/material/styles';
 import type { ElementRect } from './hooks';
 import type { ArrowProps, PaperOffset, ArrowPlacement } from './types';
 
-import { varAlpha, noRtlFlip } from 'minimal-shared/utils';
+import { noRtlFlip } from 'minimal-shared/utils';
 
-import { styled } from '@mui/material/styles';
+import { alpha, styled } from '@mui/material/styles';
 
 import { getArrowOffset } from './utils';
 
@@ -151,7 +151,7 @@ export const Arrow = styled('span', {
     borderBottomRightRadius: isRtl ? size / 4 : 0,
     clipPath: 'polygon(0% 0%, 100% 100%, 0% 100%)',
     backgroundColor: palette.background.paper,
-    border: `solid 1px ${varAlpha(palette.grey?.[500] ?? '#9CA3AF', 0.12)}`,
+    border: `solid 1px ${alpha(palette.grey?.[500] ?? '#9CA3AF', 0.12)}`,
   };
 
   const arrowBackgroundStyle: CSSObject = {
@@ -159,11 +159,11 @@ export const Arrow = styled('span', {
     backgroundSize: `${size * 3}px ${size * 3}px`,
     ...(arrowColor === 'cyan' && {
       backgroundPosition: noRtlFlip('top right'),
-      backgroundImage: `linear-gradient(45deg, ${varAlpha(palette.info.main, 0.08)}, ${varAlpha(palette.info.main, 0.08)})`,
+      backgroundImage: `linear-gradient(45deg, ${alpha(palette.info.main, 0.08)}, ${alpha(palette.info.main, 0.08)})`,
     }),
     ...(arrowColor === 'red' && {
       backgroundPosition: noRtlFlip('bottom left'),
-      backgroundImage: `linear-gradient(45deg, ${varAlpha(palette.error.main, 0.08)}, ${varAlpha(palette.error.main, 0.08)})`,
+      backgroundImage: `linear-gradient(45deg, ${alpha(palette.error.main, 0.08)}, ${alpha(palette.error.main, 0.08)})`,
     }),
   };
 
