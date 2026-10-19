@@ -1,9 +1,9 @@
 import type { ButtonBaseProps } from '@mui/material/ButtonBase';
 import type { CustomPopoverProps } from '../../custom-popover';
 
-import { varAlpha } from 'minimal-shared/utils';
 import { usePopover } from 'minimal-shared/hooks';
 
+import { alpha } from '@mui/material/styles';
 import MenuList from '@mui/material/MenuList';
 import MenuItem from '@mui/material/MenuItem';
 import ButtonBase from '@mui/material/ButtonBase';
@@ -58,7 +58,7 @@ export function ChartSelect({ options, value, onChange, slotProps, ...other }: C
             height: 34,
             borderRadius: 1,
             typography: 'subtitle2',
-            border: `solid 1px ${varAlpha(theme.palette.grey?.[500] ?? '#9CA3AF', 0.24)}`,
+            border: `solid 1px ${alpha(theme.palette.grey?.[500] ?? '#9CA3AF', 0.24)}`,
           }),
           ...(Array.isArray(slotProps?.button?.sx) ? slotProps.button.sx : [slotProps?.button?.sx]),
         ]}
