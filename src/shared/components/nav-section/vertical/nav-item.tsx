@@ -1,11 +1,11 @@
 import type { CSSObject } from '@mui/material/styles';
 import type { NavItemProps } from '../types';
 
-import { varAlpha, mergeClasses } from 'minimal-shared/utils';
+import { mergeClasses } from 'minimal-shared/utils';
 
 import Tooltip from '@mui/material/Tooltip';
-import { styled } from '@mui/material/styles';
 import ButtonBase from '@mui/material/ButtonBase';
+import { alpha, styled } from '@mui/material/styles';
 
 import { Iconify } from '../../iconify';
 import { createNavItem } from '../utils';
@@ -175,13 +175,13 @@ const ItemRoot = styled(ButtonBase, { shouldForwardProp })<StyledState>(({
       color: 'var(--nav-item-root-active-color)',
       background:
         'linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(240, 253, 244, 0.95) 100%)',
-      borderColor: varAlpha(theme.palette.primary.main, 0.35),
+      borderColor: alpha(theme.palette.primary.main, 0.35),
       borderLeft: `4px solid ${theme.palette.primary.main}`,
       boxShadow: [
-        `0 8px 24px -4px ${varAlpha(theme.palette.primary.main, 0.28)}`,
+        `0 8px 24px -4px ${alpha(theme.palette.primary.main, 0.28)}`,
         '0 2px 6px -1px rgba(15, 23, 42, 0.08)',
         'inset 0 1.5px 0 #ffffff',
-        `inset 0 -1.5px 0 ${varAlpha(theme.palette.primary.main, 0.15)}`,
+        `inset 0 -1.5px 0 ${alpha(theme.palette.primary.main, 0.15)}`,
       ].join(', '),
       '&:hover': {
         background:
@@ -247,10 +247,10 @@ const ItemIcon = styled('span', { shouldForwardProp })<StyledState>(({ theme, ac
     ? 'linear-gradient(135deg, rgba(0, 167, 111, 0.2) 0%, rgba(0, 210, 255, 0.14) 100%)'
     : 'linear-gradient(180deg, #FFFFFF 0%, #F1F5F9 100%)',
   border: active
-    ? `1px solid ${varAlpha(theme.palette.primary.main, 0.45)}`
+    ? `1px solid ${alpha(theme.palette.primary.main, 0.45)}`
     : '1px solid rgba(145, 158, 171, 0.22)',
   boxShadow: active
-    ? `0 0 14px 0 ${varAlpha(theme.palette.primary.main, 0.35)}, inset 0 1px 0 #ffffff`
+    ? `0 0 14px 0 ${alpha(theme.palette.primary.main, 0.35)}, inset 0 1px 0 #ffffff`
     : '0 1px 3px rgba(0, 0, 0, 0.05), inset 0 1px 0 #ffffff',
   color: active ? theme.palette.primary.main : 'inherit',
   ...theme.applyStyles('dark', {
