@@ -1,11 +1,11 @@
 import type { CSSObject } from '@mui/material/styles';
 import type { NavItemProps } from '../types';
 
-import { varAlpha, mergeClasses } from 'minimal-shared/utils';
+import { mergeClasses } from 'minimal-shared/utils';
 
 import Tooltip from '@mui/material/Tooltip';
-import { styled } from '@mui/material/styles';
 import ButtonBase from '@mui/material/ButtonBase';
+import { alpha, styled } from '@mui/material/styles';
 
 import { Iconify } from '../../iconify';
 import { createNavItem } from '../utils';
@@ -157,7 +157,7 @@ const ItemRoot = styled(ButtonBase, { shouldForwardProp })<StyledState>(({
     ...(active && {
       color: 'var(--nav-item-root-active-color)',
       backgroundColor: 'var(--nav-item-root-active-bg)',
-      boxShadow: `0 0 16px ${varAlpha(theme.palette.primary.main, 0.2)}`,
+      boxShadow: `0 0 16px ${alpha(theme.palette.primary.main, 0.2)}`,
       '&:hover': {
         backgroundColor: 'var(--nav-item-root-active-hover-bg)',
         transform: 'scale(1.08)',
