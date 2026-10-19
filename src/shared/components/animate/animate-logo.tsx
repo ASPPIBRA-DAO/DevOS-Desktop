@@ -2,9 +2,8 @@ import type { Theme, SxProps } from '@mui/material/styles';
 import type { LogoProps } from '../logo';
 
 import { m } from 'framer-motion';
-import { varAlpha } from 'minimal-shared/utils';
 
-import { styled } from '@mui/material/styles';
+import { alpha, styled } from '@mui/material/styles';
 
 import { Logo } from '../logo';
 
@@ -78,14 +77,14 @@ const LogoZoomPrimaryOutline = styled(m.span)(({ theme }) => ({
   position: 'absolute',
   width: 'calc(100% - 20px)',
   height: 'calc(100% - 20px)',
-  border: `solid 3px ${varAlpha(theme.palette.primary.dark, 0.24)}`,
+  border: `solid 3px ${alpha(theme.palette.primary.dark, 0.24)}`,
 }));
 
 const LogoZoomSecondaryOutline = styled(m.span)(({ theme }) => ({
   width: '100%',
   height: '100%',
   position: 'absolute',
-  border: `solid 8px ${varAlpha(theme.palette.primary.dark, 0.24)}`,
+  border: `solid 8px ${alpha(theme.palette.primary.dark, 0.24)}`,
 }));
 
 // ----------------------------------------------------------------------
