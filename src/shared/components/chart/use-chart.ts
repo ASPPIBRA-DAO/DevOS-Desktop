@@ -2,9 +2,8 @@ import type { Theme } from '@mui/material/styles';
 import type { ChartOptions } from './types';
 
 import { merge } from 'es-toolkit';
-import { varAlpha } from 'minimal-shared/utils';
 
-import { useTheme } from '@mui/material/styles';
+import { alpha, useTheme } from '@mui/material/styles';
 
 // ----------------------------------------------------------------------
 
@@ -180,7 +179,7 @@ const baseChartOptions = (theme: Theme): any => {
         track: {
           margin: -8,
           strokeWidth: '50%',
-          background: varAlpha(palette.grey?.[500] ?? '#9CA3AF', 0.16),
+          background: alpha(palette.grey?.[500] ?? '#9CA3AF', 0.16),
         },
         dataLabels: { value: { ...LABEL_VALUE }, total: { ...LABEL_TOTAL } },
       },
