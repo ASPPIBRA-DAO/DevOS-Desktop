@@ -4,9 +4,9 @@ import type { ButtonBaseProps } from '@mui/material/ButtonBase';
 import type { FormHelperTextProps } from '@mui/material/FormHelperText';
 
 import { useId, useCallback } from 'react';
-import { varAlpha } from 'minimal-shared/utils';
 
 import Box from '@mui/material/Box';
+import { alpha } from '@mui/material/styles';
 
 import { Iconify } from '../iconify';
 import {
@@ -102,14 +102,14 @@ export function NumberInput({
       <NumberInputRoot
         sx={[
           (theme) => ({
-            '--border-color': varAlpha(theme.palette.grey?.[500] ?? '#9CA3AF', 0.2),
+            '--border-color': alpha(theme.palette.grey?.[500] ?? '#9CA3AF', 0.2),
             '--vertical-divider-color': hideDivider
               ? 'transparent'
-              : varAlpha(theme.palette.grey?.[500] ?? '#9CA3AF', 0.2),
+              : alpha(theme.palette.grey?.[500] ?? '#9CA3AF', 0.2),
             '--input-background':
               !disabled && error
-                ? varAlpha(theme.palette.error.main, 0.08)
-                : varAlpha(theme.palette.grey?.[500] ?? '#9CA3AF', 0.08),
+                ? alpha(theme.palette.error.main, 0.08)
+                : alpha(theme.palette.grey?.[500] ?? '#9CA3AF', 0.08),
           }),
           ...(Array.isArray(sx) ? sx : [sx]),
         ]}
