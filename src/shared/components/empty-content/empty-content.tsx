@@ -2,11 +2,9 @@ import type { BoxProps } from '@mui/material/Box';
 import type { Theme, SxProps } from '@mui/material/styles';
 import type { TypographyProps } from '@mui/material/Typography';
 
-import { varAlpha } from 'minimal-shared/utils';
-
 import Box from '@mui/material/Box';
-import { styled } from '@mui/material/styles';
 import Typography from '@mui/material/Typography';
+import { alpha, styled } from '@mui/material/styles';
 
 import { Iconify } from '../iconify';
 
@@ -117,8 +115,8 @@ const ContentRoot = styled('div', {
     padding: theme.spacing(0, 3),
     ...(filled && {
       borderRadius: Number(theme.shape.borderRadius) * 2,
-      backgroundColor: varAlpha(greyColor, 0.04),
-      border: 'dashed 1px ' + varAlpha(greyColor, 0.08),
+      backgroundColor: alpha(greyColor, 0.04),
+      border: 'dashed 1px ' + alpha(greyColor, 0.08),
     }),
   };
 });
