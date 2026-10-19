@@ -24,22 +24,35 @@ export const devosTheme = createTheme({
   },
   typography,
   shape: {
-    borderRadius: 10,
+    borderRadius: 16,
   },
   components: {
     MuiCssBaseline: {
       styleOverrides: {
         body: {
           backgroundColor: colors.background.default,
+          backgroundImage: [
+            'radial-gradient(at 0% 0%, rgba(0, 255, 127, 0.06) 0px, transparent 50%)',
+            'radial-gradient(at 100% 0%, rgba(0, 210, 255, 0.05) 0px, transparent 50%)',
+            'radial-gradient(at 50% 50%, rgba(145, 158, 171, 0.03) 0px, transparent 60%)',
+            colors.background.default,
+          ].join(', '),
+          backgroundAttachment: 'fixed',
           color: colors.text.primary,
           scrollbarWidth: 'thin',
+          scrollbarColor: 'rgba(0, 167, 111, 0.85) rgba(145, 158, 171, 0.1)',
           '&::-webkit-scrollbar': {
-            width: '6px',
-            height: '6px',
+            width: '8px',
+            height: '8px',
+          },
+          '&::-webkit-scrollbar-track': {
+            background: 'rgba(255, 255, 255, 0.04)',
+            borderRadius: '4px',
           },
           '&::-webkit-scrollbar-thumb': {
-            backgroundColor: 'rgba(255, 255, 255, 0.15)',
-            borderRadius: '3px',
+            background: 'linear-gradient(180deg, rgba(0, 255, 127, 0.85) 0%, rgba(0, 167, 111, 0.75) 100%)',
+            borderRadius: '4px',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
           },
         },
       },
