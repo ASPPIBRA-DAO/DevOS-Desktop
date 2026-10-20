@@ -1,16 +1,18 @@
 export const colors = {
-  // Backgrounds & Surface (Obsidiana 3D & Vidromorfismo)
+  // Backgrounds & Surface (Cristalino 3D / Vidromorfismo Oficial)
   background: {
-    default: '#020817',
-    paper: '#0F172A',
-    subtle: '#1E293B',
-    elevated: 'rgba(15, 23, 42, 0.78)',
-    glass: 'linear-gradient(180deg, rgba(15, 23, 42, 0.78) 0%, rgba(2, 8, 23, 0.70) 50%, rgba(15, 23, 42, 0.82) 100%)',
-    glassHeader: 'linear-gradient(135deg, rgba(15, 23, 42, 0.78) 0%, rgba(2, 8, 23, 0.70) 50%, rgba(15, 23, 42, 0.82) 100%)',
-    border: 'rgba(255, 255, 255, 0.12)',
-    borderLight: 'rgba(255, 255, 255, 0.22)',
+    default: '#F4F6F8',
+    paper: '#FFFFFF',
+    subtle: '#F4F6F8',
+    neutral: '#F4F6F8',
+    elevated: '#FFFFFF',
+    glass: 'linear-gradient(180deg, rgba(255, 255, 255, 0.85) 0%, rgba(248, 250, 252, 0.75) 50%, rgba(241, 245, 249, 0.85) 100%)',
+    glassHeader: 'linear-gradient(135deg, rgba(255, 255, 255, 0.85) 0%, rgba(248, 250, 252, 0.72) 50%, rgba(241, 245, 249, 0.82) 100%)',
+    border: 'rgba(255, 255, 255, 0.85)',
+    borderSubtle: 'rgba(145, 158, 171, 0.2)',
+    borderLight: 'rgba(255, 255, 255, 0.95)',
   },
-  // Primárias & Destaques (Verde Esmeralda Mint Original + Neon)
+  // Primárias & Destaques (Verde Esmeralda Mint Oficial)
   primary: {
     lighter: '#C8FAD6',
     light: '#5BE49B',
@@ -18,9 +20,9 @@ export const colors = {
     dark: '#007867',
     darker: '#004B50',
     contrastText: '#FFFFFF',
-    neon: '#00FF7F',
+    neon: '#00A76F',
   },
-  // Secundárias (Roxo Cyber original)
+  // Secundárias
   secondary: {
     lighter: '#EFD6FF',
     light: '#C684FF',
@@ -64,15 +66,15 @@ export const colors = {
   },
   // Acentos Neon & Cyber
   neon: {
-    green: '#00FF7F',
-    cyan: '#00D2FF',
+    green: '#00A76F',
+    cyan: '#00B8D9',
     emerald: '#00A76F',
     gold: '#FFAB00',
   },
   // Textos
   text: {
-    primary: '#F9FAFB',
-    secondary: '#919EAB',
-    disabled: '#637381',
+    primary: '#1C252E',
+    secondary: '#637381',
+    disabled: '#919EAB',
   },
 };
