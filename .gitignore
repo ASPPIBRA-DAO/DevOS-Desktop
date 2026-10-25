@@ -83,8 +83,9 @@ Thumbs.db
 AGENTS.md
 
 # 11. Documentos Internos, Estratégia e Auditoria Local
-architecture/
-audit/
+/architecture/
+!docs/architecture/
+!audit/git-change-log.csv
 
 # 12. Python Cache & Ambientes Virtuais (Scripts de Geração de Fixtures)
 __pycache__/
@@ -100,3 +101,4 @@ env/
 *.xls
 *.csv
 !src-tauri/fixtures/*.xlsx
+!audit/git-change-log.csv
