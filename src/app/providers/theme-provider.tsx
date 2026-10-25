@@ -1,25 +1,15 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 
-import CssBaseline from '@mui/material/CssBaseline';
-import { ThemeProvider as MuiThemeProvider } from '@mui/material/styles';
-
-import { devosTheme } from '../../shared/theme/theme-provider';
+import { ThemeProvider as DevOSThemeProvider } from '../../theme/theme-provider';
 
 /**
  * Provedor Global de Tema da Aplicação DevOS Desktop.
  * 
- * Camada de composição de aplicação (src/app/providers/) que integra o MuiThemeProvider,
- * a estilização de CssBaseline (com atmosfera radial e vidromorfismo) e a hierarquia de componentes.
+ * Camada de composição de aplicação (src/app/providers/) que integra o novo sistema
+ * completo de temas, CSS Variables nativas, paletas e tipografia de src/theme/.
  */
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const theme = useMemo(() => devosTheme, []);
-
-  return (
-    <MuiThemeProvider theme={theme}>
-      <CssBaseline />
-      {children}
-    </MuiThemeProvider>
-  );
+  return <DevOSThemeProvider>{children}</DevOSThemeProvider>;
 }
 
 export default ThemeProvider;
