@@ -1,5 +1,6 @@
 import type { EditionConfig } from './types';
 
+import { paths } from '../../routes/paths';
 import { RealEstateView } from '../../modules/real-estate';
 import { CockpitDashboardPage } from './cockpit/cockpit-dashboard-page';
 
@@ -16,8 +17,20 @@ export const currentEdition: EditionConfig = {
       component: CockpitDashboardPage,
     },
     {
+      path: paths.devos.cadastre,
+      label: 'Banco Imobiliário',
+      icon: 'solar:city-bold',
+      component: RealEstateView,
+    },
+    {
+      path: paths.devos.database,
+      label: 'Banco Imobiliário (Explorer)',
+      icon: 'solar:database-bold',
+      component: RealEstateView,
+    },
+    {
       path: '/real-estate',
-      label: 'Cadastro Imobiliário',
+      label: 'Cadastro Imobiliário (Legado)',
       icon: 'solar:bill-list-bold',
       component: RealEstateView,
     },

@@ -3,6 +3,7 @@ import type { NavSectionProps } from 'src/components/nav-section';
 
 import { useEffect } from 'react';
 import { Outlet } from 'react-router';
+import currentEdition from '@edition';
 import { useBoolean } from 'minimal-shared/hooks';
 import { varAlpha, mergeClasses } from 'minimal-shared/utils';
 
@@ -27,104 +28,129 @@ import { MainSection, layoutClasses, HeaderSection, LayoutSection } from '../cor
 
 type Props = {
   children?: React.ReactNode;
+  navData?: NavSectionProps['data'];
 };
 
-export const DEVOS_NAV_DATA: NavSectionProps['data'] = [
-  {
-    subheader: 'FINANCEIRO',
-    items: [
-      {
-        title: 'Tesouraria',
-        path: paths.devos.dao,
-        icon: <Iconify icon={'solar:shield-star-bold' as any} />,
-      },
-      {
-        title: 'Carteiras',
-        path: paths.devos.wallets,
-        icon: <Iconify icon={'solar:wallet-bold' as any} />,
-      },
-      {
-        title: 'Livro-Razão',
-        path: paths.devos.ledger,
-        icon: <Iconify icon={'solar:book-bookmark-bold' as any} />,
-      },
-      {
-        title: 'Faturas',
-        path: paths.devos.invoices,
-        icon: <Iconify icon={'solar:bill-list-bold' as any} />,
-      },
-    ],
-  },
-  {
-    subheader: 'OPERAÇÕES',
-    items: [
-      {
-        title: 'Hub Analítico',
-        path: paths.devos.analytics,
-        icon: <Iconify icon={'solar:chart-square-bold' as any} />,
-      },
-      {
-        title: 'Blog',
-        path: paths.devos.blog,
-        icon: <Iconify icon={'solar:document-text-bold' as any} />,
-      },
-    ],
-  },
-  {
-    subheader: 'CONTROL PLANE',
-    items: [
-      {
-        title: 'Observability',
-        path: paths.devos.root,
-        icon: <Iconify icon={'solar:graph-up-bold' as any} />,
-      },
-      {
-        title: 'Database',
-        path: paths.devos.database,
-        icon: <Iconify icon={'solar:database-bold' as any} />,
-      },
-      {
-        title: 'Notificações',
-        path: paths.devos.notifications.root,
-        icon: <Iconify icon={'solar:bell-bing-bold' as any} />,
-      },
-    ],
-  },
-  {
-    subheader: 'SECURITY',
-    items: [
-      {
-        title: 'Security',
-        path: paths.devos.security,
-        icon: <Iconify icon={'solar:shield-keyhole-bold' as any} />,
-      },
-      {
-        title: 'Audit',
-        path: paths.devos.audit,
-        icon: <Iconify icon={'solar:document-text-bold' as any} />,
-      },
-    ],
-  },
-  {
-    subheader: 'INFRASTRUCTURE',
-    items: [
-      {
-        title: 'APIs',
-        path: paths.devos.apis,
-        icon: <Iconify icon={'solar:key-square-bold' as any} />,
-      },
-      {
-        title: 'Infrastructure',
-        path: paths.devos.infrastructure,
-        icon: <Iconify icon={'solar:server-square-bold' as any} />,
-      },
-    ],
-  },
-];
+export function createDevosNavData(editionId?: 'node' | 'cockpit'): NavSectionProps['data'] {
+  const isCockpit = editionId === 'cockpit';
+
+  return [
+    {
+      subheader: 'FINANCEIRO',
+      items: [
+        {
+          title: 'Tesouraria',
+          path: paths.devos.dao,
+          icon: <Iconify icon={'solar:shield-star-bold' as any} />,
+        },
+        {
+          title: 'Carteiras',
+          path: paths.devos.wallets,
+          icon: <Iconify icon={'solar:wallet-bold' as any} />,
+        },
+        {
+          title: 'Livro-Razão',
+          path: paths.devos.ledger,
+          icon: <Iconify icon={'solar:book-bookmark-bold' as any} />,
+        },
+        {
+          title: 'Faturas',
+          path: paths.devos.invoices,
+          icon: <Iconify icon={'solar:bill-list-bold' as any} />,
+        },
+      ],
+    },
+    {
+      subheader: 'OPERAÇÕES',
+      items: [
+        ...(isCockpit
+          ? [
+              {
+                title: 'Banco Imobiliário',
+                path: paths.devos.cadastre,
+                icon: <Iconify icon={'solar:city-bold' as any} />,
+              },
+            ]
+          : []),
+        {
+          title: 'Hub Analítico',
+          path: paths.devos.analytics,
+          icon: <Iconify icon={'solar:chart-square-bold' as any} />,
+        },
+        {
+          title: 'Blog',
+          path: paths.devos.blog,
+          icon: <Iconify icon={'solar:document-text-bold' as any} />,
+        },
+      ],
+    },
+    {
+      subheader: 'CONTROL PLANE',
+      items: [
+        {
+          title: 'Observability',
+          path: paths.devos.root,
+          icon: <Iconify icon={'solar:graph-up-bold' as any} />,
+        },
+        {
+          title: 'Database Explorer',
+          path: paths.devos.database,
+          icon: <Iconify icon={'solar:database-bold' as any} />,
+        },
+        {
+          title: 'Notificações',
+          path: paths.devos.notifications.root,
+          icon: <Iconify icon={'solar:bell-bing-bold' as any} />,
+        },
+      ],
+    },
+    {
+      subheader: 'SECURITY',
+      items: [
+        {
+          title: 'Security',
+          path: paths.devos.security,
+          icon: <Iconify icon={'solar:shield-keyhole-bold' as any} />,
+        },
+        {
+          title: 'Audit',
+          path: paths.devos.audit,
+          icon: <Iconify icon={'solar:document-text-bold' as any} />,
+        },
+      ],
+    },
+    {
+      subheader: 'INFRASTRUCTURE',
+      items: [
+        {
+          title: 'APIs',
+          path: paths.devos.apis,
+          icon: <Iconify icon={'solar:key-square-bold' as any} />,
+        },
+        {
+          title: 'Infrastructure',
+          path: paths.devos.infrastructure,
+          icon: <Iconify icon={'solar:server-square-bold' as any} />,
+        },
+      ],
+    },
+  ];
+}
+
+export const DEVOS_NAV_DATA = createDevosNavData(currentEdition.editionId);
 
 export function getSectionTitle(pathname: string): string {
   if (pathname === paths.devos.root || pathname === `${paths.devos.root}/`) {
     return 'Observability';
+  }
+  if (
+    pathname.startsWith(paths.devos.cadastre) ||
+    pathname.startsWith('/real-estate')
+  ) {
+    return 'Banco de Dados Imobiliário';
+  }
+  if (pathname.startsWith(paths.devos.database)) {
+    return 'Banco de Dados Imobiliário (Explorer)';
   }
   if (pathname.startsWith(paths.devos.dao)) {
     return 'Tesouraria';
@@ -143,9 +169,6 @@ export function getSectionTitle(pathname: string): string {
   }
   if (pathname.startsWith(paths.devos.blog)) {
     return 'Blog';
-  }
-  if (pathname.startsWith(paths.devos.database)) {
-    return 'Database';
   }
   if (pathname.startsWith(paths.devos.notifications.root)) {
     return 'Notificações';
@@ -277,9 +300,10 @@ const NavRoot = styled('div', {
 
 // ----------------------------------------------------------------------
 
-export function DevOSLayout({ children }: Props) {
+export function DevOSLayout({ children, navData: userNavData }: Props) {
   const theme = useTheme();
   const pathname = usePathname();
+  const navData = userNavData ?? DEVOS_NAV_DATA;
 
   const isNavMini = useBoolean(false);
   const mobileNav = useBoolean(false);
@@ -462,7 +486,7 @@ export function DevOSLayout({ children }: Props) {
           </Box>
 
           <NavSectionMini
-            data={DEVOS_NAV_DATA}
+            data={navData}
             sx={[
               {
                 ...theme.mixins.hideScrollY,
@@ -558,7 +582,7 @@ export function DevOSLayout({ children }: Props) {
             }}
           >
             <NavSectionVertical
-              data={DEVOS_NAV_DATA}
+              data={navData}
               sx={{ px: 1.25, flex: '1 0 auto' }}
             />
 
@@ -669,7 +693,7 @@ export function DevOSLayout({ children }: Props) {
         }}
       >
         <NavSectionVertical
-          data={DEVOS_NAV_DATA}
+          data={navData}
           sx={{ px: 1, flex: '1 0 auto' }}
         />
       </Box>
