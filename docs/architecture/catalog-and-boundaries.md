@@ -50,8 +50,8 @@ Cada módulo agrupa componentes, páginas e hooks específicos de um domínio:
 - `vault/`: Interface para desbloqueio do cofre, configuração de senha mestra e fluxos de backup.
 - `ipfs/`: Monitoramento do daemon Kubo, estatísticas de nó e operações de pinning.
 - `real-estate/`: Gestão cadastral imobiliária, importação de lotes de planilhas e auditoria de divergências.
-- `documents/`: Geração declarativa e pré-visualização de documentos/termos utilizando `@react-pdf/renderer`.
-- `reports/`: Relatórios analíticos de reconciliação de lotes e auditorias consolidadas.
+- `documents/`: Infraestrutura transversal e reutilizável de geração de documentos e PDFs baseada em `@react-pdf/renderer` (v4). Concentra templates compartilhados (`DocumentLayout`, `DocumentHeader`, `DocumentFooter`), serviços de compilação em `Blob` e download (`PdfExportService`) e visualização em modal/iframe desktop (`PdfPreviewDialog`). Não possui dependência de nenhum módulo de negócio específico.
+- `reports/`: Coordenação analítica e formatação de relatórios executivos. Obtém dados brutos dos módulos responsáveis (ex: `RealEstateBridge`), compila modelos estruturados (`ReportCompilerService`), define templates de relatório (`RealEstateReconciliationReport`) e consome a infraestrutura pública de `documents` para emitir os PDFs.
 - `audit/`: Apresentação transversal de registros de auditoria e apontamentos.
 - `system/`: Visualização de telemetria e integridade da máquina local.
 
@@ -60,9 +60,23 @@ Cada módulo agrupa componentes, páginas e hooks específicos de um domínio:
 - Nenhuma view em `modules/` ou `app/` deve chamar `@tauri-apps/api/core` diretamente.
 - Concentra a conversão de contratos e normalização de erros nativos.
 
-### 2.4. `shared/` (Biblioteca Reutilizável)
-- Contém componentes visuais reutilizáveis categorizados (`edger-lights`, `primitives`, `data-display`, `forms`, etc.), tokens de tema e funções utilitárias puras.
-- **Regra Rígida:** `shared/` nunca pode importar de `modules/` ou `app/`.
+### 2.4. `shared/components/` (Biblioteca Reutilizável de Interface)
+- Organizada progressivamente em categorias funcionais por responsabilidade:
+  - `data-display/`: Apresentação de dados, métricas, status e cartões (`Card`, `MetricBox`, `StatusBadge`, `Table`, `Chart`).
+  - `edger-lights/`: Componentes e tokens da linha visual institucional (CyberCard, StatusIndicator, GlowText).
+  - `primitives/`: Elementos visuais atômicos básicos (`CyberButton`, ícones).
+  - `forms/`: Componentes de formulários e integração react-hook-form.
+  - `navigation/`: Componentes de navegação e breadcrumbs.
+  - `feedback/`: Diálogos, popovers, telas de carregamento e snackbars.
+  - `media/`: Imagens, thumbnails e ilustrações.
+  - `animation/`: Variantes e utilitários de animação (Framer Motion).
+  - `upload/`: Componentes de seleção e upload de arquivos.
+  - `layout/`: Scrollbars, barras de progresso e utilitários de espaço.
+- **Regra de Preservação e Compatibilidade Retroativa:**
+  - Nenhum componente ou arquivo é excluído.
+  - Ao categorizar um componente para uma subpasta canônica, o caminho antigo é preservado por meio de um arquivo shim de re-exportação (ex: `src/shared/components/Card.tsx` re-exporta de `./data-display/card`).
+  - `src/shared/components/index.ts` serve como ponto de entrada público consolidado.
+- **Regra Rígida de Dependência:** `shared/` nunca pode importar de `modules/`, `app/` ou `platform/tauri/`.
 
 ---
 
