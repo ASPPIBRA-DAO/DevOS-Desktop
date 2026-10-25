@@ -3,6 +3,7 @@
     /* Bundler */
     "paths": {
       "@edition": ["./src/app/editions/edition.node.ts"],
+      "src/components/*": ["./src/shared/components/*"],
       "src/*": ["./src/*"]
     },
     "module": "ESNext",
