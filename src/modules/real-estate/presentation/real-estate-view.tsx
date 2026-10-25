@@ -237,14 +237,74 @@ export function RealEstateView() {
       {/* Seção com Abas de Navegação */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
         <Tabs value={activeTab} onChange={(_, val) => setActiveTab(val)}>
-          <Tab label={`Lotes de Importação (${batches.length})`} />
-          <Tab label={`Apontamentos de Auditoria (${findings.length})`} />
           <Tab label={`Planilha Cadastral (${properties.length})`} />
+          <Tab label={`Apontamentos de Auditoria (${findings.length})`} />
+          <Tab label={`Lotes de Importação (${batches.length})`} />
         </Tabs>
       </Box>
 
-      {/* Aba 0: Lotes de Importação */}
+      {/* Aba 0: Planilha Cadastral Territorial (Espelho do Banco SQLite WAL) */}
       {activeTab === 0 && (
+        <RealEstateSpreadsheetTable
+          properties={properties}
+          preview={preview}
+          isLoading={isLoadingPreview || isImporting}
+          onRefresh={loadStatsAndData}
+          onTriggerPreview={handleGeneratePreview}
+          onTriggerPilot={() => handleExecuteImport(50)}
+        />
+      )}
+
+      {/* Aba 1: Apontamentos de Auditoria */}
+      {activeTab === 1 && (
+        <TableContainer component={Paper} variant="outlined">
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 700 }}>ID</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Categoria</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Gravidade</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Origem</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Descrição</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Status Análise</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Registrado Em</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {findings.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} align="center" sx={{ py: 3, color: colors.text.secondary }}>
+                    Nenhuma inconsistência aberta encontrada.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                findings.map((f) => (
+                  <TableRow key={f.id}>
+                    <TableCell sx={{ fontWeight: 700 }}>#{f.id}</TableCell>
+                    <TableCell>
+                      <Chip size="small" variant="outlined" label={f.category} />
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        size="small"
+                        label={f.severity}
+                        color={f.severity === 'HIGH' ? 'error' : f.severity === 'MEDIUM' ? 'warning' : 'info'}
+                      />
+                    </TableCell>
+                    <TableCell sx={{ fontSize: '0.8rem' }}>{f.source}</TableCell>
+                    <TableCell>{f.description}</TableCell>
+                    <TableCell>{f.analysis_status}</TableCell>
+                    <TableCell sx={{ fontSize: '0.8rem' }}>{f.created_at}</TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
+
+      {/* Aba 2: Lotes de Importação */}
+      {activeTab === 2 && (
         <TableContainer component={Paper} variant="outlined">
           <Table size="small">
             <TableHead>
@@ -308,66 +368,6 @@ export function RealEstateView() {
             </TableBody>
           </Table>
         </TableContainer>
-      )}
-
-      {/* Aba 1: Apontamentos de Auditoria */}
-      {activeTab === 1 && (
-        <TableContainer component={Paper} variant="outlined">
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 700 }}>ID</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Categoria</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Gravidade</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Origem</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Descrição</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Status Análise</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Registrado Em</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {findings.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} align="center" sx={{ py: 3, color: colors.text.secondary }}>
-                    Nenhuma inconsistência aberta encontrada.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                findings.map((f) => (
-                  <TableRow key={f.id}>
-                    <TableCell sx={{ fontWeight: 700 }}>#{f.id}</TableCell>
-                    <TableCell>
-                      <Chip size="small" variant="outlined" label={f.category} />
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        size="small"
-                        label={f.severity}
-                        color={f.severity === 'HIGH' ? 'error' : f.severity === 'MEDIUM' ? 'warning' : 'info'}
-                      />
-                    </TableCell>
-                    <TableCell sx={{ fontSize: '0.8rem' }}>{f.source}</TableCell>
-                    <TableCell>{f.description}</TableCell>
-                    <TableCell>{f.analysis_status}</TableCell>
-                    <TableCell sx={{ fontSize: '0.8rem' }}>{f.created_at}</TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      )}
-
-      {/* Aba 2: Planilha Cadastral Territorial (Espelho do Banco SQLite WAL) */}
-      {activeTab === 2 && (
-        <RealEstateSpreadsheetTable
-          properties={properties}
-          preview={preview}
-          isLoading={isLoadingPreview || isImporting}
-          onRefresh={loadStatsAndData}
-          onTriggerPreview={handleGeneratePreview}
-          onTriggerPilot={() => handleExecuteImport(50)}
-        />
       )}
         </>
       )}
