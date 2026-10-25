@@ -51,6 +51,10 @@ export default defineConfig(({ mode }) => {
           replacement: zodPath,
         },
         {
+          find: /^src\/components\/(.*)/,
+          replacement: path.resolve(process.cwd(), 'src/shared/components/$1'),
+        },
+        {
           find: /^src(.+)/,
           replacement: path.resolve(process.cwd(), 'src/$1'),
         },
