@@ -3,7 +3,6 @@ import type { NavSectionProps } from 'src/components/nav-section';
 
 import { useEffect } from 'react';
 import { Outlet } from 'react-router';
-import currentEdition from '@edition';
 import { useBoolean } from 'minimal-shared/hooks';
 import { varAlpha, mergeClasses } from 'minimal-shared/utils';
 
@@ -31,9 +30,7 @@ type Props = {
   navData?: NavSectionProps['data'];
 };
 
-export function createDevosNavData(editionId?: 'node' | 'cockpit'): NavSectionProps['data'] {
-  const isCockpit = editionId === 'cockpit';
-
+export function createDevosNavData(): NavSectionProps['data'] {
   return [
     {
       subheader: 'FINANCEIRO',
@@ -63,15 +60,11 @@ export function createDevosNavData(editionId?: 'node' | 'cockpit'): NavSectionPr
     {
       subheader: 'OPERAÇÕES',
       items: [
-        ...(isCockpit
-          ? [
-              {
-                title: 'Banco Imobiliário',
-                path: paths.devos.cadastre,
-                icon: <Iconify icon={'solar:city-bold' as any} />,
-              },
-            ]
-          : []),
+        {
+          title: 'Banco Imobiliário',
+          path: paths.devos.cadastre,
+          icon: <Iconify icon={'solar:city-bold' as any} />,
+        },
         {
           title: 'Hub Analítico',
           path: paths.devos.analytics,
@@ -137,7 +130,7 @@ export function createDevosNavData(editionId?: 'node' | 'cockpit'): NavSectionPr
   ];
 }
 
-export const DEVOS_NAV_DATA = createDevosNavData(currentEdition.editionId);
+export const DEVOS_NAV_DATA = createDevosNavData();
 
 export function getSectionTitle(pathname: string): string {
   if (pathname === paths.devos.root || pathname === `${paths.devos.root}/`) {
