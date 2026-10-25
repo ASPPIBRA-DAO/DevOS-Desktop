@@ -78,4 +78,15 @@ export interface PropertySummary {
   identifier_type: string | null;
   address: string | null;
   created_at: string;
+  // Campos enriquecidos para exibição em formato de planilha
+  matricula?: string | null;
+  titular?: string | null;
+  bairro?: string | null;
+  rua?: string | null;
+  numero?: string | null;
+  quadra?: string | null;
+  lote?: string | null;
+  complemento?: string | null;
+  status?: string;
 }
+

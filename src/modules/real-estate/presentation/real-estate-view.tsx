@@ -21,6 +21,7 @@ import { StatusBadge } from '../../../shared/components/StatusBadge';
 import { RealEstateMetricsBar } from './components/real-estate-metrics-bar';
 import { TerritorialHubSelector } from './components/territorial-hub-selector';
 import { RealEstateImporterCard } from './components/real-estate-importer-card';
+import { RealEstateSpreadsheetTable } from './components/real-estate-spreadsheet-table';
 import {
   RealEstateBridge,
   type PropertySummary,
@@ -238,7 +239,7 @@ export function RealEstateView() {
         <Tabs value={activeTab} onChange={(_, val) => setActiveTab(val)}>
           <Tab label={`Lotes de Importação (${batches.length})`} />
           <Tab label={`Apontamentos de Auditoria (${findings.length})`} />
-          <Tab label={`Imóveis Cadastrados (${properties.length})`} />
+          <Tab label={`Planilha Cadastral (${properties.length})`} />
         </Tabs>
       </Box>
 
@@ -357,46 +358,16 @@ export function RealEstateView() {
         </TableContainer>
       )}
 
-      {/* Aba 2: Imóveis Cadastrados */}
+      {/* Aba 2: Planilha Cadastral Territorial (Espelho do Banco SQLite WAL) */}
       {activeTab === 2 && (
-        <TableContainer component={Paper} variant="outlined">
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 700 }}>ID</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>UUID Imóvel</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Matrícula de Origem</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Tipo Identificador</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Endereço Formatado</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Data Criação</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {properties.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 3, color: colors.text.secondary }}>
-                    Nenhum imóvel cadastrado no banco local.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                properties.map((p) => (
-                  <TableRow key={p.id}>
-                    <TableCell sx={{ fontWeight: 700 }}>#{p.id}</TableCell>
-                    <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>
-                      {p.uuid.substring(0, 8)}...
-                    </TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>{p.identifier || '—'}</TableCell>
-                    <TableCell sx={{ fontSize: '0.8rem' }}>
-                      <Chip size="small" variant="outlined" label={p.identifier_type || 'NÃO CLASSIFICADO'} />
-                    </TableCell>
-                    <TableCell>{p.address || '—'}</TableCell>
-                    <TableCell sx={{ fontSize: '0.8rem' }}>{p.created_at}</TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
+        <RealEstateSpreadsheetTable
+          properties={properties}
+          preview={preview}
+          isLoading={isLoadingPreview || isImporting}
+          onRefresh={loadStatsAndData}
+          onTriggerPreview={handleGeneratePreview}
+          onTriggerPilot={() => handleExecuteImport(50)}
+        />
       )}
         </>
       )}

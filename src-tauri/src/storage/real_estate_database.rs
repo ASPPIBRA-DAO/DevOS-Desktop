@@ -51,7 +51,7 @@ pub struct AuditFindingSummary {
     pub created_at: String,
 }
 
-/// Resumo de imóvel cadastrado
+/// Resumo de imóvel cadastrado enriquecido com dados da planilha e auditoria
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PropertySummary {
     pub id: i64,
@@ -60,6 +60,16 @@ pub struct PropertySummary {
     pub identifier_type: Option<String>,
     pub address: Option<String>,
     pub created_at: String,
+    // Campos enriquecidos para exibição em formato de planilha
+    pub matricula: Option<String>,
+    pub titular: Option<String>,
+    pub bairro: Option<String>,
+    pub rua: Option<String>,
+    pub numero: Option<String>,
+    pub quadra: Option<String>,
+    pub lote: Option<String>,
+    pub complemento: Option<String>,
+    pub status: String,
 }
 
 /// Banco de dados local SQLite dedicado exclusivamente ao Cadastro Imobiliário (DevOS Cockpit)
@@ -385,27 +395,73 @@ impl RealEstateDatabase {
         Ok(findings)
     }
 
-    /// Lista amostra de imóveis cadastrados
+    /// Lista imóveis cadastrados enriquecidos com dados de planilha e auditoria
     pub fn list_properties(&self, limit: usize) -> Result<Vec<PropertySummary>, StorageError> {
         let conn = self.get_connection()?;
         let mut stmt = conn.prepare(
-            "SELECT p.id, p.uuid, i.raw_value, i.identifier_type, a.raw_address, p.created_at
+            "SELECT 
+                p.id, 
+                p.uuid, 
+                (SELECT pi.raw_value FROM property_identifiers pi WHERE pi.property_id = p.id AND pi.identifier_type LIKE '%MATRICULA%' ORDER BY pi.id ASC LIMIT 1) AS matricula,
+                (SELECT pi.raw_value FROM property_identifiers pi WHERE pi.property_id = p.id AND pi.identifier_type = 'TITULAR_DECLARADO' ORDER BY pi.id ASC LIMIT 1) AS titular,
+                a.neighborhood,
+                a.street,
+                a.number,
+                a.complement,
+                a.raw_address,
+                (SELECT COUNT(*) FROM audit_findings af WHERE af.property_id = p.id AND af.analysis_status = 'OPEN') AS open_findings_count,
+                p.created_at
              FROM properties p
-             LEFT JOIN property_identifiers i ON i.property_id = p.id
              LEFT JOIN property_address_links pal ON pal.property_id = p.id AND pal.is_primary = 1
              LEFT JOIN addresses a ON a.id = pal.address_id
-             GROUP BY p.id
              ORDER BY p.id DESC LIMIT ?1",
         )?;
 
         let prop_iter = stmt.query_map([limit as i64], |row| {
+            let id: i64 = row.get(0)?;
+            let uuid: String = row.get(1)?;
+            let matricula: Option<String> = row.get(2)?;
+            let titular: Option<String> = row.get(3)?;
+            let neighborhood: Option<String> = row.get(4)?;
+            let street: Option<String> = row.get(5)?;
+            let number: Option<String> = row.get(6)?;
+            let complement: Option<String> = row.get(7)?;
+            let raw_addr: Option<String> = row.get(8)?;
+            let open_findings: i64 = row.get(9)?;
+            let created_at: String = row.get(10)?;
+
+            let quadra = raw_addr.as_deref().and_then(|r| parse_address_token(r, "Qd:"));
+            let lote = raw_addr.as_deref().and_then(|r| parse_address_token(r, "Lt:"));
+
+            let status = if open_findings > 0 {
+                "COM_INCONSISTENCIA".to_string()
+            } else {
+                "NORMALIZADO".to_string()
+            };
+
+            let identifier = matricula.clone();
+            let identifier_type = if matricula.is_some() {
+                Some("MATRICULA".to_string())
+            } else {
+                Some("ORIGEM_FISICA".to_string())
+            };
+
             Ok(PropertySummary {
-                id: row.get(0)?,
-                uuid: row.get(1)?,
-                identifier: row.get(2)?,
-                identifier_type: row.get(3)?,
-                address: row.get(4)?,
-                created_at: row.get(5)?,
+                id,
+                uuid,
+                identifier,
+                identifier_type,
+                address: raw_addr,
+                created_at,
+                matricula,
+                titular,
+                bairro: neighborhood,
+                rua: street,
+                numero: number,
+                quadra,
+                lote,
+                complemento: complement,
+                status,
             })
         })?;
 
@@ -458,4 +514,18 @@ impl RealEstateDatabase {
         conn.query_row("PRAGMA quick_check;", [], |_| Ok(()))?;
         Ok(())
     }
+}
+
+/// Extrai componente rotulado do endereço original (ex: 'Qd: 10', 'Lt: 05')
+fn parse_address_token(raw_addr: &str, token_prefix: &str) -> Option<String> {
+    for part in raw_addr.split('|') {
+        let trimmed = part.trim();
+        if let Some(val) = trimmed.strip_prefix(token_prefix) {
+            let clean = val.trim();
+            if !clean.is_empty() {
+                return Some(clean.to_string());
+            }
+        }
+    }
+    None
 }
