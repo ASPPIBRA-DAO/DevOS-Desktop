@@ -1,7 +1,4 @@
-import React, { useMemo } from 'react';
-
-import CssBaseline from '@mui/material/CssBaseline';
-import { createTheme, ThemeProvider as MuiThemeProvider } from '@mui/material/styles';
+import { createTheme } from '@mui/material/styles';
 
 import { colors } from './palette';
 import { typography } from './typography';
@@ -79,13 +76,3 @@ export const devosTheme = createTheme({
   },
 });
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const theme = useMemo(() => devosTheme, []);
-
-  return (
-    <MuiThemeProvider theme={theme}>
-      <CssBaseline />
-      {children}
-    </MuiThemeProvider>
-  );
-}
