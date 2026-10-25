@@ -42,24 +42,24 @@ O DevOS Desktop utiliza uma arquitetura em camadas estrita para isolar o código
 
 ## 2. Inventário Completo dos Comandos Tauri v2
 
-O backend Rust registra **21 comandos nativos** organizados em 5 submódulos de comandos.
+O backend Rust registra **21 comandos nativos** organizados em 5 submódulos de comandos em `src-tauri/src/commands/`.
 
 | # | Comando Tauri Público | Módulo Rust | Função Rust | Bridge TypeScript | Capability Tauri v2 |
 |---|-----------------------|-------------|-------------|-------------------|---------------------|
-| 1 | `get_device_status` | `commands::system_commands` | `get_device_status` | `SystemBridge.getDeviceStatus()` | `default.json` |
-| 2 | `get_vault_status` | `commands::vault_commands` | `get_vault_status` | `VaultBridge.getStatus()` | `default.json` |
-| 3 | `init_master_password` | `commands::vault_commands` | `init_master_password` | `VaultBridge.initMasterPassword()` | `default.json` |
-| 4 | `unlock_vault` | `commands::vault_commands` | `unlock_vault` | `VaultBridge.unlock()` | `default.json` |
-| 5 | `export_authorized_secret` | `commands::vault_commands` | `export_authorized_secret` | `VaultBridge.exportAuthorizedSecret()` | `default.json` |
-| 6 | `export_vault_backup` | `commands::vault_commands` | `export_vault_backup` | `VaultBridge.exportBackup()` | `default.json` |
-| 7 | `restore_vault_backup` | `commands::vault_commands` | `restore_vault_backup` | `VaultBridge.restoreBackup()` | `default.json` |
-| 8 | `generate_seed_and_preview` | `commands::wallet_commands` | `generate_seed_and_preview` | `WalletBridge.generateSeedAndPreview()` | `default.json` |
-| 9 | `reveal_pending_mnemonic` | `commands::wallet_commands` | `reveal_pending_mnemonic` | `WalletBridge.revealPendingMnemonic()` | `default.json` |
-| 10 | `cancel_pending_creation` | `commands::wallet_commands` | `cancel_pending_creation` | `WalletBridge.cancelPendingCreation()` | `default.json` |
-| 11 | `confirm_and_save_wallets` | `commands::wallet_commands` | `confirm_and_save_wallets` | `WalletBridge.confirmAndSaveWallets()` | `default.json` |
-| 12 | `list_stored_wallets` | `commands::wallet_commands` | `list_stored_wallets` | `WalletBridge.listStoredWallets()` | `default.json` |
-| 13 | `fetch_wallet_balance` | `commands::monitoring_commands` | `fetch_wallet_balance` | `MonitoringBridge.fetchWalletBalance()` | `default.json` |
-| 14 | `batch_fetch_wallet_balances` | `commands::monitoring_commands` | `batch_fetch_wallet_balances` | `MonitoringBridge.batchFetchWalletBalances()` | `default.json` |
+| 1 | `get_device_status` | `commands::system_commands` | `get_device_status` | `SystemBridge.getDeviceStatus()` | `desktop-vault.json` |
+| 2 | `get_vault_status` | `commands::vault_commands` | `get_vault_status` | `VaultBridge.getStatus()` | `desktop-vault.json` |
+| 3 | `init_master_password` | `commands::vault_commands` | `init_master_password` | `VaultBridge.initMasterPassword()` | `desktop-vault.json` |
+| 4 | `unlock_vault` | `commands::vault_commands` | `unlock_vault` | `VaultBridge.unlock()` | `desktop-vault.json` |
+| 5 | `export_authorized_secret` | `commands::vault_commands` | `export_authorized_secret` | `VaultBridge.exportAuthorizedSecret()` | `desktop-vault.json` |
+| 6 | `export_vault_backup` | `commands::vault_commands` | `export_vault_backup` | `VaultBridge.exportBackup()` | `desktop-vault.json` |
+| 7 | `restore_vault_backup` | `commands::vault_commands` | `restore_vault_backup` | `VaultBridge.restoreBackup()` | `desktop-vault.json` |
+| 8 | `generate_seed_and_preview` | `commands::wallet_commands` | `generate_seed_and_preview` | `WalletBridge.generateSeedAndPreview()` | `desktop-vault.json` |
+| 9 | `reveal_pending_mnemonic` | `commands::wallet_commands` | `reveal_pending_mnemonic` | `WalletBridge.revealPendingMnemonic()` | `desktop-vault.json` |
+| 10 | `cancel_pending_creation` | `commands::wallet_commands` | `cancel_pending_creation` | `WalletBridge.cancelPendingCreation()` | `desktop-vault.json` |
+| 11 | `confirm_and_save_wallets` | `commands::wallet_commands` | `confirm_and_save_wallets` | `WalletBridge.confirmAndSaveWallets()` | `desktop-vault.json` |
+| 12 | `list_stored_wallets` | `commands::wallet_commands` | `list_stored_wallets` | `WalletBridge.listStoredWallets()` | `desktop-vault.json` |
+| 13 | `fetch_wallet_balance` | `commands::monitoring_commands` | `fetch_wallet_balance` | `MonitoringBridge.fetchWalletBalance()` | `desktop-vault.json` |
+| 14 | `batch_fetch_wallet_balances` | `commands::monitoring_commands` | `batch_fetch_wallet_balances` | `MonitoringBridge.batchFetchWalletBalances()` | `desktop-vault.json` |
 | 15 | `get_real_estate_stats` | `commands::real_estate_commands` | `get_real_estate_stats` | `RealEstateBridge.getStats()` | `cockpit-real-estate.json` |
 | 16 | `preview_real_estate_import` | `commands::real_estate_commands` | `preview_real_estate_import` | `RealEstateBridge.previewImport()` | `cockpit-real-estate.json` |
 | 17 | `execute_real_estate_import` | `commands::real_estate_commands` | `execute_real_estate_import` | `RealEstateBridge.executeImport()` | `cockpit-real-estate.json` |
@@ -67,6 +67,26 @@ O backend Rust registra **21 comandos nativos** organizados em 5 submódulos de 
 | 19 | `list_audit_findings` | `commands::real_estate_commands` | `list_audit_findings` | `RealEstateBridge.listFindings()` | `cockpit-real-estate.json` |
 | 20 | `list_properties` | `commands::real_estate_commands` | `list_properties` | `RealEstateBridge.listProperties()` | `cockpit-real-estate.json` |
 | 21 | `select_spreadsheet_file` | `commands::real_estate_commands` | `select_spreadsheet_file` | `RealEstateBridge.selectFile()` | `cockpit-real-estate.json` |
+
+### 2.1. Papel das Capabilities e Menor Privilégio por Edição
+
+O modelo de controle de acesso do Tauri v2 baseia-se em capabilities granulares vinculadas a rótulos de janelas e perfis de segurança:
+
+1. **`default.json` (Menor Privilégio Absoluto):**
+   - Configurado com `"permissions": []`.
+   - Não concede autorização a nenhum comando da aplicação. Serve como baseline de segurança para assegurar que janelas sem capabilities específicas não herdem permissões implícitas.
+2. **`desktop-vault.json` (Sistema, Cofre, Carteiras e Monitoramento):**
+   - Concede permissões para os comandos 1 a 14 para a janela `main`.
+   - É ativado **em ambas as edições** (`DevOS Cockpit` e `DevOS Node`), permitindo a operação de custódia local, sessões protegidas e consulta de telemetria RPC.
+3. **`cockpit-real-estate.json` (Cadastro Imobiliário e Reconciliação):**
+   - Concede permissões exclusivas para os comandos 15 a 21 para a janela `main`.
+   - É carregado **exclusivamente na edição Cockpit** (`tauri.cockpit.conf.json`).
+
+> **Fronteira Específica entre Edições vs Comandos Compartilhados:**  
+> A fronteira arquitetural entre as edições Cockpit e Node reside **especificamente na segregação das funcionalidades do Cadastro Imobiliário**, as quais são totalmente inacessíveis à edição Node. Os comandos de cofre e carteiras são compartilhados por desenho institucional, pois ambas as edições necessitam de identidade criptográfica e custódia local.
+
+> **Evidências Estáticas vs Comportamentos Comprovados por Execução:**  
+> A configuração estática do Tauri (`AppManifest::commands` e arquivos `.conf.json`) impede que a interface da edição Node invoque comandos imobiliários via ACL. Essa restrição estática é reforçada em tempo de execução pelo backend Rust, que não inicializa o `RealEstateDatabase` no modo Node e valida a presença do estado via `get_cockpit_re_db`. Adicionalmente, as operações sensíveis do cofre exigem validação criptográfica ativa da senha mestre (Argon2id), assegurando defesa em profundidade.
 
 ---
 
