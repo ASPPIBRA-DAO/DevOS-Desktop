@@ -13,9 +13,13 @@ import CircularProgress from '@mui/material/CircularProgress';
 
 import { Card } from '../../../shared/components/Card';
 import { colors } from '../../../shared/theme/palette';
+import { VaultStatusMetric } from '../../../modules/wallets';
+// Componentes modulares de domínio
+import { HostIntegrityCard } from '../../../modules/identity';
 import { MetricBox } from '../../../shared/components/MetricBox';
 import { formatAsppbr } from '../../../shared/utils/format-number';
 import { StatusBadge } from '../../../shared/components/StatusBadge';
+import { StorageProofCard, IpfsDaemonMetric } from '../../../modules/ipfs';
 import {
   IpfsBridge,
   SystemBridge,
@@ -166,25 +170,11 @@ export function NodeDashboardPage() {
           accentColor={colors.success.main}
         />
 
-        <MetricBox
-          label="Cofre Nativo Local"
-          value={
-            vaultStatus?.is_initialized
-              ? vaultStatus.is_unlocked
-                ? 'Desbloqueado'
-                : 'Trancado'
-              : 'Não Inicializado'
-          }
-          subtext={`${vaultStatus?.dao_wallets_count || 0} carteiras persistidas no SQLite`}
-          accentColor={vaultStatus?.is_unlocked ? colors.success.main : colors.warning.main}
-        />
+        {/* Métrica do Módulo de Carteiras / Cofre */}
+        <VaultStatusMetric status={vaultStatus} />
 
-        <MetricBox
-          label="Daemon IPFS Local"
-          value={ipfsStatus?.running ? `${ipfsStatus.peers_count || 0} Peers` : 'Inativo'}
-          subtext={ipfsStatus?.running ? 'Kubo daemon operacional' : 'Aguardando inicialização'}
-          accentColor={ipfsStatus?.running ? colors.primary.main : colors.text.disabled}
-        />
+        {/* Métrica do Módulo IPFS */}
+        <IpfsDaemonMetric status={ipfsStatus} />
       </Box>
 
       {/* Painéis Detalhados */}
@@ -198,82 +188,11 @@ export function NodeDashboardPage() {
           gap: 2.5,
         }}
       >
-        {/* Painel do Dispositivo Host */}
-        <Card variant="glass">
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-            <Typography variant="h5" sx={{ fontWeight: 700 }}>
-              Integridade do Host
-            </Typography>
-            <StatusBadge
-              status={deviceStatus?.status || 'UNINITIALIZED'}
-              label={deviceStatus?.status || 'UNINITIALIZED'}
-            />
-          </Box>
+        {/* Painel do Dispositivo Host (Módulo Identity) */}
+        <HostIntegrityCard deviceStatus={deviceStatus} isDesktop={isDesktop} />
 
-          <Typography variant="body2" sx={{ color: colors.text.secondary, mb: 2.5 }}>
-            O núcleo nativo Rust executa em sandbox com controle estrito de privilégios (Zero-Privilege Capability Manifest).
-          </Typography>
-
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1, borderBottom: `1px solid ${colors.background.border}` }}>
-              <Typography variant="body2" sx={{ color: colors.text.secondary }}>Ambiente de Execução:</Typography>
-              <Typography variant="body2" sx={{ fontWeight: 600, color: colors.primary.light }}>
-                {isDesktop ? 'Tauri v2 Desktop Nativo (Linux)' : 'Web Browser Preview'}
-              </Typography>
-            </Box>
-
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1, borderBottom: `1px solid ${colors.background.border}` }}>
-              <Typography variant="body2" sx={{ color: colors.text.secondary }}>Dispositivo Inscrito:</Typography>
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                {deviceStatus?.enrolled ? 'Sim (Hardware Vinculado)' : 'Não (Aguardando Enrollment)'}
-              </Typography>
-            </Box>
-
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1 }}>
-              <Typography variant="body2" sx={{ color: colors.text.secondary }}>Isolamento de Segredos:</Typography>
-              <Typography variant="body2" sx={{ fontWeight: 600, color: colors.success.light }}>
-                Ativo (Argon2id + Zeroize em RAM)
-              </Typography>
-            </Box>
-          </Box>
-        </Card>
-
-        {/* Protocolo de Prova DePIN (ADR-012) */}
-        <Card variant="glass">
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-            <Typography variant="h5" sx={{ fontWeight: 700 }}>
-              Prova de Armazenamento DePIN
-            </Typography>
-            <StatusBadge status="ACTIVE" label="Pull Protocol (ADR-012)" />
-          </Box>
-
-          <Typography variant="body2" sx={{ color: colors.text.secondary, mb: 2.5 }}>
-            O nó opera em modo Pull (sem expor portas residuais a inbound NAT). Os desafios de storage do cluster são autenticados via chave operacional dedicada.
-          </Typography>
-
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1, borderBottom: `1px solid ${colors.background.border}` }}>
-              <Typography variant="body2" sx={{ color: colors.text.secondary }}>Algoritmo de Prova:</Typography>
-              <Typography variant="body2" sx={{ fontWeight: 600, fontFamily: 'monospace' }}>
-                SHA256(ServerNonce || RawBlockBytes)
-              </Typography>
-            </Box>
-
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1, borderBottom: `1px solid ${colors.background.border}` }}>
-              <Typography variant="body2" sx={{ color: colors.text.secondary }}>Tolerância a Desconexão:</Typography>
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                Janela de 24h para contestação
-              </Typography>
-            </Box>
-
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1 }}>
-              <Typography variant="body2" sx={{ color: colors.text.secondary }}>Canal de Telemetria:</Typography>
-              <Typography variant="body2" sx={{ fontWeight: 600, color: colors.primary.light }}>
-                Autenticado via WebSocket TLS
-              </Typography>
-            </Box>
-          </Box>
-        </Card>
+        {/* Protocolo de Prova DePIN (Módulo IPFS) */}
+        <StorageProofCard />
       </Box>
     </Box>
   );
@@ -281,3 +200,4 @@ export function NodeDashboardPage() {
 
 // Alias de compatibilidade com nomenclatura anterior
 export const NodeDashboardView = NodeDashboardPage;
+
