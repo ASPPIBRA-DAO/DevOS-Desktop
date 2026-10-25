@@ -1,7 +1,7 @@
 import type { EditionConfig } from './types';
 
+import { CockpitDashboardPage } from './cockpit/cockpit-dashboard-page';
 import { RealEstateView } from '../../modules/real-estate/presentation/real-estate-view';
-import { CockpitDashboardView } from '../../modules/ipfs/presentation/cockpit-dashboard-view';
 
 export const currentEdition: EditionConfig = {
   editionId: 'cockpit',
@@ -13,7 +13,7 @@ export const currentEdition: EditionConfig = {
       path: '/',
       label: 'Visão Geral',
       icon: 'solar:widget-5-bold-duotone',
-      component: CockpitDashboardView,
+      component: CockpitDashboardPage,
     },
     {
       path: '/real-estate',
