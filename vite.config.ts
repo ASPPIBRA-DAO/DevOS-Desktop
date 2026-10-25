@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import path from 'path';
 import checker from 'vite-plugin-checker';
 import { defineConfig } from 'vite';
@@ -76,6 +77,10 @@ export default defineConfig(({ mode }) => {
           manualChunks: undefined,
         },
       },
+    },
+    test: {
+      globals: true,
+      setupFiles: ['./src/test/setup.ts'],
     },
   };
 });
