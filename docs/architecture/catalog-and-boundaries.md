@@ -65,10 +65,20 @@ Cada módulo agrupa componentes, páginas e hooks específicos de um domínio:
 - `audit/`: Apresentação transversal de registros de auditoria e apontamentos.
 - `system/`: Visualização de telemetria e integridade da máquina local.
 
-### 2.3. `platform/tauri/` (Camada Anti-Corrupção / Bridges)
+### 2.3. `platform/tauri/` (Camada Anti-Corrupção, Contratos e Bridges)
 - É a **única camada autorizada a invocar comandos Tauri** (`invokeNative`).
 - Nenhuma view em `modules/` ou `app/` deve chamar `@tauri-apps/api/core` diretamente.
 - Concentra a conversão de contratos e normalização de erros nativos.
+- **Estrutura Canônica Consolidada (Onda 5):**
+  - `core/`: Transporte IPC seguro (`invoke.ts`), verificação de ambiente desktop e normalização de exceções nativas com categorização padronizada (`tauri-errors.ts`).
+  - `contracts/`: Definição canônica de DTOs, interfaces e erros IPC tipados (`system-contracts.ts`, `vault-contracts.ts`, `wallet-contracts.ts`, `monitoring-contracts.ts`, `real-estate-contracts.ts`, `ipc-errors.ts`).
+  - `vault/vault-bridge.ts`: Operações de ciclo de vida do cofre, senha mestre, desbloqueio e backups atômicos.
+  - `wallets/wallet-bridge.ts`: Criação de carteiras, sessões BIP-39/44 protegidas em memória e listagem com persistência.
+  - `monitoring/monitoring-bridge.ts`: Consultas de telemetria RPC multichain e saldos de carteiras.
+  - `real-estate/real-estate-bridge.ts`: Gestão cadastral imobiliária, importação de planilhas e auditoria de divergências.
+  - `system/system-bridge.ts`: Status de registro e integridade do dispositivo host.
+  - `ipfs/ipfs-bridge.ts`: Interação com o nó IPFS local.
+  - Para detalhes exatos de mapeamento, matriz de comandos e capabilities, consulte [docs/architecture/ipc-contracts.md](file:///home/sandro/%C3%81rea%20de%20trabalho/App%20Desktop/DevOS-Desktop/docs/architecture/ipc-contracts.md).
 
 ### 2.4. `shared/components/` (Biblioteca Reutilizável de Interface)
 - Organizada progressivamente em categorias funcionais por responsabilidade:
