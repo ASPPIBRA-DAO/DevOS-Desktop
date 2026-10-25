@@ -5,8 +5,8 @@ import { CockpitDashboardPage } from './cockpit/cockpit-dashboard-page';
 
 export const currentEdition: EditionConfig = {
   editionId: 'cockpit',
-  name: 'DevOS Cockpit',
-  subtitle: 'Coordenação Institucional & Fundadores',
+  name: 'DevOS Admin',
+  subtitle: 'Administração Institucional & Fundadores',
   bundleId: 'br.aspp.devos.cockpit',
   routes: [
     {
