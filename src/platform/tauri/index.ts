@@ -5,6 +5,6 @@ export * from './core/tauri-errors';
 export * from './vault/vault-bridge';
 export * from './system/system-bridge';
 export * from './wallets/wallet-bridge';
+export * from './documents/document-bridge';
 export * from './monitoring/monitoring-bridge';
 export * from './real-estate/real-estate-bridge';
-
