@@ -13,12 +13,12 @@ export function CockpitDashboardPage() {
       <Box sx={{ mb: 4, pb: 3, borderBottom: `1px solid ${colors.background.border}` }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.75 }}>
           <Typography variant="h3" sx={{ fontWeight: 800 }}>
-            DevOS Cockpit
+            DevOS Admin
           </Typography>
-          <StatusBadge status="ACTIVE" label="Edição Fundadores" />
+          <StatusBadge status="ACTIVE" label="Edição Administrador" />
         </Box>
         <Typography variant="body2" sx={{ color: colors.text.secondary }}>
-          Painel Institucional de Coordenação de Cluster & Governança ASPPIBRA DAO
+          Painel Institucional de Administração de Cluster & Governança ASPPIBRA DAO
         </Typography>
       </Box>
 
