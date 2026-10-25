@@ -1,9 +1,8 @@
+import type { DeviceStatusResponse } from '../contracts/system-contracts';
+
 import { invokeNative } from '../core/invoke';
 
-export interface DeviceStatusResponse {
-  enrolled: boolean;
-  status: string;
-}
+export type { DeviceStatusResponse };
 
 export const SystemBridge = {
   /**
