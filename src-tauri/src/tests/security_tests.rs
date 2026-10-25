@@ -223,3 +223,44 @@ fn test_cockpit_real_estate_capability_file_exists() {
     assert!(content.contains("allow-execute-real-estate-import"));
     assert!(content.contains("cockpit-real-estate"));
 }
+
+#[test]
+fn test_node_edition_excludes_cockpit_real_estate_capability() {
+    let node_conf_path = Path::new("tauri.node.conf.json");
+    assert!(
+        node_conf_path.exists(),
+        "tauri.node.conf.json deve existir para validar as capabilities da edição Node"
+    );
+
+    let content = fs::read_to_string(node_conf_path).expect("falha ao ler tauri.node.conf.json");
+    let parsed: serde_json::Value =
+        serde_json::from_str(&content).expect("JSON inválido em tauri.node.conf.json");
+
+    let capabilities = parsed
+        .get("app")
+        .and_then(|app| app.get("security"))
+        .and_then(|sec| sec.get("capabilities"))
+        .and_then(|caps| caps.as_array())
+        .expect(
+            "campo 'app.security.capabilities' deve existir como array em tauri.node.conf.json",
+        );
+
+    let has_cockpit_re = capabilities
+        .iter()
+        .any(|cap| cap.as_str() == Some("cockpit-real-estate"));
+
+    assert!(
+        !has_cockpit_re,
+        "VIOLAÇÃO DE SEGURANÇA: A edição Node não deve conter a capability 'cockpit-real-estate', mas ela foi encontrada em tauri.node.conf.json: {:?}",
+        capabilities
+    );
+
+    let has_desktop_vault = capabilities
+        .iter()
+        .any(|cap| cap.as_str() == Some("desktop-vault"));
+
+    assert!(
+        has_desktop_vault,
+        "A edição Node deve conter a capability 'desktop-vault' para operações locais de custódia e carteiras"
+    );
+}
