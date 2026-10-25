@@ -1,6 +1,6 @@
 import type { EditionConfig } from './types';
 
-import { NodeDashboardView } from '../../modules/ipfs/presentation/node-dashboard-view';
+import { NodeDashboardPage } from './node/node-dashboard-page';
 
 export const currentEdition: EditionConfig = {
   editionId: 'node',
@@ -12,7 +12,7 @@ export const currentEdition: EditionConfig = {
       path: '/',
       label: 'Painel do Nó',
       icon: 'solar:server-square-bold-duotone',
-      component: NodeDashboardView,
+      component: NodeDashboardPage,
     },
   ],
 };
