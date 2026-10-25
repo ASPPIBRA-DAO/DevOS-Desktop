@@ -19,6 +19,7 @@ import { ReconciliationReportButton } from '../../reports';
 import { Iconify } from '../../../shared/components/iconify';
 import { StatusBadge } from '../../../shared/components/StatusBadge';
 import { RealEstateMetricsBar } from './components/real-estate-metrics-bar';
+import { TerritorialHubSelector } from './components/territorial-hub-selector';
 import { RealEstateImporterCard } from './components/real-estate-importer-card';
 import {
   RealEstateBridge,
@@ -40,6 +41,15 @@ export function RealEstateView() {
   const [executionReport, setExecutionReport] = useState<ImportExecutionReport | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState(0);
+
+  // Controle Hierárquico Territorial (Estado / Município)
+  const [selectedStateUf, setSelectedStateUf] = useState('RJ');
+  const [selectedCityId, setSelectedCityId] = useState<string | null>(() => {
+    if (typeof window !== 'undefined' && window.location.hash.includes('city=marica')) {
+      return 'marica';
+    }
+    return null;
+  });
 
   // Dados auxiliares para as abas
   const [batches, setBatches] = useState<ImportBatchSummary[]>([]);
@@ -106,41 +116,103 @@ export function RealEstateView() {
 
   return (
     <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: 1400, mx: 'auto' }}>
-      {/* Header Institucional */}
-      <Box sx={{ mb: 4, pb: 3, borderBottom: `1px solid ${colors.background.border}` }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2, mb: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <Typography variant="h3" sx={{ fontWeight: 800 }}>
-              Cadastro Imobiliário & Auditoria
+      {/* 1. VISÃO A: HUB TERRITORIAL (SELETOR DE ESTADOS E MUNICÍPIOS) */}
+      {!selectedCityId ? (
+        <TerritorialHubSelector
+          selectedStateUf={selectedStateUf}
+          onSelectState={setSelectedStateUf}
+          onSelectCity={(cityId) => setSelectedCityId(cityId)}
+          stats={stats}
+        />
+      ) : (
+        /* 2. VISÃO B: AMBIENTE DE ANÁLISE E FILTRAGEM DO MUNICÍPIO SELECIONADO */
+        <>
+          {/* Barra de Navegação e Contexto Municipal */}
+          <Box
+            sx={{
+              mb: 3.5,
+              p: 2,
+              borderRadius: 2,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: 2,
+              background: 'linear-gradient(135deg, rgba(0, 167, 111, 0.08) 0%, rgba(15, 23, 42, 0.04) 100%)',
+              border: '1px solid rgba(0, 167, 111, 0.25)',
+              boxShadow: '0 4px 16px -2px rgba(0, 167, 111, 0.08)',
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => setSelectedCityId(null)}
+                startIcon={<Iconify icon="solar:arrow-left-bold" />}
+                sx={{
+                  fontWeight: 700,
+                  bgcolor: 'background.paper',
+                  borderColor: 'rgba(0, 167, 111, 0.4)',
+                  '&:hover': {
+                    bgcolor: 'rgba(0, 167, 111, 0.1)',
+                    borderColor: colors.primary.main,
+                  },
+                }}
+              >
+                Trocar Estado / Município
+              </Button>
+
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'text.secondary', fontSize: '0.85rem' }}>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>Brasil</Typography>
+                <Typography variant="caption" sx={{ color: 'text.disabled' }}>❯</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>Rio de Janeiro (RJ)</Typography>
+                <Typography variant="caption" sx={{ color: 'text.disabled' }}>❯</Typography>
+                <Chip
+                  size="small"
+                  label="Maricá (Base Ativa)"
+                  color="primary"
+                  sx={{ fontWeight: 800, fontSize: '0.75rem' }}
+                />
+              </Box>
+            </Box>
+
+            <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+              <ReconciliationReportButton stats={stats} batches={batches} findings={findings} />
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={loadStatsAndData}
+                startIcon={<Iconify icon="solar:restart-bold" />}
+              >
+                Atualizar Painel
+              </Button>
+            </Box>
+          </Box>
+
+          {/* Header Institucional de Maricá */}
+          <Box sx={{ mb: 4, pb: 2.5, borderBottom: `1px solid ${colors.background.border}` }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2, mb: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <Typography variant="h3" sx={{ fontWeight: 800 }}>
+                  Maricá — Cadastro Territorial & Auditoria
+                </Typography>
+                <StatusBadge status="ACTIVE" label="Base Operacional" />
+                <Chip
+                  size="small"
+                  label="real_estate.sqlite (WAL)"
+                  sx={{
+                    bgcolor: 'rgba(0, 167, 111, 0.12)',
+                    color: colors.primary.main,
+                    fontWeight: 700,
+                    fontSize: '0.75rem',
+                  }}
+                />
+              </Box>
+            </Box>
+            <Typography variant="body2" sx={{ color: colors.text.secondary }}>
+              Ingestão rastreável de cadastros territoriais, proveniência criptográfica (SHA-256) e normalização idempotente para o município de <strong>Maricá - RJ</strong>.
             </Typography>
-            <StatusBadge status="ACTIVE" label="Cockpit Exclusivo" />
-            <Chip
-              size="small"
-              label="real_estate.sqlite (WAL)"
-              sx={{
-                bgcolor: 'rgba(0, 167, 111, 0.12)',
-                color: colors.primary.main,
-                fontWeight: 700,
-                fontSize: '0.75rem',
-              }}
-            />
           </Box>
-          <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
-            <ReconciliationReportButton stats={stats} batches={batches} findings={findings} />
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={loadStatsAndData}
-              startIcon={<Iconify icon="solar:restart-bold" />}
-            >
-              Atualizar Painel
-            </Button>
-          </Box>
-        </Box>
-        <Typography variant="body2" sx={{ color: colors.text.secondary }}>
-          Ingestão rastreável de cadastros territoriais, proveniência criptográfica (SHA-256) e normalização idempotente.
-        </Typography>
-      </Box>
 
       {/* Métricas Consolidadas */}
       <RealEstateMetricsBar stats={stats} />
@@ -325,6 +397,8 @@ export function RealEstateView() {
             </TableBody>
           </Table>
         </TableContainer>
+      )}
+        </>
       )}
     </Box>
   );
