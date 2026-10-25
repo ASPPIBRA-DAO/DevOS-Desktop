@@ -33,10 +33,15 @@ src/
 └── test/       -> Infraestrutura e utilitários de teste do frontend
 ```
 
-### 2.1. `app/` (Composição da Aplicação)
+### 2.1. `app/` (Composição da Aplicação e Edições)
 - Responsável por montar a árvore de componentes, gerenciar rotas e selecionar as configurações de cada edição (`edition.cockpit.ts` e `edition.node.ts`).
-- **Edição Cockpit:** Modo avançado voltado para desenvolvedores, fundadores e auditores, com acesso ao módulo cadastral imobiliário.
-- **Edição Node:** Modo focado em operadores de nós IPFS, monitoramento de conectividade e custódia simplificada de carteiras.
+- **`app/providers/` (Provedores Globais):**
+  - `theme-provider.tsx`: Provedor oficial do tema global (`ThemeProvider`), compondo `MuiThemeProvider` com `devosTheme` de `shared/theme` e aplicando atmosfera de vidromorfismo e iluminação radial via `CssBaseline`.
+  - `error-boundary.tsx`: Captura de erros não tratados na renderização do React e exibição da tela de fallback resiliente.
+- **`app/editions/` (Composição e Páginas de Edição):**
+  - `cockpit/cockpit-dashboard-page.tsx`: Composição exclusiva do painel da edição Cockpit (gestão institucional e governança).
+  - `node/node-dashboard-page.tsx`: Composição exclusiva do painel da edição Node (painel de métricas operacionais DePIN, orquestrando status de dispositivo, cofre e nó).
+  - `edition.cockpit.ts` e `edition.node.ts`: Configurações de rotas e metadados compiladas condicionalmente via flag de modo do Vite.
 
 ### 2.2. `modules/` (Módulos Funcionais)
 Cada módulo agrupa componentes, páginas e hooks específicos de um domínio:
