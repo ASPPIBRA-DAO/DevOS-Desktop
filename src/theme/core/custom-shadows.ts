@@ -1,4 +1,4 @@
-import type { SchemesRecord } from '../types';
+import type { SchemesRecord, CustomShadows } from '../types';
 
 import { varAlpha } from 'minimal-shared/utils';
 
@@ -6,24 +6,7 @@ import { grey, info, error, common, primary, success, warning, secondary } from 
 
 // ----------------------------------------------------------------------
 
-export type CustomShadows = {
-  z1: string;
-  z4: string;
-  z8: string;
-  z12: string;
-  z16: string;
-  z20: string;
-  z24: string;
-  primary: string;
-  secondary: string;
-  info: string;
-  success: string;
-  warning: string;
-  error: string;
-  card: string;
-  dialog: string;
-  dropdown: string;
-};
+export type { CustomShadows };
 
 // ----------------------------------------------------------------------
 

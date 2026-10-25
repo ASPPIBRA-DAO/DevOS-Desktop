@@ -2,12 +2,34 @@ import type {
   Theme,
   Shadows,
   Components,
+  PaletteColor,
   ColorSystemOptions,
   CssVarsThemeOptions,
   SupportedColorScheme,
   ThemeOptions as MuiThemeOptions,
 } from '@mui/material/styles';
-import type { CustomShadows } from './core/custom-shadows';
+
+export type PaletteColorKey = 'primary' | 'secondary' | 'info' | 'success' | 'warning' | 'error';
+export type PaletteColorNoChannels = Omit<PaletteColor, 'lighterChannel' | 'darkerChannel'>;
+
+export type CustomShadows = {
+  z1: string;
+  z4: string;
+  z8: string;
+  z12: string;
+  z16: string;
+  z20: string;
+  z24: string;
+  primary: string;
+  secondary: string;
+  info: string;
+  success: string;
+  warning: string;
+  error: string;
+  card: string;
+  dialog: string;
+  dropdown: string;
+};
 
 export type ThemeColorScheme = SupportedColorScheme;
 export type ThemeCssVariables = Pick<

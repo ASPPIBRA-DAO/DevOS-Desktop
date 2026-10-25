@@ -13,10 +13,9 @@ import { themeConfig } from '../theme-config';
 
 // ----------------------------------------------------------------------
 
-export type PaletteColorKey = 'primary' | 'secondary' | 'info' | 'success' | 'warning' | 'error';
+export type { PaletteColorKey, PaletteColorNoChannels } from '../types';
 export type CommonColorsKeys = 'black' | 'white';
 
-export type PaletteColorNoChannels = Omit<PaletteColor, 'lighterChannel' | 'darkerChannel'>;
 export type PaletteColorWithChannels = PaletteColor & PaletteColorChannel;
 
 export type PaletteColorExtend = {
