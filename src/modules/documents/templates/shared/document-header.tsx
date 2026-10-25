@@ -54,7 +54,7 @@ export interface DocumentHeaderProps {
 export const DocumentHeader: React.FC<DocumentHeaderProps> = ({
   title,
   subtitle,
-  systemTag = 'DevOS Cockpit • Verificado',
+  systemTag = 'DevOS Admin • Verificado',
 }) => (
   <View style={styles.headerContainer} fixed>
     <View style={styles.institutionRow}>
