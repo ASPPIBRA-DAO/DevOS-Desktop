@@ -1,7 +1,7 @@
 import type { EditionConfig } from './types';
 
+import { RealEstateView } from '../../modules/real-estate';
 import { CockpitDashboardPage } from './cockpit/cockpit-dashboard-page';
-import { RealEstateView } from '../../modules/real-estate/presentation/real-estate-view';
 
 export const currentEdition: EditionConfig = {
   editionId: 'cockpit',
