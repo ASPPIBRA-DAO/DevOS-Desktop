@@ -1,5 +1,6 @@
 import '@fontsource-variable/inter';
 import '@fontsource-variable/public-sans';
+import './global.css';
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
