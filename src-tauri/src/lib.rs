@@ -1,8 +1,11 @@
 use tauri::Manager;
 
 pub mod commands;
+pub mod modules;
 pub mod monitoring;
+pub mod platform;
 pub mod real_estate;
+pub mod reports;
 pub mod storage;
 pub mod vault;
 pub mod wallets;
@@ -69,7 +72,8 @@ pub fn run() {
             commands::list_import_batches,
             commands::list_audit_findings,
             commands::list_properties,
-            commands::select_spreadsheet_file
+            commands::select_spreadsheet_file,
+            commands::generate_document
         ])
         .run(tauri::generate_context!())
         .expect("error while building tauri application");

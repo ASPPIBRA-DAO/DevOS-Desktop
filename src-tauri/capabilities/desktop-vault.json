@@ -19,6 +19,7 @@
     "allow-export-vault-backup",
     "allow-restore-vault-backup",
     "allow-fetch-wallet-balance",
-    "allow-batch-fetch-wallet-balances"
+    "allow-batch-fetch-wallet-balances",
+    "allow-generate-document"
   ]
 }
