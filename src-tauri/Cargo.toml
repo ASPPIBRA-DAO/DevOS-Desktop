@@ -40,6 +40,11 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 calamine = "0.37"
 sha2 = "0.10"
 uuid = { version = "1", features = ["v4"] }
+typst = "0.15"
+typst-as-lib = "0.17"
+typst-pdf = "0.15"
+dirs = "6"
+open = "5"
 
 
 
