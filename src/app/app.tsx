@@ -2,8 +2,7 @@ import React from 'react';
 import { HashRouter } from 'react-router';
 
 import { AppRouter } from './router';
-import { ThemeProvider } from '../shared/theme';
-import { ErrorBoundary } from './providers/error-boundary';
+import { ThemeProvider, ErrorBoundary } from './providers';
 
 export function App() {
   return (
