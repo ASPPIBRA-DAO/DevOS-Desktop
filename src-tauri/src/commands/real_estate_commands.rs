@@ -101,25 +101,25 @@ pub fn list_properties(
 pub fn select_spreadsheet_file() -> Result<Option<String>, String> {
     // 1. Tenta zenity (comum em GNOME / XFCE / distribuições baseadas em GTK)
     let zenity_res = std::process::Command::new("zenity")
-        .args(&[
+        .args([
             "--file-selection",
             "--title=Selecionar Planilha Cadastral",
             "--file-filter=Planilhas Excel (*.xlsx *.xls) | *.xlsx *.xls",
         ])
         .output();
 
-    if let Ok(out) = zenity_res {
-        if out.status.success() {
-            let path_str = String::from_utf8_lossy(&out.stdout).trim().to_string();
-            if !path_str.is_empty() {
-                return Ok(Some(path_str));
-            }
+    if let Ok(out) = zenity_res
+        && out.status.success()
+    {
+        let path_str = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        if !path_str.is_empty() {
+            return Ok(Some(path_str));
         }
     }
 
     // 2. Fallback para kdialog (comum em KDE Plasma / Qt)
     let kdialog_res = std::process::Command::new("kdialog")
-        .args(&[
+        .args([
             "--getopenfilename",
             ".",
             "*.xlsx *.xls | Planilhas Excel (*.xlsx, *.xls)",
@@ -128,12 +128,12 @@ pub fn select_spreadsheet_file() -> Result<Option<String>, String> {
         ])
         .output();
 
-    if let Ok(out) = kdialog_res {
-        if out.status.success() {
-            let path_str = String::from_utf8_lossy(&out.stdout).trim().to_string();
-            if !path_str.is_empty() {
-                return Ok(Some(path_str));
-            }
+    if let Ok(out) = kdialog_res
+        && out.status.success()
+    {
+        let path_str = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        if !path_str.is_empty() {
+            return Ok(Some(path_str));
         }
     }
 
