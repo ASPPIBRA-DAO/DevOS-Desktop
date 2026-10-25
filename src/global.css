@@ -1,0 +1,132 @@
+/** **************************************
+* Fonts: app
+*************************************** */
+@import '@fontsource-variable/public-sans';
+@import '@fontsource-variable/inter';
+@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Nunito+Sans:ital,opsz,wght@0,6..12,200..1000;1,6..12,200..1000&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
+
+/** **************************************
+* Plugins
+*************************************** */
+/* scrollbar */
+@import './shared/components/scrollbar/styles.css';
+
+/* chart */
+@import './shared/components/chart/styles.css';
+
+:root {
+  --font-orbitron: 'Orbitron', sans-serif;
+  --font-barlow: 'Barlow', sans-serif;
+  --font-public-sans: 'Public Sans Variable', sans-serif;
+}
+
+/** **************************************
+* Baseline
+*************************************** */
+html {
+  height: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+body,
+#root,
+#root__layout {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 100%;
+  flex-direction: column;
+}
+img {
+  max-width: 100%;
+  vertical-align: middle;
+}
+ul {
+  margin: 0;
+  padding: 0;
+  list-style-type: none;
+}
+input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: none;
+}
+input[type='number']::-webkit-outer-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+input[type='number']::-webkit-inner-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+
+/** **************************************
+* UI Protection / App-Like Behavior
+*************************************** */
+body {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+input, textarea {
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  -ms-user-select: text !important;
+  user-select: text !important;
+}
+
+.selectable {
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  -ms-user-select: text !important;
+  user-select: text !important;
+  cursor: text;
+}
+
+/** **************************************
+* Print Engine Styles (A4 Legal Publishing)
+*************************************** */
+.print-only {
+  display: none !important;
+}
+
+@media print {
+  .print-only {
+    display: block !important;
+  }
+
+  header,
+  footer,
+  nav,
+  aside,
+  [role="banner"],
+  [role="contentinfo"],
+  .MuiSpeedDial-root,
+  .MuiSpeedDialAction-root,
+  .MuiFab-root,
+  .no-print {
+    display: none !important;
+  }
+
+  html, body, #root, #root__layout, main {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 11pt !important;
+    line-height: 1.6 !important;
+    min-height: auto !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body {
+    -webkit-user-select: text !important;
+    user-select: text !important;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 16mm 16mm 16mm 16mm;
+  }
+}
