@@ -4,7 +4,7 @@ import type {
   ColorSystemOptions,
   PaletteColorChannel,
 } from '@mui/material/styles';
-import type { SchemesRecord } from '../types';
+import type { SchemesRecord, PaletteColorKey, PaletteColorNoChannels } from '../types';
 
 import { varAlpha, createPaletteChannel } from 'minimal-shared/utils';
 
@@ -13,7 +13,7 @@ import { themeConfig } from '../theme-config';
 
 // ----------------------------------------------------------------------
 
-export type { PaletteColorKey, PaletteColorNoChannels } from '../types';
+export type { PaletteColorKey, PaletteColorNoChannels };
 export type CommonColorsKeys = 'black' | 'white';
 
 export type PaletteColorWithChannels = PaletteColor & PaletteColorChannel;
