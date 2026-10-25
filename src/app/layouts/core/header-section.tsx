@@ -2,12 +2,12 @@ import type { AppBarProps } from '@mui/material/AppBar';
 import type { ContainerProps } from '@mui/material/Container';
 import type { Theme, SxProps, CSSObject, Breakpoint } from '@mui/material/styles';
 
-import { mergeClasses } from 'minimal-shared/utils';
 import { useScrollOffsetTop } from 'minimal-shared/hooks';
+import { varAlpha, mergeClasses } from 'minimal-shared/utils';
 
 import AppBar from '@mui/material/AppBar';
+import { styled } from '@mui/material/styles';
 import Container from '@mui/material/Container';
-import { alpha, styled } from '@mui/material/styles';
 
 import { layoutClasses } from './classes';
 
@@ -53,7 +53,7 @@ export function HeaderSection({
       sx={[
         (theme) => ({
           ...(isOffset && {
-            '--color': `var(--offset-color, ${theme.palette.text.primary})`,
+            '--color': `var(--offset-color, ${theme.vars.palette.text.primary})`,
           }),
         }),
         ...(Array.isArray(sx) ? sx : [sx]),
@@ -99,9 +99,9 @@ const HeaderRoot = styled(AppBar, {
   };
 
   const bgStyles: CSSObject = {
-    backdropFilter: 'blur(8px)',
-    WebkitBackdropFilter: 'blur(8px)',
-    backgroundColor: alpha(theme.palette.background.default, 0.8),
+    ...theme.mixins.bgBlur({
+      color: varAlpha(theme.vars.palette.background.defaultChannel, 0.8),
+    }),
     ...pauseStyles,
     top: 0,
     left: 0,
@@ -121,7 +121,7 @@ const HeaderRoot = styled(AppBar, {
     borderRadius: '50%',
     width: `calc(100% - 48px)`,
     zIndex: pauseZindex.bottom,
-    boxShadow: '0 8px 16px 0 rgba(0, 0, 0, 0.16)',
+    boxShadow: theme.vars.customShadows.z8,
     ...(isOffset && { opacity: 0.48, visibility: 'visible' }),
   };
 
