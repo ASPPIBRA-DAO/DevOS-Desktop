@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "DevOS Cockpit",
+  "productName": "DevOS Admin",
   "version": "1.0.0",
   "identifier": "br.aspp.devos.cockpit",
   "build": {
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "DevOS — DAO Master Cockpit",
+        "title": "DevOS — DAO Admin Master",
         "width": 1440,
         "height": 900,
         "resizable": true,
