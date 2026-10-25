@@ -11,6 +11,16 @@
 O **DevOS Desktop** adota o padrão de **Monólito Modular** segregado fisicamente entre a interface (`src/`) e o núcleo de execução nativa segura (`src-tauri/`):
 
 - **Backend Nativo Rust (`src-tauri/`)**:
+  - **Ponto Canônico de Composição (`src/lib.rs`):** Responsável estritamente pela inicialização do Tauri runtime (`run()`), injeção de dependências e estado gerenciado (`LocalDatabase`, `RealEstateDatabase`), configuração condicional de plugins de logging e registro centralizado do `invoke_handler`.
+  - **Camada de Comandos Segregada por Responsabilidade (`src/commands/`):**
+    - `system_commands.rs`: Operações não-privilegiadas de status do dispositivo e telemetria nativa (`get_device_status`).
+    - `vault_commands.rs`: Gestão de ciclo de vida do cofre, configuração de senha mestre, desbloqueio, exportação de segredos e backups (`get_vault_status`, `init_master_password`, `unlock_vault`, `export_authorized_secret`, `export_vault_backup`, `restore_vault_backup`).
+    - `wallet_commands.rs`: Criação e custódia local de carteiras, sessões efêmeras em memória com `zeroize` (`generate_seed_and_preview`, `reveal_pending_mnemonic`, `cancel_pending_creation`, `confirm_and_save_wallets`, `list_stored_wallets`).
+    - `real_estate_commands.rs`: Ingestão de planilhas territoriais, prévias, lotes, consultas cadastrais e seleção de arquivos no SO (`get_real_estate_stats`, `preview_real_estate_import`, `execute_real_estate_import`, `list_import_batches`, `list_audit_findings`, `list_properties`, `select_spreadsheet_file`).
+    - `monitoring_commands.rs`: Consulta de saldos RPC multichain e tokens EVM (`fetch_wallet_balance`, `batch_fetch_wallet_balances`).
+  - **Organização da Suíte de Testes Rust (`src/tests/`):**
+    - Subdividida em `security_tests.rs` (menor privilégio, manifestos ACL autogerados, capabilities e integridade referencial) e `real_estate_integration_tests.rs` (fluxos completos de reconciliação de lotes, idempotência e recuperação).
+    - Registrada sob `#[cfg(test)] mod tests;`, preservando a visibilidade interna do crate (`crate::*`) sem violar o encapsulamento nem tornar funções internas públicas artificialmente.
   - **Autoridade de Domínio e Criptografia:** Concentra a derivação criptográfica BIP39/BIP32/secp256k1, algoritmos de encriptação AES-GCM com KDF Argon2id, expiração de segredos com `zeroize`, processamento de planilhas de alta performance e reconciliação cadastral.
   - **Isolamento de Persistência:** Bancos de dados SQLite fisicamente segregados (`devos_vault.sqlite` e `real_estate.sqlite`), com modo WAL, integridade referencial ativa e imutabilidade de eventos de auditoria garantida por triggers.
   - **Segurança Tauri v2:** Manifesto de menor privilégio estrito (`default.json` sem permissões) e concessão granular por capability (`desktop-vault.json`, `cockpit-real-estate.json`).
