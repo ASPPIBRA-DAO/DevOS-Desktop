@@ -41,16 +41,19 @@ impl CreationSessionStore {
     /// Cria uma nova instância com rotina em background periódica para expurgo autônomo
     pub fn with_sweep_interval(ttl_secs: u64, sweep_secs: u64) -> Self {
         let ttl = Duration::from_secs(ttl_secs);
-        let sessions: Arc<Mutex<HashMap<String, StagedSession>>> = Arc::new(Mutex::new(HashMap::new()));
+        let sessions: Arc<Mutex<HashMap<String, StagedSession>>> =
+            Arc::new(Mutex::new(HashMap::new()));
 
         let reaper_sessions = Arc::clone(&sessions);
         let sweep_duration = Duration::from_secs(sweep_secs.max(1));
         let _ = std::thread::Builder::new()
             .name("devos_session_reaper".to_string())
-            .spawn(move || loop {
-                std::thread::sleep(sweep_duration);
-                if let Ok(mut map) = reaper_sessions.lock() {
-                    map.retain(|_, s| s.created_at.elapsed() <= ttl);
+            .spawn(move || {
+                loop {
+                    std::thread::sleep(sweep_duration);
+                    if let Ok(mut map) = reaper_sessions.lock() {
+                        map.retain(|_, s| s.created_at.elapsed() <= ttl);
+                    }
                 }
             });
 
@@ -153,11 +156,15 @@ mod tests {
         assert_eq!(store.session_count(), 1);
 
         // Recupera mnemônica temporariamente com wrapper Zeroizing
-        let revealed = store.get_mnemonic(&session_id).expect("Sessão deve existir");
+        let revealed = store
+            .get_mnemonic(&session_id)
+            .expect("Sessão deve existir");
         assert_eq!(*revealed, secret);
 
         // Consome mnemônica atomicamente para gravação no cofre
-        let consumed = store.consume_mnemonic(&session_id).expect("Sessão deve existir");
+        let consumed = store
+            .consume_mnemonic(&session_id)
+            .expect("Sessão deve existir");
         assert_eq!(*consumed, secret);
 
         // Verifica que a sessão consumida não pode ser reutilizada
@@ -198,7 +205,8 @@ mod tests {
     fn test_periodic_cleanup_sweeps_without_user_request() {
         // TTL de 1 segundo e intervalo de varredura de fundo de 1 segundo
         let store = CreationSessionStore::with_sweep_interval(1, 1);
-        let secret = "alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu".to_string();
+        let secret =
+            "alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu".to_string();
 
         let _session_id = store.create_session(secret);
         assert_eq!(store.session_count(), 1);
@@ -207,6 +215,10 @@ mod tests {
         std::thread::sleep(Duration::from_millis(2200));
 
         // A thread em segundo plano deve ter expurgado autonomamente a sessão expirada
-        assert_eq!(store.session_count(), 0, "A sessão expirada deve ser expurgada autonomamente pelo reaper em background");
+        assert_eq!(
+            store.session_count(),
+            0,
+            "A sessão expirada deve ser expurgada autonomamente pelo reaper em background"
+        );
     }
 }

@@ -1,5 +1,5 @@
-use k256::elliptic_curve::sec1::ToEncodedPoint;
 use k256::PublicKey;
+use k256::elliptic_curve::sec1::ToEncodedPoint;
 use tiny_keccak::{Hasher, Keccak};
 
 /// Calcula o hash Keccak-256 de uma sequência de bytes
@@ -13,7 +13,10 @@ pub fn keccak256(data: &[u8]) -> [u8; 32] {
 
 /// Aplica a formatação de checksum EIP-55 a um endereço hexadecimal (sem ou com 0x)
 pub fn to_eip55_checksum(address_hex: &str) -> String {
-    let clean_hex = address_hex.strip_prefix("0x").unwrap_or(address_hex).to_ascii_lowercase();
+    let clean_hex = address_hex
+        .strip_prefix("0x")
+        .unwrap_or(address_hex)
+        .to_ascii_lowercase();
     if clean_hex.len() != 40 {
         return format!("0x{}", clean_hex);
     }
@@ -59,7 +62,9 @@ pub fn is_valid_evm_address(address: &str) -> bool {
     if !address.starts_with("0x") || address.len() != 42 {
         return false;
     }
-    hex::decode(&address[2..]).map(|bytes| bytes.len() == 20).unwrap_or(false)
+    hex::decode(&address[2..])
+        .map(|bytes| bytes.len() == 20)
+        .unwrap_or(false)
 }
 
 #[cfg(test)]
@@ -82,9 +87,17 @@ mod tests {
 
     #[test]
     fn test_validate_evm_address() {
-        assert!(is_valid_evm_address("0x52908400098527886E0F7030069857D2E4169EE7"));
-        assert!(!is_valid_evm_address("0x52908400098527886E0F7030069857D2E4169EE")); // 41 chars
-        assert!(!is_valid_evm_address("52908400098527886E0F7030069857D2E4169EE7")); // sem 0x
-        assert!(!is_valid_evm_address("0xZZ908400098527886E0F7030069857D2E4169EE7")); // hex inválido
+        assert!(is_valid_evm_address(
+            "0x52908400098527886E0F7030069857D2E4169EE7"
+        ));
+        assert!(!is_valid_evm_address(
+            "0x52908400098527886E0F7030069857D2E4169EE"
+        )); // 41 chars
+        assert!(!is_valid_evm_address(
+            "52908400098527886E0F7030069857D2E4169EE7"
+        )); // sem 0x
+        assert!(!is_valid_evm_address(
+            "0xZZ908400098527886E0F7030069857D2E4169EE7"
+        )); // hex inválido
     }
 }

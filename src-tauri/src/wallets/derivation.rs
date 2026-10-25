@@ -1,7 +1,7 @@
-use std::str::FromStr;
 use bip32::{DerivationPath, XPrv};
 use k256::PublicKey;
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
 use super::address::public_key_to_address;
 
@@ -33,8 +33,7 @@ impl DerivationService {
         let path = DerivationPath::from_str(path_str)
             .map_err(|e| DerivationError::InvalidPath(format!("{}: {}", path_str, e)))?;
 
-        XPrv::derive_from_path(seed, &path)
-            .map_err(|e| DerivationError::Bip32Error(e.to_string()))
+        XPrv::derive_from_path(seed, &path).map_err(|e| DerivationError::Bip32Error(e.to_string()))
     }
 
     /// Deriva a chave pública e endereço EVM para um caminho específico
@@ -114,9 +113,15 @@ mod tests {
 
         assert_eq!(batch.len(), 3);
         assert_eq!(batch[0].derivation_path, "m/44'/60'/0'/0/0");
-        assert_eq!(batch[0].address, "0x9858EfFD232B4033E47d90003D41EC34EcaEda94");
+        assert_eq!(
+            batch[0].address,
+            "0x9858EfFD232B4033E47d90003D41EC34EcaEda94"
+        );
         assert_eq!(batch[1].derivation_path, "m/44'/60'/0'/0/1");
-        assert_eq!(batch[1].address, "0x6Fac4D18c912343BF86fa7049364Dd4E424Ab9C0");
+        assert_eq!(
+            batch[1].address,
+            "0x6Fac4D18c912343BF86fa7049364Dd4E424Ab9C0"
+        );
         assert_eq!(batch[0].label, "DAO Tesouraria #1");
         assert_eq!(batch[0].network, "Arbitrum One");
     }

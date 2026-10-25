@@ -23,7 +23,8 @@
     ],
     "security": {
       "capabilities": [
-        "desktop-vault"
+        "desktop-vault",
+        "cockpit-real-estate"
       ],
       "csp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost tauri: https://api.asppibra.com http://localhost:8787; frame-src 'none'; object-src 'none'; base-uri 'self';",
       "devCsp": null

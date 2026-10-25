@@ -1,7 +1,7 @@
+use rusqlite::{Connection, OptionalExtension, params};
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
-use rusqlite::{params, Connection, OptionalExtension};
-use serde::{Deserialize, Serialize};
 
 use crate::vault::access_control::{VaultHeader, VaultStatus};
 use crate::vault::encryption::{EncryptedEnvelope, VaultCryptoError};
@@ -24,7 +24,6 @@ pub enum StorageError {
     AlreadyInitialized,
 }
 
-
 /// Metadados públicos da carteira persistida no SQLite
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct StoredWallet {
@@ -36,8 +35,8 @@ pub struct StoredWallet {
     pub derivation_path: String,
     pub network: String,
     pub address: String,
-    pub status: String,       // "ACTIVE" | "PENDING" | "ROTATED"
-    pub kyc_status: String,   // "UNVERIFIED" | "SIMULATED_TEST" | "VERIFIED"
+    pub status: String,     // "ACTIVE" | "PENDING" | "ROTATED"
+    pub kyc_status: String, // "UNVERIFIED" | "SIMULATED_TEST" | "VERIFIED"
     pub seed_words_count: usize,
     pub created_at: String,
     pub vault_id: Option<String>, // NULL se WATCH_ONLY
@@ -84,21 +83,31 @@ impl LocalDatabase {
     /// Retorna o cabeçalho persistido do cofre (se existir)
     pub fn get_header(&self) -> Result<Option<VaultHeader>, StorageError> {
         let conn = self.get_connection()?;
-        let mut stmt = conn.prepare("SELECT version, canary_envelope, created_at FROM vault_header WHERE id = 1")?;
+        let mut stmt = conn.prepare(
+            "SELECT version, canary_envelope, created_at FROM vault_header WHERE id = 1",
+        )?;
 
-        let header = stmt.query_row([], |row| {
-            let version: u32 = row.get(0)?;
-            let canary_json: String = row.get(1)?;
-            let created_at: String = row.get(2)?;
-            let canary_envelope: EncryptedEnvelope = serde_json::from_str(&canary_json)
-                .map_err(|e| rusqlite::Error::FromSqlConversionFailure(1, rusqlite::types::Type::Text, Box::new(e)))?;
+        let header = stmt
+            .query_row([], |row| {
+                let version: u32 = row.get(0)?;
+                let canary_json: String = row.get(1)?;
+                let created_at: String = row.get(2)?;
+                let canary_envelope: EncryptedEnvelope = serde_json::from_str(&canary_json)
+                    .map_err(|e| {
+                        rusqlite::Error::FromSqlConversionFailure(
+                            1,
+                            rusqlite::types::Type::Text,
+                            Box::new(e),
+                        )
+                    })?;
 
-            Ok(VaultHeader {
-                version,
-                canary_envelope,
-                created_at,
+                Ok(VaultHeader {
+                    version,
+                    canary_envelope,
+                    created_at,
+                })
             })
-        }).optional()?;
+            .optional()?;
 
         Ok(header)
     }
@@ -114,11 +123,11 @@ impl LocalDatabase {
         let mut conn = self.get_connection()?;
         let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
 
-        let existing: Option<u32> = tx.query_row(
-            "SELECT id FROM vault_header WHERE id = 1",
-            [],
-            |row| row.get(0)
-        ).optional()?;
+        let existing: Option<u32> = tx
+            .query_row("SELECT id FROM vault_header WHERE id = 1", [], |row| {
+                row.get(0)
+            })
+            .optional()?;
 
         if existing.is_some() {
             return Err(StorageError::AlreadyInitialized);
@@ -168,7 +177,10 @@ impl LocalDatabase {
     }
 
     /// Insere uma lista de carteiras dentro de uma transação atômica
-    pub fn append_wallets(&self, new_wallets: &[StoredWallet]) -> Result<Vec<StoredWallet>, StorageError> {
+    pub fn append_wallets(
+        &self,
+        new_wallets: &[StoredWallet],
+    ) -> Result<Vec<StoredWallet>, StorageError> {
         let mut conn = self.get_connection()?;
         let tx = conn.transaction()?;
 
@@ -218,25 +230,37 @@ impl LocalDatabase {
     }
 
     /// Busca o envelope secreto correspondente a um vault_id
-    pub fn get_secret_by_vault_id(&self, vault_id: &str) -> Result<Option<StoredSecret>, StorageError> {
+    pub fn get_secret_by_vault_id(
+        &self,
+        vault_id: &str,
+    ) -> Result<Option<StoredSecret>, StorageError> {
         let conn = self.get_connection()?;
-        let mut stmt = conn.prepare("SELECT vault_id, target, envelope, created_at FROM vault_secrets WHERE vault_id = ?1")?;
+        let mut stmt = conn.prepare(
+            "SELECT vault_id, target, envelope, created_at FROM vault_secrets WHERE vault_id = ?1",
+        )?;
 
-        let secret = stmt.query_row(params![vault_id], |row| {
-            let v_id: String = row.get(0)?;
-            let target: String = row.get(1)?;
-            let env_json: String = row.get(2)?;
-            let created_at: String = row.get(3)?;
-            let envelope: EncryptedEnvelope = serde_json::from_str(&env_json)
-                .map_err(|e| rusqlite::Error::FromSqlConversionFailure(2, rusqlite::types::Type::Text, Box::new(e)))?;
+        let secret = stmt
+            .query_row(params![vault_id], |row| {
+                let v_id: String = row.get(0)?;
+                let target: String = row.get(1)?;
+                let env_json: String = row.get(2)?;
+                let created_at: String = row.get(3)?;
+                let envelope: EncryptedEnvelope = serde_json::from_str(&env_json).map_err(|e| {
+                    rusqlite::Error::FromSqlConversionFailure(
+                        2,
+                        rusqlite::types::Type::Text,
+                        Box::new(e),
+                    )
+                })?;
 
-            Ok(StoredSecret {
-                vault_id: v_id,
-                target,
-                envelope,
-                created_at,
+                Ok(StoredSecret {
+                    vault_id: v_id,
+                    target,
+                    envelope,
+                    created_at,
+                })
             })
-        }).optional()?;
+            .optional()?;
 
         Ok(secret)
     }
@@ -273,11 +297,15 @@ impl LocalDatabase {
     /// Restaura o banco de dados a partir de um arquivo de backup verificado
     pub fn restore_backup(&self, source_path: &std::path::Path) -> Result<(), StorageError> {
         if !source_path.exists() {
-            return Err(StorageError::InvalidData(format!("Arquivo de backup não encontrado: {:?}", source_path)));
+            return Err(StorageError::InvalidData(format!(
+                "Arquivo de backup não encontrado: {:?}",
+                source_path
+            )));
         }
 
         // Valida que o arquivo de backup é um banco SQLite íntegro com a tabela vault_header
-        let test_conn = Connection::open_with_flags(source_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+        let test_conn =
+            Connection::open_with_flags(source_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
         let has_vault_header: bool = test_conn
             .query_row(
                 "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='vault_header'",
@@ -310,14 +338,14 @@ impl LocalDatabase {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_sqlite_persistence_across_reconnect() {
-        let test_dir = std::env::temp_dir().join(format!("devos_test_db_{}", rand::random::<u32>()));
+        let test_dir =
+            std::env::temp_dir().join(format!("devos_test_db_{}", rand::random::<u32>()));
         let db = LocalDatabase::new(test_dir.clone());
 
         // Cria tabelas via conexão inicial
@@ -354,7 +382,10 @@ mod tests {
         let loaded = reloaded_db.list_wallets().unwrap();
 
         assert_eq!(loaded.len(), 1);
-        assert_eq!(loaded[0].address, "0x9858EfFD232B4033E47d90003D41EC34EcaEda94");
+        assert_eq!(
+            loaded[0].address,
+            "0x9858EfFD232B4033E47d90003D41EC34EcaEda94"
+        );
         assert_eq!(loaded[0].custody_type, "CUSTODIAL_LOCAL");
 
         // Limpeza do diretório de teste
@@ -363,7 +394,8 @@ mod tests {
 
     #[test]
     fn test_wallet_isolation_and_custody_segregation() {
-        let test_dir = std::env::temp_dir().join(format!("devos_test_isolation_{}", rand::random::<u32>()));
+        let test_dir =
+            std::env::temp_dir().join(format!("devos_test_isolation_{}", rand::random::<u32>()));
         let db = LocalDatabase::new(test_dir.clone());
 
         let conn = db.get_connection().unwrap();
@@ -408,7 +440,8 @@ mod tests {
             client_doc: Some("123.456.789-00".to_string()),
         };
 
-        db.append_wallets(&[dao_custodial, client_watch_only]).unwrap();
+        db.append_wallets(&[dao_custodial, client_watch_only])
+            .unwrap();
 
         let all = db.list_wallets().unwrap();
         assert_eq!(all.len(), 2);
@@ -418,7 +451,8 @@ mod tests {
         assert!(secret_none.is_none());
 
         // Salva segredo para a carteira custodial
-        let fake_envelope = crate::vault::encryption::VaultCrypto::encrypt("master_123", b"secret_words").unwrap();
+        let fake_envelope =
+            crate::vault::encryption::VaultCrypto::encrypt("master_123", b"secret_words").unwrap();
         let stored_secret = StoredSecret {
             vault_id: "dao_vault_1".to_string(),
             target: "DAO".to_string(),
@@ -427,16 +461,23 @@ mod tests {
         };
         db.save_secret(stored_secret).unwrap();
 
-        let retrieved = db.get_secret_by_vault_id("dao_vault_1").unwrap().expect("Segredo deve existir");
+        let retrieved = db
+            .get_secret_by_vault_id("dao_vault_1")
+            .unwrap()
+            .expect("Segredo deve existir");
         assert_eq!(retrieved.vault_id, "dao_vault_1");
-        assert_eq!(retrieved.envelope.ciphertext_hex, fake_envelope.ciphertext_hex);
+        assert_eq!(
+            retrieved.envelope.ciphertext_hex,
+            fake_envelope.ciphertext_hex
+        );
 
         let _ = fs::remove_dir_all(test_dir);
     }
 
     #[test]
     fn test_vault_header_persistence_and_recovery() {
-        let test_dir = std::env::temp_dir().join(format!("devos_test_header_{}", rand::random::<u32>()));
+        let test_dir =
+            std::env::temp_dir().join(format!("devos_test_header_{}", rand::random::<u32>()));
         let db = LocalDatabase::new(test_dir.clone());
 
         let conn = db.get_connection().unwrap();
@@ -445,7 +486,8 @@ mod tests {
         ).unwrap();
         drop(conn);
 
-        let canary = crate::vault::encryption::VaultCrypto::encrypt("master_123", b"canary_canary").unwrap();
+        let canary =
+            crate::vault::encryption::VaultCrypto::encrypt("master_123", b"canary_canary").unwrap();
         let header = VaultHeader {
             version: 1,
             canary_envelope: canary.clone(),
@@ -456,15 +498,22 @@ mod tests {
 
         // Recarrega banco
         let reloaded_db = LocalDatabase::new(test_dir.clone());
-        let loaded_header = reloaded_db.get_header().unwrap().expect("Header deve existir");
-        assert_eq!(loaded_header.canary_envelope.ciphertext_hex, canary.ciphertext_hex);
+        let loaded_header = reloaded_db
+            .get_header()
+            .unwrap()
+            .expect("Header deve existir");
+        assert_eq!(
+            loaded_header.canary_envelope.ciphertext_hex,
+            canary.ciphertext_hex
+        );
 
         let _ = fs::remove_dir_all(test_dir);
     }
 
     #[test]
     fn test_complete_vault_lifecycle_and_backup() {
-        let test_dir = std::env::temp_dir().join(format!("devos_full_lifecycle_{}", rand::random::<u32>()));
+        let test_dir =
+            std::env::temp_dir().join(format!("devos_full_lifecycle_{}", rand::random::<u32>()));
         let db = LocalDatabase::new(test_dir.clone());
         let master_password = "SuperMasterPassword2026!Secure";
 
@@ -482,14 +531,25 @@ mod tests {
         db.save_header(&header).expect("Header deve ser persistido");
 
         // 2. Gerar uma nova carteira BIP-39 e derivar BIP-44
-        let mnemonic = crate::wallets::mnemonic::MnemonicService::generate(24).expect("Mnemônica de 24 palavras");
-        let seed = crate::wallets::mnemonic::MnemonicService::to_seed(&mnemonic, "").expect("Seed derivada");
-        let previews = crate::wallets::derivation::DerivationService::derive_batch(&seed, 0, 1, "Caixa Primário", "Arbitrum One").expect("Derivação");
+        let mnemonic = crate::wallets::mnemonic::MnemonicService::generate(24)
+            .expect("Mnemônica de 24 palavras");
+        let seed = crate::wallets::mnemonic::MnemonicService::to_seed(&mnemonic, "")
+            .expect("Seed derivada");
+        let previews = crate::wallets::derivation::DerivationService::derive_batch(
+            &seed,
+            0,
+            1,
+            "Caixa Primário",
+            "Arbitrum One",
+        )
+        .expect("Derivação");
         let derived_address = previews[0].address.clone();
         let derivation_path = previews[0].derivation_path.clone();
 
         // 3. Confirmar e persistir a carteira (envelope cifrado e metadados)
-        let envelope = crate::vault::encryption::VaultCrypto::encrypt(master_password, mnemonic.as_bytes()).expect("Cifragem AEAD");
+        let envelope =
+            crate::vault::encryption::VaultCrypto::encrypt(master_password, mnemonic.as_bytes())
+                .expect("Cifragem AEAD");
         let vault_id = "dao_vault_lifecycle_test".to_string();
         let secret_record = StoredSecret {
             vault_id: vault_id.clone(),
@@ -521,9 +581,18 @@ mod tests {
         let reloaded_db = LocalDatabase::new(test_dir.clone());
 
         // 5. Desbloquear o cofre (validar senha mestre)
-        let reloaded_header = reloaded_db.get_header().unwrap().expect("Header recarregado deve existir");
-        assert!(reloaded_header.verify_password(master_password), "Senha mestre válida deve desbloquear");
-        assert!(!reloaded_header.verify_password("SenhaErrada!"), "Senha errada deve ser rejeitada");
+        let reloaded_header = reloaded_db
+            .get_header()
+            .unwrap()
+            .expect("Header recarregado deve existir");
+        assert!(
+            reloaded_header.verify_password(master_password),
+            "Senha mestre válida deve desbloquear"
+        );
+        assert!(
+            !reloaded_header.verify_password("SenhaErrada!"),
+            "Senha errada deve ser rejeitada"
+        );
 
         // 6. Recuperar os metadados da carteira
         let wallets = reloaded_db.list_wallets().expect("Listagem pós-reboot");
@@ -532,35 +601,67 @@ mod tests {
         assert_eq!(wallets[0].custody_type, "CUSTODIAL_LOCAL");
 
         // 7. Confirmar que o endereço recuperado corresponde exatamente à chave derivada do envelope decifrado
-        let retrieved_secret = reloaded_db.get_secret_by_vault_id(&vault_id).unwrap().expect("Segredo deve existir");
-        let decrypted_bytes = crate::vault::encryption::VaultCrypto::decrypt(master_password, &retrieved_secret.envelope).expect("Decifragem autorizada");
+        let retrieved_secret = reloaded_db
+            .get_secret_by_vault_id(&vault_id)
+            .unwrap()
+            .expect("Segredo deve existir");
+        let decrypted_bytes = crate::vault::encryption::VaultCrypto::decrypt(
+            master_password,
+            &retrieved_secret.envelope,
+        )
+        .expect("Decifragem autorizada");
         let recovered_mnemonic = String::from_utf8(decrypted_bytes).expect("UTF-8 válido");
         assert_eq!(recovered_mnemonic, mnemonic);
 
-        let recovered_seed = crate::wallets::mnemonic::MnemonicService::to_seed(&recovered_mnemonic, "").expect("Seed recuperada");
-        let recovered_previews = crate::wallets::derivation::DerivationService::derive_batch(&recovered_seed, 0, 1, "Teste", "Arbitrum One").expect("Derivação conferida");
-        assert_eq!(recovered_previews[0].address, wallets[0].address, "Endereço decifrado deve coincidir com o salvo");
+        let recovered_seed =
+            crate::wallets::mnemonic::MnemonicService::to_seed(&recovered_mnemonic, "")
+                .expect("Seed recuperada");
+        let recovered_previews = crate::wallets::derivation::DerivationService::derive_batch(
+            &recovered_seed,
+            0,
+            1,
+            "Teste",
+            "Arbitrum One",
+        )
+        .expect("Derivação conferida");
+        assert_eq!(
+            recovered_previews[0].address, wallets[0].address,
+            "Endereço decifrado deve coincidir com o salvo"
+        );
 
         // 8. Verificar que o segredo permaneceu criptografado no armazenamento
         assert!(!retrieved_secret.envelope.ciphertext_hex.is_empty());
         assert!(!retrieved_secret.envelope.ciphertext_hex.contains(&mnemonic));
 
         // 9. Confirmar que uma senha incorreta não permite recuperar o segredo
-        let fail_result = crate::vault::encryption::VaultCrypto::decrypt("SenhaIncorreta999!", &retrieved_secret.envelope);
-        assert!(fail_result.is_err(), "Decifragem com senha incorreta deve retornar erro AEAD");
+        let fail_result = crate::vault::encryption::VaultCrypto::decrypt(
+            "SenhaIncorreta999!",
+            &retrieved_secret.envelope,
+        );
+        assert!(
+            fail_result.is_err(),
+            "Decifragem com senha incorreta deve retornar erro AEAD"
+        );
 
         // 10. Validação de Backup e Restauração
         let backup_path = test_dir.join("backups").join("vault_backup.bak");
-        let copied = reloaded_db.export_backup(&backup_path).expect("Backup deve ser exportado");
+        let copied = reloaded_db
+            .export_backup(&backup_path)
+            .expect("Backup deve ser exportado");
         assert!(copied > 0);
         assert!(backup_path.exists());
 
         // Restaura em diretório limpo
-        let restore_dir = std::env::temp_dir().join(format!("devos_restored_{}", rand::random::<u32>()));
+        let restore_dir =
+            std::env::temp_dir().join(format!("devos_restored_{}", rand::random::<u32>()));
         let restored_db = LocalDatabase::new(restore_dir.clone());
-        restored_db.restore_backup(&backup_path).expect("Restauração de backup deve ser concluída");
+        restored_db
+            .restore_backup(&backup_path)
+            .expect("Restauração de backup deve ser concluída");
 
-        let restored_wallets = restored_db.list_wallets().expect("Carteiras no banco restaurado");
+        let restored_wallets = restored_db
+            .list_wallets()
+            .expect("Carteiras no banco restaurado");
         assert_eq!(restored_wallets.len(), 1);
         assert_eq!(restored_wallets[0].address, derived_address);
 
@@ -570,7 +671,8 @@ mod tests {
 
     #[test]
     fn test_atomic_initialize_vault_if_absent_prevents_overwrite() {
-        let test_dir = std::env::temp_dir().join(format!("devos_atomic_vault_{}", rand::random::<u32>()));
+        let test_dir =
+            std::env::temp_dir().join(format!("devos_atomic_vault_{}", rand::random::<u32>()));
         let db = LocalDatabase::new(test_dir.clone());
         let conn = db.get_connection().unwrap();
         conn.execute_batch(
@@ -587,7 +689,10 @@ mod tests {
 
         // Segunda chamada concorrente/duplicada deve falhar categoricamente
         let second_res = db.initialize_vault_if_absent(&header2);
-        assert!(second_res.is_err(), "Segunda inicialização deve ser rejeitada");
+        assert!(
+            second_res.is_err(),
+            "Segunda inicialização deve ser rejeitada"
+        );
         match second_res {
             Err(StorageError::AlreadyInitialized) => {}
             _ => panic!("Esperado StorageError::AlreadyInitialized"),
@@ -606,7 +711,8 @@ mod tests {
         use std::sync::{Arc, Barrier};
         use std::thread;
 
-        let test_dir = std::env::temp_dir().join(format!("devos_concurrency_race_{}", rand::random::<u32>()));
+        let test_dir =
+            std::env::temp_dir().join(format!("devos_concurrency_race_{}", rand::random::<u32>()));
         let db = LocalDatabase::new(test_dir.clone());
         let conn = db.get_connection().unwrap();
         conn.execute_batch(
@@ -647,11 +753,17 @@ mod tests {
         }
 
         // Exatamente UMA thread pode ter sucesso
-        assert_eq!(success_count, 1, "Exatamente UMA thread concorrente deve ter sucesso na inicialização atômica");
+        assert_eq!(
+            success_count, 1,
+            "Exatamente UMA thread concorrente deve ter sucesso na inicialização atômica"
+        );
 
         // O cabeçalho salvo no disco deve corresponder exatamente à thread vencedora
         let final_header = db.get_header().unwrap().expect("Header persistido");
-        assert!(final_header.verify_password(&winning_password), "Header deve ser da thread vencedora");
+        assert!(
+            final_header.verify_password(&winning_password),
+            "Header deve ser da thread vencedora"
+        );
 
         let _ = fs::remove_dir_all(test_dir);
     }

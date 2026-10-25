@@ -13,12 +13,16 @@ impl MigrationManager {
             "CREATE TABLE IF NOT EXISTS schema_migrations (
                 version INTEGER PRIMARY KEY,
                 applied_at TEXT NOT NULL
-            );"
+            );",
         )?;
 
         // Consulta última migração aplicada
         let current_version: u32 = tx
-            .query_row("SELECT COALESCE(MAX(version), 0) FROM schema_migrations", [], |row| row.get(0))
+            .query_row(
+                "SELECT COALESCE(MAX(version), 0) FROM schema_migrations",
+                [],
+                |row| row.get(0),
+            )
             .unwrap_or(0);
 
         // Migração 1: Estrutura inicial do cofre e tabelas de custódia
@@ -56,7 +60,7 @@ impl MigrationManager {
                 );
 
                 INSERT INTO schema_migrations (version, applied_at)
-                VALUES (1, datetime('now'));"
+                VALUES (1, datetime('now'));",
             )?;
         }
 

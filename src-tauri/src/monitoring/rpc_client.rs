@@ -1,5 +1,5 @@
-use std::time::Duration;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 use crate::wallets::address::is_valid_evm_address;
 
@@ -211,7 +211,10 @@ impl EvmRpcClient {
                     formatted_balance: "Rede Indisponível".to_string(),
                     symbol: "".to_string(),
                     transaction_count: None,
-                    error_message: Some(format!("Rede '{}' não possui endpoint RPC configurado", network)),
+                    error_message: Some(format!(
+                        "Rede '{}' não possui endpoint RPC configurado",
+                        network
+                    )),
                     last_updated_at: now,
                 };
             }
@@ -240,7 +243,10 @@ impl EvmRpcClient {
         // Identifica se a consulta é de Token ERC-20 ou Moeda Nativa
         let (rpc_req, decimals, symbol) = match token_symbol {
             Some(sym) => {
-                let token_match = config.supported_tokens.iter().find(|t| t.symbol.eq_ignore_ascii_case(sym));
+                let token_match = config
+                    .supported_tokens
+                    .iter()
+                    .find(|t| t.symbol.eq_ignore_ascii_case(sym));
                 match token_match {
                     Some(token) => {
                         let calldata = Self::encode_erc20_balance_of(address);
@@ -311,7 +317,11 @@ impl EvmRpcClient {
                         formatted_balance: "RPC Offline".to_string(),
                         symbol,
                         transaction_count: tx_count,
-                        error_message: Some(format!("HTTP {} recebido de {}", res.status(), config.rpc_url)),
+                        error_message: Some(format!(
+                            "HTTP {} recebido de {}",
+                            res.status(),
+                            config.rpc_url
+                        )),
                         last_updated_at: now,
                     };
                 }
@@ -419,7 +429,8 @@ mod tests {
 
     #[test]
     fn test_network_and_token_configurations() {
-        let arb = EvmRpcClient::get_network_config("Arbitrum One").expect("Arbitrum One deve existir");
+        let arb =
+            EvmRpcClient::get_network_config("Arbitrum One").expect("Arbitrum One deve existir");
         assert_eq!(arb.chain_id, 42161);
         assert!(arb.supported_tokens.iter().any(|t| t.symbol == "USDT"));
         assert!(arb.supported_tokens.iter().any(|t| t.symbol == "USDC"));

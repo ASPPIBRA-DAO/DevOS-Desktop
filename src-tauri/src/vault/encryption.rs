@@ -1,6 +1,6 @@
 use aes_gcm::aead::{Aead, KeyInit};
 use aes_gcm::{Aes256Gcm, Nonce};
-use argon2::{Argon2, Algorithm, Version, Params};
+use argon2::{Algorithm, Argon2, Params, Version};
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use zeroize::{Zeroize, ZeroizeOnDrop};
@@ -43,14 +43,18 @@ impl VaultCrypto {
         let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
         let mut key_bytes = [0u8; 32];
 
-        argon2.hash_password_into(password.as_bytes(), salt, &mut key_bytes)
+        argon2
+            .hash_password_into(password.as_bytes(), salt, &mut key_bytes)
             .map_err(|e| VaultCryptoError::EncryptionFailed(format!("Argon2 KDF: {}", e)))?;
 
         Ok(DerivedKey(key_bytes))
     }
 
     /// Cifra dados sensíveis utilizando Argon2id + AES-256-GCM
-    pub fn encrypt(password: &str, plaintext: &[u8]) -> Result<EncryptedEnvelope, VaultCryptoError> {
+    pub fn encrypt(
+        password: &str,
+        plaintext: &[u8],
+    ) -> Result<EncryptedEnvelope, VaultCryptoError> {
         let mut rng = rand::thread_rng();
 
         // Salt de 16 bytes para KDF
@@ -66,7 +70,8 @@ impl VaultCrypto {
             .map_err(|e| VaultCryptoError::EncryptionFailed(e.to_string()))?;
 
         let nonce = Nonce::from_slice(&nonce_bytes);
-        let ciphertext = cipher.encrypt(nonce, plaintext)
+        let ciphertext = cipher
+            .encrypt(nonce, plaintext)
             .map_err(|e| VaultCryptoError::EncryptionFailed(e.to_string()))?;
 
         Ok(EncryptedEnvelope {
@@ -80,7 +85,10 @@ impl VaultCrypto {
     }
 
     /// Decifra e autentica o envelope criptográfico. Falha caso a senha esteja incorreta ou os dados tenham sido alterados.
-    pub fn decrypt(password: &str, envelope: &EncryptedEnvelope) -> Result<Vec<u8>, VaultCryptoError> {
+    pub fn decrypt(
+        password: &str,
+        envelope: &EncryptedEnvelope,
+    ) -> Result<Vec<u8>, VaultCryptoError> {
         if envelope.version != 1 {
             return Err(VaultCryptoError::DecryptionFailed);
         }
@@ -97,7 +105,8 @@ impl VaultCrypto {
             .map_err(|_| VaultCryptoError::DecryptionFailed)?;
 
         let nonce = Nonce::from_slice(&nonce_bytes);
-        cipher.decrypt(nonce, ciphertext.as_ref())
+        cipher
+            .decrypt(nonce, ciphertext.as_ref())
             .map_err(|_| VaultCryptoError::DecryptionFailed)
     }
 }
@@ -116,7 +125,8 @@ mod tests {
         assert_eq!(envelope.cipher, "AES-256-GCM");
         assert_eq!(envelope.kdf, "Argon2id");
 
-        let decrypted = VaultCrypto::decrypt(password, &envelope).expect("decriptação bem-sucedida");
+        let decrypted =
+            VaultCrypto::decrypt(password, &envelope).expect("decriptação bem-sucedida");
         assert_eq!(decrypted, secret);
     }
 
@@ -144,6 +154,9 @@ mod tests {
         envelope.ciphertext_hex = hex::encode(tampered_bytes);
 
         let result = VaultCrypto::decrypt(password, &envelope);
-        assert!(result.is_err(), "deve rejeitar envelope adulterado por integridade AEAD");
+        assert!(
+            result.is_err(),
+            "deve rejeitar envelope adulterado por integridade AEAD"
+        );
     }
 }

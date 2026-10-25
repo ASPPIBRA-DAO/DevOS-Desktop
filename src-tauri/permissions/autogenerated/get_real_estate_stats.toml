@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-get-real-estate-stats"
+description = "Enables the get_real_estate_stats command without any pre-configured scope."
+commands.allow = ["get_real_estate_stats"]
+
+[[permission]]
+identifier = "deny-get-real-estate-stats"
+description = "Denies the get_real_estate_stats command without any pre-configured scope."
+commands.deny = ["get_real_estate_stats"]

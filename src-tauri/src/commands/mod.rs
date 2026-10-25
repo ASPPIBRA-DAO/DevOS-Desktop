@@ -1,9 +1,11 @@
 use serde::{Deserialize, Serialize};
 
 pub mod monitoring_commands;
+pub mod real_estate_commands;
 pub mod wallet_commands;
 
 pub use monitoring_commands::*;
+pub use real_estate_commands::*;
 pub use wallet_commands::*;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]

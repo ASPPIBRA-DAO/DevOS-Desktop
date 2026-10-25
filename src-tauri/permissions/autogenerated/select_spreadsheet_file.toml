@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-select-spreadsheet-file"
+description = "Enables the select_spreadsheet_file command without any pre-configured scope."
+commands.allow = ["select_spreadsheet_file"]
+
+[[permission]]
+identifier = "deny-select-spreadsheet-file"
+description = "Denies the select_spreadsheet_file command without any pre-configured scope."
+commands.deny = ["select_spreadsheet_file"]

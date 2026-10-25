@@ -37,3 +37,9 @@ thiserror = "2.0"
 k256 = { version = "0.13", features = ["ecdsa"] }
 tokio = { version = "1", features = ["sync", "macros"] }
 rusqlite = { version = "0.32", features = ["bundled"] }
+calamine = "0.37"
+sha2 = "0.10"
+uuid = { version = "1", features = ["v4"] }
+
+
+

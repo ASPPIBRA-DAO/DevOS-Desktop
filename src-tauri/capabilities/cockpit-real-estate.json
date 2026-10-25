@@ -1,0 +1,17 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "cockpit-real-estate",
+  "description": "DevOS Cockpit exclusive real estate cadastral management capabilities",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "allow-get-real-estate-stats",
+    "allow-preview-real-estate-import",
+    "allow-execute-real-estate-import",
+    "allow-list-import-batches",
+    "allow-list-audit-findings",
+    "allow-list-properties",
+    "allow-select-spreadsheet-file"
+  ]
+}

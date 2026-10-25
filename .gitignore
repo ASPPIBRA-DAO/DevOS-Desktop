@@ -19,6 +19,7 @@ node_modules/
 *.tsbuildinfo
 coverage/
 .turbo/
+.vite/
 
 # 3. Artefatos de Build do Frontend
 dist/
@@ -28,6 +29,7 @@ dist-ssr/
 *.local
 
 # 4. Compilação Rust & Tauri
+target/
 src-tauri/target/
 src-tauri/gen/
 src-tauri/bin/*
@@ -83,3 +85,18 @@ AGENTS.md
 # 11. Documentos Internos, Estratégia e Auditoria Local
 architecture/
 audit/
+
+# 12. Python Cache & Ambientes Virtuais (Scripts de Geração de Fixtures)
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# 13. Planilhas de Dados Massivos & Arquivos Reais de Clientes
+# (Garante que dados reais volumosos/sensíveis nunca subam ao Git, preservando apenas as fixtures sintéticas de teste)
+*.xlsx
+*.xls
+*.csv
+!src-tauri/fixtures/*.xlsx

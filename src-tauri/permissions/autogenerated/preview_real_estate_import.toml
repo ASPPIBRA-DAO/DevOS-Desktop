@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-preview-real-estate-import"
+description = "Enables the preview_real_estate_import command without any pre-configured scope."
+commands.allow = ["preview_real_estate_import"]
+
+[[permission]]
+identifier = "deny-preview-real-estate-import"
+description = "Denies the preview_real_estate_import command without any pre-configured scope."
+commands.deny = ["preview_real_estate_import"]

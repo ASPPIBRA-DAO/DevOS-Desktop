@@ -65,6 +65,8 @@ mod tests {
 
     #[test]
     fn test_reject_invalid_mnemonic() {
-        assert!(!MnemonicService::validate("invalid word phrase that is not real bip39 checksum"));
+        assert!(!MnemonicService::validate(
+            "invalid word phrase that is not real bip39 checksum"
+        ));
     }
 }
