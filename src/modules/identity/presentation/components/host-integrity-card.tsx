@@ -1,3 +1,5 @@
+import type { DeviceStatusResponse } from '../../../../platform/tauri';
+
 import React from 'react';
 
 import Box from '@mui/material/Box';
@@ -6,7 +8,6 @@ import Typography from '@mui/material/Typography';
 import { Card } from '../../../../shared/components/Card';
 import { colors } from '../../../../shared/theme/palette';
 import { StatusBadge } from '../../../../shared/components/StatusBadge';
-import type { DeviceStatusResponse } from '../../../../platform/tauri';
 
 export interface HostIntegrityCardProps {
   deviceStatus: DeviceStatusResponse | null;
