@@ -24,6 +24,7 @@ import TableContainer from '@mui/material/TableContainer';
 import CircularProgress from '@mui/material/CircularProgress';
 
 import { colors } from '../../../shared/theme/palette';
+import { ReconciliationReportButton } from '../../reports';
 import { Iconify } from '../../../shared/components/iconify';
 import { MetricBox } from '../../../shared/components/MetricBox';
 import { StatusBadge } from '../../../shared/components/StatusBadge';
@@ -132,14 +133,17 @@ export function RealEstateView() {
               }}
             />
           </Box>
-          <Button
-            variant="outlined"
-            size="small"
-            onClick={loadStatsAndData}
-            startIcon={<Iconify icon="solar:restart-bold" />}
-          >
-            Atualizar Painel
-          </Button>
+          <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+            <ReconciliationReportButton stats={stats} batches={batches} findings={findings} />
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={loadStatsAndData}
+              startIcon={<Iconify icon="solar:restart-bold" />}
+            >
+              Atualizar Painel
+            </Button>
+          </Box>
         </Box>
         <Typography variant="body2" sx={{ color: colors.text.secondary }}>
           Ingestão rastreável de cadastros territoriais, proveniência criptográfica (SHA-256) e normalização idempotente.
