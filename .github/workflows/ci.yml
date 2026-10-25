@@ -1,0 +1,110 @@
+name: CI — DevOS Desktop Quality Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Frontend Quality & Architecture
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Architectural Boundary Check (Dependency Cruiser)
+        run: pnpm check:arch
+
+      - name: ESLint Static Analysis
+        run: pnpm lint
+
+      - name: TypeScript Type Checking
+        run: pnpm ts:check
+
+      - name: Vitest Automated Unit & Integration Tests
+        run: pnpm test
+
+      - name: Build Frontend (Node Edition)
+        run: pnpm build:node
+
+      - name: Build Frontend (Cockpit Edition)
+        run: pnpm build:cockpit
+
+  backend:
+    name: Backend Rust & Tauri Engine
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Install Linux Native Dependencies for Tauri v2
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "src-tauri -> target"
+
+      - name: Check Rust Code Formatting (rustfmt)
+        working-directory: src-tauri
+        run: cargo fmt --check
+
+      - name: Compile Check (cargo check)
+        working-directory: src-tauri
+        run: cargo check
+
+      - name: Run Backend Unit & Integration Tests (cargo test)
+        working-directory: src-tauri
+        run: cargo test --verbose
+
+      - name: Rust Static Analysis (cargo clippy)
+        working-directory: src-tauri
+        run: cargo clippy
