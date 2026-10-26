@@ -50,7 +50,6 @@ export function RealEstateSpreadsheetTable({
   // Filtros de Planilha
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedNeighborhood, setSelectedNeighborhood] = useState('ALL');
-  const [selectedStatus, setSelectedStatus] = useState('ALL');
 
   // Paginação
   const [page, setPage] = useState(0);
@@ -73,15 +72,7 @@ export function RealEstateSpreadsheetTable({
         return false;
       }
 
-      // 2. Filtro de Status
-      if (selectedStatus === 'NORMALIZADO' && p.status !== 'NORMALIZADO') {
-        return false;
-      }
-      if (selectedStatus === 'COM_INCONSISTENCIA' && p.status === 'NORMALIZADO') {
-        return false;
-      }
-
-      // 3. Busca por texto livre (Matrícula, Titular, Logradouro, Bairro, UUID)
+      // 2. Busca por texto livre (Matrícula, Contribuinte, Rua, Bairro, UUID)
       if (searchTerm.trim()) {
         const query = searchTerm.toLowerCase().trim();
         const mat = (p.matricula || p.identifier || '').toLowerCase();
@@ -102,7 +93,7 @@ export function RealEstateSpreadsheetTable({
       }
 
       return true;
-    }), [properties, selectedNeighborhood, selectedStatus, searchTerm]);
+    }), [properties, selectedNeighborhood, searchTerm]);
 
   // Registros paginados
   const paginatedProperties = useMemo(() => {
@@ -115,12 +106,11 @@ export function RealEstateSpreadsheetTable({
   const handleResetFilters = () => {
     setSearchTerm('');
     setSelectedNeighborhood('ALL');
-    setSelectedStatus('ALL');
     setPage(0);
   };
 
   const hasActiveFilters = Boolean(
-    searchTerm.trim() || selectedNeighborhood !== 'ALL' || selectedStatus !== 'ALL'
+    searchTerm.trim() || selectedNeighborhood !== 'ALL'
   );
 
   return (
@@ -184,24 +174,13 @@ export function RealEstateSpreadsheetTable({
           </Box>
         </Box>
 
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Chip
-            label={`${filteredProperties.length} ${
-              filteredProperties.length === 1 ? 'imóvel listado' : 'imóveis listados'
-            }`}
-            color="primary"
-            variant="outlined"
-            sx={{ fontWeight: 700, fontSize: '0.78rem' }}
-          />
-
-          {onRefresh && (
-            <Tooltip title="Atualizar dados do banco local">
-              <IconButton size="small" onClick={onRefresh} disabled={isLoading}>
-                <Iconify icon="solar:refresh-bold" width={20} />
-              </IconButton>
-            </Tooltip>
-          )}
-        </Box>
+        {onRefresh && (
+          <Tooltip title="Atualizar dados do banco local">
+            <IconButton size="small" onClick={onRefresh} disabled={isLoading}>
+              <Iconify icon="solar:refresh-bold" width={20} />
+            </IconButton>
+          </Tooltip>
+        )}
       </Box>
 
       {/* 2. BARRA DE FILTROS AVANÇADOS DA PLANILHA */}
@@ -271,24 +250,6 @@ export function RealEstateSpreadsheetTable({
             </Select>
           </FormControl>
 
-          {/* Filtro por Status */}
-          <FormControl size="small" sx={{ minWidth: 170, bgcolor: 'background.paper' }}>
-            <InputLabel id="status-filter-label">Status Cadastral</InputLabel>
-            <Select
-              labelId="status-filter-label"
-              value={selectedStatus}
-              label="Status Cadastral"
-              onChange={(e) => {
-                setSelectedStatus(e.target.value);
-                setPage(0);
-              }}
-            >
-              <MenuItem value="ALL">Todos os Status</MenuItem>
-              <MenuItem value="NORMALIZADO">Apenas Normalizados</MenuItem>
-              <MenuItem value="COM_INCONSISTENCIA">Com Apontamentos</MenuItem>
-            </Select>
-          </FormControl>
-
           {hasActiveFilters && (
             <Button
               size="small"
@@ -303,7 +264,7 @@ export function RealEstateSpreadsheetTable({
           )}
         </Box>
 
-        {/* Controles de Paginação Superior */}
+        {/* Controles de Linhas por Página */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <Typography variant="caption" sx={{ color: colors.text.secondary }}>
             Linhas por página:
@@ -322,27 +283,6 @@ export function RealEstateSpreadsheetTable({
             <MenuItem value={50}>50</MenuItem>
             <MenuItem value={100}>100</MenuItem>
           </Select>
-
-          <Typography variant="caption" sx={{ color: colors.text.secondary, minWidth: 70, textAlign: 'center' }}>
-            {totalPages > 0 ? `${page + 1} de ${totalPages}` : '0 de 0'}
-          </Typography>
-
-          <Box sx={{ display: 'flex', gap: 0.5 }}>
-            <IconButton
-              size="small"
-              disabled={page === 0}
-              onClick={() => setPage((p) => Math.max(0, p - 1))}
-            >
-              <Iconify icon="solar:arrow-left-bold" width={16} />
-            </IconButton>
-            <IconButton
-              size="small"
-              disabled={page >= totalPages - 1}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              <Iconify icon="solar:arrow-right-bold" width={16} />
-            </IconButton>
-          </Box>
         </Box>
       </Box>
 
