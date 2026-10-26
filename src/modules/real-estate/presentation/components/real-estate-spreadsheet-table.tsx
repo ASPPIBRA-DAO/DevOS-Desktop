@@ -74,9 +74,9 @@ export function RealEstateSpreadsheetTable({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedNeighborhood, setSelectedNeighborhood] = useState('ALL');
 
-  // Paginação
+  // Paginação (fixada em 25 registros para máxima performance sem travamentos)
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(25);
+  const rowsPerPage = 25;
 
   // Lista dinâmica de Bairros carregada do banco de dados oficial
   const [bairrosDb, setBairrosDb] = useState<string[]>([]);
@@ -334,27 +334,6 @@ export function RealEstateSpreadsheetTable({
               Limpar Filtros
             </Button>
           )}
-        </Box>
-
-        {/* Controles de Linhas por Página */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Typography variant="caption" sx={{ color: colors.text.secondary }}>
-            Linhas por página:
-          </Typography>
-          <Select
-            size="small"
-            value={rowsPerPage}
-            onChange={(e) => {
-              setRowsPerPage(Number(e.target.value));
-              setPage(0);
-            }}
-            sx={{ height: 32, fontSize: '0.8rem', bgcolor: 'background.paper' }}
-          >
-            <MenuItem value={10}>10</MenuItem>
-            <MenuItem value={25}>25</MenuItem>
-            <MenuItem value={50}>50</MenuItem>
-            <MenuItem value={100}>100</MenuItem>
-          </Select>
         </Box>
       </Box>
 
@@ -657,6 +636,24 @@ export function RealEstateSpreadsheetTable({
           >
             Início
           </Button>
+
+          <IconButton
+            size="small"
+            disabled={page === 0}
+            onClick={() => setPage((prev) => Math.max(0, prev - 1))}
+            sx={{ p: 0.5 }}
+          >
+            <Iconify icon="solar:arrow-left-linear" width={16} />
+          </IconButton>
+
+          <IconButton
+            size="small"
+            disabled={page >= totalPages - 1}
+            onClick={() => setPage((prev) => Math.min(totalPages - 1, prev + 1))}
+            sx={{ p: 0.5 }}
+          >
+            <Iconify icon="solar:arrow-right-linear" width={16} />
+          </IconButton>
 
           <Button
             size="small"
