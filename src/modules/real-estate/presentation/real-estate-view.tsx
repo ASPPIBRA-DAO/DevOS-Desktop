@@ -1,18 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
-import Tab from '@mui/material/Tab';
 import Chip from '@mui/material/Chip';
-import Tabs from '@mui/material/Tabs';
-import Paper from '@mui/material/Paper';
-import Table from '@mui/material/Table';
 import Button from '@mui/material/Button';
-import TableRow from '@mui/material/TableRow';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableHead from '@mui/material/TableHead';
 import Typography from '@mui/material/Typography';
-import TableContainer from '@mui/material/TableContainer';
 
 import { colors } from '../../../shared/theme/palette';
 import { ReconciliationReportButton } from '../../reports';
@@ -41,7 +32,6 @@ export function RealEstateView() {
   const [preview, setPreview] = useState<XlsxPreviewReport | null>(null);
   const [executionReport, setExecutionReport] = useState<ImportExecutionReport | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState(0);
 
   // Controle Hierárquico Territorial (Estado / Município)
   const [selectedStateUf, setSelectedStateUf] = useState('RJ');
@@ -234,17 +224,8 @@ export function RealEstateView() {
         handleExecuteImport={handleExecuteImport}
       />
 
-      {/* Seção com Abas de Navegação */}
-      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
-        <Tabs value={activeTab} onChange={(_, val) => setActiveTab(val)}>
-          <Tab label={`Planilha Cadastral (${properties.length})`} />
-          <Tab label={`Apontamentos de Auditoria (${findings.length})`} />
-          <Tab label={`Lotes de Importação (${batches.length})`} />
-        </Tabs>
-      </Box>
-
-      {/* Aba 0: Planilha Cadastral Territorial (Espelho do Banco SQLite WAL) */}
-      {activeTab === 0 && (
+      {/* Planilha Cadastral Territorial (Espelho Direto do Banco SQLite WAL) */}
+      <Box sx={{ mt: 3.5 }}>
         <RealEstateSpreadsheetTable
           properties={properties}
           preview={preview}
@@ -253,122 +234,7 @@ export function RealEstateView() {
           onTriggerPreview={handleGeneratePreview}
           onTriggerPilot={() => handleExecuteImport(50)}
         />
-      )}
-
-      {/* Aba 1: Apontamentos de Auditoria */}
-      {activeTab === 1 && (
-        <TableContainer component={Paper} variant="outlined">
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 700 }}>ID</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Categoria</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Gravidade</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Origem</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Descrição</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Status Análise</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Registrado Em</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {findings.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} align="center" sx={{ py: 3, color: colors.text.secondary }}>
-                    Nenhuma inconsistência aberta encontrada.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                findings.map((f) => (
-                  <TableRow key={f.id}>
-                    <TableCell sx={{ fontWeight: 700 }}>#{f.id}</TableCell>
-                    <TableCell>
-                      <Chip size="small" variant="outlined" label={f.category} />
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        size="small"
-                        label={f.severity}
-                        color={f.severity === 'HIGH' ? 'error' : f.severity === 'MEDIUM' ? 'warning' : 'info'}
-                      />
-                    </TableCell>
-                    <TableCell sx={{ fontSize: '0.8rem' }}>{f.source}</TableCell>
-                    <TableCell>{f.description}</TableCell>
-                    <TableCell>{f.analysis_status}</TableCell>
-                    <TableCell sx={{ fontSize: '0.8rem' }}>{f.created_at}</TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      )}
-
-      {/* Aba 2: Lotes de Importação */}
-      {activeTab === 2 && (
-        <TableContainer component={Paper} variant="outlined">
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 700 }}>ID</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Arquivo</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Aba</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Modo</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Linhas Lidas</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Importados</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Última Linha</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Inconsistências</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Data / Hora</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {batches.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={10} align="center" sx={{ py: 3, color: colors.text.secondary }}>
-                    Nenhum lote importado até o momento.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                batches.map((b) => (
-                  <TableRow key={b.id}>
-                    <TableCell sx={{ fontWeight: 700 }}>#{b.id}</TableCell>
-                    <TableCell>{b.source_filename}</TableCell>
-                    <TableCell>{b.sheet_name}</TableCell>
-                    <TableCell>
-                      <Chip
-                        size="small"
-                        variant="outlined"
-                        label={b.import_mode}
-                        color={b.import_mode === 'FULL' ? 'primary' : 'info'}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        size="small"
-                        label={b.status}
-                        color={
-                          b.status === 'COMPLETED'
-                            ? 'success'
-                            : b.status === 'PILOT_COMPLETED'
-                            ? 'info'
-                            : b.status === 'IN_PROGRESS'
-                            ? 'warning'
-                            : 'error'
-                        }
-                      />
-                    </TableCell>
-                    <TableCell>{b.total_rows_read.toLocaleString('pt-BR')}</TableCell>
-                    <TableCell>{b.total_records_imported.toLocaleString('pt-BR')}</TableCell>
-                    <TableCell>{b.last_processed_row.toLocaleString('pt-BR')}</TableCell>
-                    <TableCell>{b.total_inconsistencies_detected}</TableCell>
-                    <TableCell sx={{ fontSize: '0.8rem' }}>{b.started_at}</TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      )}
+      </Box>
         </>
       )}
     </Box>

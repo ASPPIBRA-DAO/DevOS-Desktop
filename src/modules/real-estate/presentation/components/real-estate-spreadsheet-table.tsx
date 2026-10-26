@@ -23,7 +23,6 @@ import InputAdornment from '@mui/material/InputAdornment';
 
 import { colors } from '../../../../shared/theme/palette';
 import { Iconify } from '../../../../shared/components/iconify';
-import { StatusBadge } from '../../../../shared/components/StatusBadge';
 import {
   type PropertySummary,
   type XlsxPreviewReport,
@@ -56,9 +55,6 @@ export function RealEstateSpreadsheetTable({
   // Paginação
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
-
-  // Copiar UUID Feedback
-  const [copiedUuid, setCopiedUuid] = useState<string | null>(null);
 
   // Lista dinâmica de Bairros únicos presentes nos dados cadastrados
   const uniqueNeighborhoods = useMemo(() => {
@@ -115,14 +111,6 @@ export function RealEstateSpreadsheetTable({
   }, [filteredProperties, page, rowsPerPage]);
 
   const totalPages = Math.ceil(filteredProperties.length / rowsPerPage);
-
-  const handleCopyUuid = (uuid: string) => {
-    if (navigator?.clipboard?.writeText) {
-      navigator.clipboard.writeText(uuid);
-      setCopiedUuid(uuid);
-      setTimeout(() => setCopiedUuid(null), 2500);
-    }
-  };
 
   const handleResetFilters = () => {
     setSearchTerm('');
@@ -392,8 +380,6 @@ export function RealEstateSpreadsheetTable({
               <TableCell align="center" sx={{ width: 80 }}>Quadra</TableCell>
               <TableCell align="center" sx={{ width: 80 }}>Lote</TableCell>
               <TableCell sx={{ minWidth: 140 }}>Complemento</TableCell>
-              <TableCell align="center" sx={{ width: 130 }}>Status</TableCell>
-              <TableCell align="center" sx={{ width: 90 }}>Ações</TableCell>
             </TableRow>
           </TableHead>
 
@@ -401,7 +387,7 @@ export function RealEstateSpreadsheetTable({
             {properties.length === 0 ? (
               /* CASO 1: BANCO VAZIO (NENHUM REGISTRO IMPORTADO AINDA) */
               <TableRow>
-                <TableCell colSpan={11} align="center" sx={{ py: 6 }}>
+                <TableCell colSpan={9} align="center" sx={{ py: 6 }}>
                   <Box sx={{ maxWidth: 500, mx: 'auto', textAlign: 'center' }}>
                     <Box
                       sx={{
@@ -478,7 +464,7 @@ export function RealEstateSpreadsheetTable({
             ) : paginatedProperties.length === 0 ? (
               /* CASO 2: NENHUM REGISTRO ENCONTRADO PELOS FILTROS */
               <TableRow>
-                <TableCell colSpan={11} align="center" sx={{ py: 5 }}>
+                <TableCell colSpan={9} align="center" sx={{ py: 5 }}>
                   <Typography variant="body2" sx={{ color: colors.text.secondary, mb: 1.5 }}>
                     Nenhum imóvel corresponde aos critérios de pesquisa selecionados.
                   </Typography>
@@ -665,42 +651,6 @@ export function RealEstateSpreadsheetTable({
                       >
                         {complementoDisplay}
                       </Typography>
-                    </TableCell>
-
-                    {/* Status */}
-                    <TableCell align="center">
-                      <StatusBadge
-                        status={isConflict ? 'PENDING' : 'ACTIVE'}
-                        label={isConflict ? 'Em Auditoria' : 'Normalizado'}
-                      />
-                    </TableCell>
-
-                    {/* Ações / UUID */}
-                    <TableCell align="center">
-                      <Tooltip
-                        title={
-                          copiedUuid === prop.uuid
-                            ? 'UUID Copiado!'
-                            : `Copiar UUID: ${prop.uuid}`
-                        }
-                      >
-                        <IconButton
-                          size="small"
-                          onClick={() => handleCopyUuid(prop.uuid)}
-                          sx={{
-                            color: copiedUuid === prop.uuid ? colors.primary.main : 'text.secondary',
-                          }}
-                        >
-                          <Iconify
-                            icon={
-                              copiedUuid === prop.uuid
-                                ? 'solar:check-read-bold'
-                                : 'solar:copy-bold'
-                            }
-                            width={16}
-                          />
-                        </IconButton>
-                      </Tooltip>
                     </TableCell>
                   </TableRow>
                 );
