@@ -1,6 +1,7 @@
 import type { EditionConfig } from './types';
 
 import { paths } from '../../routes/paths';
+import { LedgerView } from '../../modules/ledger';
 import { RealEstateView } from '../../modules/real-estate';
 import { CockpitDashboardPage } from './cockpit/cockpit-dashboard-page';
 
@@ -27,6 +28,18 @@ export const currentEdition: EditionConfig = {
       label: 'Banco Imobiliário (Explorer)',
       icon: 'solar:database-bold',
       component: RealEstateView,
+    },
+    {
+      path: paths.devos.ledger,
+      label: 'Livro-Razão',
+      icon: 'solar:book-bookmark-bold',
+      component: LedgerView,
+    },
+    {
+      path: paths.devos.dao,
+      label: 'Tesouraria & Livro-Razão',
+      icon: 'solar:shield-star-bold',
+      component: LedgerView,
     },
     {
       path: '/real-estate',
