@@ -17,3 +17,21 @@ export function formatBytes(bytes: number, decimals = 2): string {
 }
 
 export const fData = formatBytes;
+
+export function fCurrency(inputValue: number | string | null | undefined): string {
+  if (inputValue === null || inputValue === undefined || isNaN(Number(inputValue))) return 'R$ 0,00';
+  const num = Number(inputValue);
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  }).format(num);
+}
+
+export function fNumber(
+  inputValue: number | string | null | undefined,
+  options?: Intl.NumberFormatOptions
+): string {
+  if (inputValue === null || inputValue === undefined || isNaN(Number(inputValue))) return '0';
+  const num = Number(inputValue);
+  return new Intl.NumberFormat('pt-BR', options).format(num);
+}
