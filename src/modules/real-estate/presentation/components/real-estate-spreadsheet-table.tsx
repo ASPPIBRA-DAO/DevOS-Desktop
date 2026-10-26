@@ -221,7 +221,7 @@ export function RealEstateSpreadsheetTable({
           {/* Busca por texto */}
           <TextField
             size="small"
-            placeholder="Buscar por Matrícula, Titular, Rua, Bairro..."
+            placeholder="Buscar por Matrícula, Contribuinte, Rua, Bairro..."
             value={searchTerm}
             onChange={(e) => {
               setSearchTerm(e.target.value);
@@ -373,9 +373,9 @@ export function RealEstateSpreadsheetTable({
             >
               <TableCell align="center" sx={{ width: 60 }}># ID</TableCell>
               <TableCell sx={{ minWidth: 120 }}>Matrícula</TableCell>
-              <TableCell sx={{ minWidth: 200 }}>Titular / Contribuinte</TableCell>
+              <TableCell sx={{ minWidth: 200 }}>Contribuinte</TableCell>
               <TableCell sx={{ minWidth: 140 }}>Bairro</TableCell>
-              <TableCell sx={{ minWidth: 180 }}>Logradouro / Rua</TableCell>
+              <TableCell sx={{ minWidth: 180 }}>Rua</TableCell>
               <TableCell align="center" sx={{ width: 80 }}>Nº</TableCell>
               <TableCell align="center" sx={{ width: 80 }}>Quadra</TableCell>
               <TableCell align="center" sx={{ width: 80 }}>Lote</TableCell>
@@ -551,23 +551,17 @@ export function RealEstateSpreadsheetTable({
                       </Typography>
                     </TableCell>
 
-                    {/* Logradouro / Rua */}
+                    {/* Rua */}
                     <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                        <Iconify icon="solar:point-on-map-bold" width={14} color="text.secondary" />
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            fontSize: '0.82rem',
-                            maxWidth: 200,
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                          }}
-                        >
-                          {ruaDisplay}
-                        </Typography>
-                      </Box>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontSize: '0.82rem',
+                          fontWeight: 500,
+                        }}
+                      >
+                        {ruaDisplay}
+                      </Typography>
                     </TableCell>
 
                     {/* Nº */}
