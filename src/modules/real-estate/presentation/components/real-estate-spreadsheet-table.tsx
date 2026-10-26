@@ -477,26 +477,25 @@ export function RealEstateSpreadsheetTable({
                     }}
                   >
                     {/* ID */}
-                    <TableCell align="center" sx={{ fontWeight: 700, color: colors.text.secondary }}>
-                      #{prop.id}
+                    <TableCell align="center">
+                      <Typography variant="body2" sx={{ fontSize: '0.82rem', fontWeight: 600, color: 'text.secondary' }}>
+                        #{prop.id}
+                      </Typography>
                     </TableCell>
 
                     {/* Matrícula */}
                     <TableCell>
                       {hasMatricula ? (
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                          <Typography
-                            variant="body2"
-                            sx={{
-                              fontFamily: 'monospace',
-                              fontWeight: 700,
-                              fontSize: '0.85rem',
-                              color: colors.primary.main,
-                            }}
-                          >
-                            {matriculaDisplay}
-                          </Typography>
-                        </Box>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            fontWeight: 600,
+                            fontSize: '0.82rem',
+                            color: colors.primary.main,
+                          }}
+                        >
+                          {matriculaDisplay}
+                        </Typography>
                       ) : (
                         <Chip
                           size="small"
@@ -514,6 +513,7 @@ export function RealEstateSpreadsheetTable({
                         sx={{
                           fontWeight: 600,
                           fontSize: '0.82rem',
+                          color: 'text.primary',
                         }}
                       >
                         {titularDisplay}
@@ -522,7 +522,7 @@ export function RealEstateSpreadsheetTable({
 
                     {/* Bairro */}
                     <TableCell>
-                      <Typography variant="body2" sx={{ fontSize: '0.82rem', fontWeight: 500 }}>
+                      <Typography variant="body2" sx={{ fontSize: '0.82rem', fontWeight: 400, color: 'text.primary' }}>
                         {bairroDisplay}
                       </Typography>
                     </TableCell>
@@ -533,7 +533,8 @@ export function RealEstateSpreadsheetTable({
                         variant="body2"
                         sx={{
                           fontSize: '0.82rem',
-                          fontWeight: 500,
+                          fontWeight: 400,
+                          color: 'text.primary',
                         }}
                       >
                         {ruaDisplay}
@@ -542,21 +543,21 @@ export function RealEstateSpreadsheetTable({
 
                     {/* Nº */}
                     <TableCell align="center">
-                      <Typography variant="body2" sx={{ fontSize: '0.82rem', fontWeight: 600 }}>
+                      <Typography variant="body2" sx={{ fontSize: '0.82rem', fontWeight: 400, color: 'text.primary' }}>
                         {numeroDisplay}
                       </Typography>
                     </TableCell>
 
                     {/* Quadra */}
                     <TableCell align="center">
-                      <Typography variant="body2" sx={{ fontSize: '0.82rem', fontWeight: 500 }}>
+                      <Typography variant="body2" sx={{ fontSize: '0.82rem', fontWeight: 400, color: 'text.primary' }}>
                         {quadraDisplay}
                       </Typography>
                     </TableCell>
 
                     {/* Lote */}
                     <TableCell align="center">
-                      <Typography variant="body2" sx={{ fontSize: '0.82rem', fontWeight: 500 }}>
+                      <Typography variant="body2" sx={{ fontSize: '0.82rem', fontWeight: 400, color: 'text.primary' }}>
                         {loteDisplay}
                       </Typography>
                     </TableCell>
@@ -564,9 +565,11 @@ export function RealEstateSpreadsheetTable({
                     {/* Complemento */}
                     <TableCell>
                       <Typography
-                        variant="caption"
+                        variant="body2"
                         sx={{
-                          color: colors.text.secondary,
+                          fontSize: '0.82rem',
+                          fontWeight: 400,
+                          color: 'text.secondary',
                           maxWidth: 160,
                           display: 'block',
                           whiteSpace: 'nowrap',
