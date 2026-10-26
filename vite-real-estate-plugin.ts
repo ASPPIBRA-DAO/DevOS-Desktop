@@ -184,6 +184,92 @@ export function cockpitRealEstateSqlitePlugin(): Plugin {
           }
         }
 
+        // 4. Exportação completa da planilha em formato CSV com streaming de alta velocidade
+        if (pathname === '/api/real-estate/export-csv') {
+          try {
+            const bairro = url.searchParams.get('bairro');
+            const search = url.searchParams.get('search');
+
+            let query = `
+              SELECT 
+                p.id, 
+                (SELECT pi.raw_value FROM property_identifiers pi WHERE pi.property_id = p.id AND pi.identifier_type LIKE '%MATRICULA%' ORDER BY pi.id ASC LIMIT 1) AS matricula,
+                (SELECT pi.raw_value FROM property_identifiers pi WHERE pi.property_id = p.id AND pi.identifier_type = 'TITULAR_DECLARADO' ORDER BY pi.id ASC LIMIT 1) AS titular,
+                a.neighborhood as bairro,
+                a.street as rua,
+                a.number as numero,
+                a.complement as complemento,
+                a.raw_address as address
+              FROM properties p
+              LEFT JOIN property_address_links pal ON pal.property_id = p.id AND pal.is_primary = 1
+              LEFT JOIN addresses a ON a.id = pal.address_id
+            `;
+
+            const conditions: string[] = [];
+            const params: (string | number)[] = [];
+
+            if (bairro && bairro !== 'ALL') {
+              conditions.push('a.neighborhood = ?');
+              params.push(bairro);
+            }
+
+            if (search && search.trim()) {
+              conditions.push('(a.street LIKE ? OR a.neighborhood LIKE ? OR (SELECT pi.raw_value FROM property_identifiers pi WHERE pi.property_id = p.id AND pi.identifier_type = \'TITULAR_DECLARADO\' LIMIT 1) LIKE ?)');
+              const s = `%${search.trim()}%`;
+              params.push(s, s, s);
+            }
+
+            if (conditions.length > 0) {
+              query += ' WHERE ' + conditions.join(' AND ');
+            }
+
+            query += ' ORDER BY p.id ASC';
+
+            const filename = bairro && bairro !== 'ALL'
+              ? `cadastro-imobiliario-marica-${bairro.toLowerCase().replace(/[^a-z0-9]/g, '_')}.csv`
+              : 'cadastro-imobiliario-marica-completo-145756.csv';
+
+            res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+            res.write('\uFEFF'); // UTF-8 BOM para garantir acentuação correta no Excel
+            res.write('ID;Matrícula;Contribuinte;Bairro;Logradouro;Número;Quadra;Lote;Complemento\n');
+
+            const stmt = db.prepare(query);
+            for (const r of stmt.iterate(...params) as Iterable<{
+              id: number;
+              matricula: string | null;
+              titular: string | null;
+              bairro: string | null;
+              rua: string | null;
+              numero: string | null;
+              complemento: string | null;
+              address: string | null;
+            }>) {
+              const qd = parseAddressToken(r.address, 'Qd:') || '';
+              const lt = parseAddressToken(r.address, 'Lt:') || '';
+              const line = [
+                r.id,
+                `"${(r.matricula || '').replace(/"/g, '""')}"`,
+                `"${(r.titular || '').replace(/"/g, '""')}"`,
+                `"${(r.bairro || '').replace(/"/g, '""')}"`,
+                `"${(r.rua || '').replace(/"/g, '""')}"`,
+                `"${(r.numero || 'S/N').replace(/"/g, '""')}"`,
+                `"${qd.replace(/"/g, '""')}"`,
+                `"${lt.replace(/"/g, '""')}"`,
+                `"${(r.complemento || '').replace(/"/g, '""')}"`,
+              ].join(';') + '\n';
+              res.write(line);
+            }
+
+            res.end();
+            return;
+          } catch (e: any) {
+            res.statusCode = 500;
+            res.end(JSON.stringify({ error: e?.message }));
+            return;
+          }
+        }
+
         next();
       });
     },

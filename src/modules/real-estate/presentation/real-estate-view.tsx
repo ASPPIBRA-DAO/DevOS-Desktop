@@ -35,6 +35,8 @@ export function RealEstateView() {
   const [batches, setBatches] = useState<ImportBatchSummary[]>([]);
   const [findings, setFindings] = useState<AuditFindingSummary[]>([]);
   const [properties, setProperties] = useState<PropertySummary[]>([]);
+  const [selectedNeighborhood, setSelectedNeighborhood] = useState<string>('ALL');
+  const [searchTerm, setSearchTerm] = useState<string>('');
 
   const loadStatsAndData = useCallback(async () => {
     setIsLoading(true);
@@ -123,6 +125,8 @@ export function RealEstateView() {
                 batches={batches}
                 findings={findings}
                 properties={properties}
+                selectedNeighborhood={selectedNeighborhood}
+                searchTerm={searchTerm}
               />
               <Button
                 variant="outlined"
@@ -143,6 +147,10 @@ export function RealEstateView() {
         <RealEstateSpreadsheetTable
           properties={properties}
           isLoading={isLoading}
+          selectedNeighborhood={selectedNeighborhood}
+          onSelectNeighborhood={setSelectedNeighborhood}
+          searchTerm={searchTerm}
+          onSearchChange={setSearchTerm}
           onRefresh={loadStatsAndData}
         />
       </Box>

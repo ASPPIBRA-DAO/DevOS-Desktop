@@ -194,7 +194,9 @@ export const RealEstateReconciliationReport: React.FC<RealEstateReconciliationRe
         )}
       </View>
 
-      <Text style={styles.sectionTitle}>Planilha Cadastral Territorial (Imóveis Registrados)</Text>
+      <Text style={styles.sectionTitle}>
+        Planilha Cadastral Territorial ({data.properties?.length ? `${data.properties.length.toLocaleString('pt-BR')} Imóveis Registrados` : 'Imóveis Registrados'})
+      </Text>
       <View style={styles.table}>
         <View style={styles.tableRowHeader}>
           <Text style={[styles.headerText, styles.propColId]}>#ID</Text>
@@ -229,6 +231,13 @@ export const RealEstateReconciliationReport: React.FC<RealEstateReconciliationRe
           ))
         )}
       </View>
+      {data.properties && data.properties.length > 0 && data.stats && data.properties.length < data.stats.totalProperties && (
+        <View style={{ marginTop: 6, marginBottom: 10, padding: 6, backgroundColor: '#0f172a', borderRadius: 4, borderWidth: 0.5, borderColor: '#1e293b' }}>
+          <Text style={[styles.cellText, { textAlign: 'center', color: '#94a3b8', fontSize: 6.5 }]}>
+            Documento analítico contendo {data.properties.length.toLocaleString('pt-BR')} registros impressos da base territorial oficial de Maricá - RJ (total de {data.stats.totalProperties.toLocaleString('pt-BR')} imóveis cadastrados). Para a extração integral sem limite de paginação, utilize a exportação completa em Planilha CSV.
+          </Text>
+        </View>
+      )}
     </DocumentLayout>
   </Document>
 );

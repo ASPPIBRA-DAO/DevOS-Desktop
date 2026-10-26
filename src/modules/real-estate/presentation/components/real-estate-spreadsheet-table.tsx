@@ -58,6 +58,10 @@ interface RealEstateSpreadsheetTableProps {
   properties: PropertySummary[];
   preview?: XlsxPreviewReport | null;
   isLoading?: boolean;
+  selectedNeighborhood?: string;
+  onSelectNeighborhood?: (bairro: string) => void;
+  searchTerm?: string;
+  onSearchChange?: (term: string) => void;
   onRefresh?: () => void;
   onTriggerPreview?: () => void;
   onTriggerPilot?: () => void;
@@ -67,14 +71,30 @@ export function RealEstateSpreadsheetTable({
   properties,
   preview,
   isLoading = false,
+  selectedNeighborhood: propNeighborhood,
+  onSelectNeighborhood,
+  searchTerm: propSearch,
+  onSearchChange,
   onRefresh,
   onTriggerPreview,
   onTriggerPilot,
 }: RealEstateSpreadsheetTableProps) {
-  // Filtros de Planilha
-  const [searchTerm, setSearchTerm] = useState('');
+  // Filtros de Planilha (suporta modo controlado pelo pai ou interno)
+  const [internalSearch, setInternalSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [selectedNeighborhood, setSelectedNeighborhood] = useState('ALL');
+  const [internalNeighborhood, setInternalNeighborhood] = useState('ALL');
+
+  const searchTerm = propSearch !== undefined ? propSearch : internalSearch;
+  const setSearchTerm = (term: string) => {
+    setInternalSearch(term);
+    onSearchChange?.(term);
+  };
+
+  const selectedNeighborhood = propNeighborhood !== undefined ? propNeighborhood : internalNeighborhood;
+  const setSelectedNeighborhood = (bairro: string) => {
+    setInternalNeighborhood(bairro);
+    onSelectNeighborhood?.(bairro);
+  };
 
   // Registros carregados dinamicamente para Rolagem Contínua (Infinite Scroll)
   const [items, setItems] = useState<PropertySummary[]>(properties || []);
@@ -232,13 +252,53 @@ export function RealEstateSpreadsheetTable({
           </Typography>
         </Box>
 
-        {onRefresh && (
-          <Tooltip title="Atualizar dados do banco local">
-            <IconButton size="small" onClick={onRefresh} disabled={isLoading}>
-              <Iconify icon="solar:refresh-bold" width={20} />
-            </IconButton>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Tooltip title={`Baixar ${selectedNeighborhood === 'ALL' ? 'Base Completa (145.756 Linhas CSV)' : `Planilha de ${selectedNeighborhood} (CSV)`}`}>
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => {
+                const params = new URLSearchParams();
+                if (selectedNeighborhood && selectedNeighborhood !== 'ALL') {
+                  params.set('bairro', selectedNeighborhood);
+                }
+                if (debouncedSearch && debouncedSearch.trim()) {
+                  params.set('search', debouncedSearch.trim());
+                }
+                const url = `/api/real-estate/export-csv?${params.toString()}`;
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = selectedNeighborhood && selectedNeighborhood !== 'ALL'
+                  ? `cadastro-imobiliario-marica-${selectedNeighborhood.toLowerCase().replace(/[^a-z0-9]/g, '_')}.csv`
+                  : 'cadastro-imobiliario-marica-completo-145756.csv';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+              }}
+              startIcon={<Iconify icon="solar:file-download-bold" width={16} />}
+              sx={{
+                fontWeight: 700,
+                fontSize: '0.75rem',
+                borderColor: 'rgba(0, 167, 111, 0.4)',
+                color: colors.primary.main,
+                '&:hover': {
+                  bgcolor: 'rgba(0, 167, 111, 0.08)',
+                  borderColor: colors.primary.main,
+                },
+              }}
+            >
+              Exportar CSV ({selectedNeighborhood === 'ALL' ? '145.756' : toTitleCase(selectedNeighborhood)})
+            </Button>
           </Tooltip>
-        )}
+
+          {onRefresh && (
+            <Tooltip title="Atualizar dados do banco local">
+              <IconButton size="small" onClick={onRefresh} disabled={isLoading}>
+                <Iconify icon="solar:refresh-bold" width={20} />
+              </IconButton>
+            </Tooltip>
+          )}
+        </Box>
       </Box>
 
       {/* 2. BARRA DE FILTROS AVANÇADOS DA PLANILHA */}
