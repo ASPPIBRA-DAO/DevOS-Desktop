@@ -232,7 +232,7 @@ export function RealEstateSpreadsheetTable({
                 setPage(0);
               }}
             >
-              <MenuItem value="ALL">Todos os Bairros ({properties.length})</MenuItem>
+              <MenuItem value="ALL">Todos</MenuItem>
               {uniqueNeighborhoods.map((n) => (
                 <MenuItem key={n} value={n}>
                   {n}
