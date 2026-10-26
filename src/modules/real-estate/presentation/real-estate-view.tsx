@@ -122,7 +122,12 @@ export function RealEstateView() {
             </Box>
 
             <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
-              <ReconciliationReportButton stats={stats} batches={batches} findings={findings} />
+              <ReconciliationReportButton
+                stats={stats}
+                batches={batches}
+                findings={findings}
+                properties={properties}
+              />
               <Button
                 variant="outlined"
                 size="small"

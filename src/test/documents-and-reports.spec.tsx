@@ -50,11 +50,32 @@ describe('Módulos Documents & Reports — Geração e Compilação', () => {
     },
   ];
 
+  const mockProperties = [
+    {
+      id: 1,
+      uuid: 'uuid-1',
+      identifier: '7656.0',
+      identifier_type: 'MATRICULA',
+      address: 'Rua DOIS, 0 - Chácaras de Inoã',
+      created_at: '2026-10-24T10:00:00Z',
+      matricula: '7656.0',
+      titular: 'BRUNO NUNES SANTOS',
+      bairro: 'Chácaras de Inoã',
+      rua: 'DOIS',
+      numero: '0',
+      quadra: '0.0',
+      lote: '39.0',
+      complemento: 'Chácaras de Inoã',
+      status: 'NORMALIZADO',
+    },
+  ];
+
   it('deve compilar o modelo de relatório analítico a partir dos dados do backend', () => {
     const compiled = ReportCompilerService.compileReconciliationReport(
       mockStats,
       mockBatches,
-      mockFindings
+      mockFindings,
+      mockProperties
     );
 
     expect(compiled.stats.totalProperties).toBe(42);
@@ -63,6 +84,10 @@ describe('Módulos Documents & Reports — Geração e Compilação', () => {
     expect(compiled.batches[0].filename).toBe('lote_teste_01.xlsx');
     expect(compiled.findings).toHaveLength(1);
     expect(compiled.findings[0].category).toBe('DUPLICATE_IDENTIFIER');
+    expect(compiled.properties).toHaveLength(1);
+    expect(compiled.properties[0].matricula).toBe('7656.0');
+    expect(compiled.properties[0].contribuinte).toBe('BRUNO NUNES SANTOS');
+    expect(compiled.properties[0].rua).toBe('DOIS');
   });
 
   it('deve suportar compilação segura mesmo sem lotes ou apontamentos', () => {
@@ -71,6 +96,7 @@ describe('Módulos Documents & Reports — Geração e Compilação', () => {
     expect(compiled.stats.totalProperties).toBe(42);
     expect(compiled.batches).toEqual([]);
     expect(compiled.findings).toEqual([]);
+    expect(compiled.properties).toEqual([]);
   });
 
   it('deve gerar um Blob PDF real e válido com cabeçalho mágico %PDF-', async () => {

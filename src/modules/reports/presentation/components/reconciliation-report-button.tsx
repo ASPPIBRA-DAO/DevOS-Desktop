@@ -1,5 +1,6 @@
 import type {
   RealEstateStats,
+  PropertySummary,
   ImportBatchSummary,
   AuditFindingSummary,
 } from '../../../../platform/tauri/real-estate/real-estate-bridge';
@@ -16,6 +17,7 @@ export interface ReconciliationReportButtonProps {
   stats: RealEstateStats | null;
   batches?: ImportBatchSummary[];
   findings?: AuditFindingSummary[];
+  properties?: PropertySummary[];
   disabled?: boolean;
 }
 
@@ -23,13 +25,19 @@ export const ReconciliationReportButton: React.FC<ReconciliationReportButtonProp
   stats,
   batches = [],
   findings = [],
+  properties = [],
   disabled = false,
 }) => {
   const [open, setOpen] = useState(false);
 
   if (!stats) return null;
 
-  const reportModel = ReportCompilerService.compileReconciliationReport(stats, batches, findings);
+  const reportModel = ReportCompilerService.compileReconciliationReport(
+    stats,
+    batches,
+    findings,
+    properties
+  );
   const documentElement = <RealEstateReconciliationReport data={reportModel} />;
 
   return (

@@ -67,6 +67,15 @@ const styles = StyleSheet.create({
   col2: { width: '45%' },
   col3: { width: '20%' },
   col4: { width: '20%', textAlign: 'right' },
+  propColId: { width: '6%', textAlign: 'center' },
+  propColMatricula: { width: '11%' },
+  propColContribuinte: { width: '22%' },
+  propColBairro: { width: '14%' },
+  propColRua: { width: '17%' },
+  propColNumero: { width: '6%', textAlign: 'center' },
+  propColQuadra: { width: '7%', textAlign: 'center' },
+  propColLote: { width: '7%', textAlign: 'center' },
+  propColComplemento: { width: '10%' },
   headerText: {
     fontSize: 7,
     fontWeight: 'bold',
@@ -180,6 +189,42 @@ export const RealEstateReconciliationReport: React.FC<RealEstateReconciliationRe
               >
                 {finding.severity}
               </Text>
+            </View>
+          ))
+        )}
+      </View>
+
+      <Text style={styles.sectionTitle}>Planilha Cadastral Territorial (Imóveis Registrados)</Text>
+      <View style={styles.table}>
+        <View style={styles.tableRowHeader}>
+          <Text style={[styles.headerText, styles.propColId]}>#ID</Text>
+          <Text style={[styles.headerText, styles.propColMatricula]}>Matrícula</Text>
+          <Text style={[styles.headerText, styles.propColContribuinte]}>Contribuinte</Text>
+          <Text style={[styles.headerText, styles.propColBairro]}>Bairro</Text>
+          <Text style={[styles.headerText, styles.propColRua]}>Rua</Text>
+          <Text style={[styles.headerText, styles.propColNumero]}>Nº</Text>
+          <Text style={[styles.headerText, styles.propColQuadra]}>Quadra</Text>
+          <Text style={[styles.headerText, styles.propColLote]}>Lote</Text>
+          <Text style={[styles.headerText, styles.propColComplemento]}>Complemento</Text>
+        </View>
+        {!data.properties || data.properties.length === 0 ? (
+          <View style={styles.tableRow}>
+            <Text style={[styles.cellText, { width: '100%', textAlign: 'center' }]}>
+              Nenhum imóvel cadastrado registrado no banco local.
+            </Text>
+          </View>
+        ) : (
+          data.properties.map((prop) => (
+            <View key={prop.id} style={styles.tableRow} wrap={false}>
+              <Text style={[styles.cellTextEmphasis, styles.propColId]}>#{prop.id}</Text>
+              <Text style={[styles.cellText, styles.propColMatricula]}>{prop.matricula}</Text>
+              <Text style={[styles.cellTextEmphasis, styles.propColContribuinte]}>{prop.contribuinte}</Text>
+              <Text style={[styles.cellText, styles.propColBairro]}>{prop.bairro}</Text>
+              <Text style={[styles.cellText, styles.propColRua]}>{prop.rua}</Text>
+              <Text style={[styles.cellText, styles.propColNumero]}>{prop.numero}</Text>
+              <Text style={[styles.cellText, styles.propColQuadra]}>{prop.quadra}</Text>
+              <Text style={[styles.cellText, styles.propColLote]}>{prop.lote}</Text>
+              <Text style={[styles.cellText, styles.propColComplemento]}>{prop.complemento}</Text>
             </View>
           ))
         )}

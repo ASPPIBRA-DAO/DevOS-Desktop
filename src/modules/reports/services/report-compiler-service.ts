@@ -1,8 +1,21 @@
 import type {
   RealEstateStats,
+  PropertySummary,
   ImportBatchSummary,
   AuditFindingSummary,
 } from '../../../platform/tauri/real-estate/real-estate-bridge';
+
+export interface ReconciliationReportPropertyItem {
+  id: number;
+  matricula: string;
+  contribuinte: string;
+  bairro: string;
+  rua: string;
+  numero: string;
+  quadra: string;
+  lote: string;
+  complemento: string;
+}
 
 export interface ReconciliationReportModel {
   generatedAt: string;
@@ -29,6 +42,7 @@ export interface ReconciliationReportModel {
     description: string;
     status: string;
   }>;
+  properties: ReconciliationReportPropertyItem[];
 }
 
 export class ReportCompilerService {
@@ -38,7 +52,8 @@ export class ReportCompilerService {
   static compileReconciliationReport(
     stats: RealEstateStats,
     batches: ImportBatchSummary[] = [],
-    findings: AuditFindingSummary[] = []
+    findings: AuditFindingSummary[] = [],
+    properties: PropertySummary[] = []
   ): ReconciliationReportModel {
     return {
       generatedAt: new Date().toLocaleString('pt-BR'),
@@ -64,6 +79,17 @@ export class ReportCompilerService {
         severity: f.severity,
         description: f.description,
         status: f.analysis_status,
+      })),
+      properties: properties.map((p) => ({
+        id: p.id,
+        matricula: p.matricula || p.identifier || '—',
+        contribuinte: p.titular || '—',
+        bairro: p.bairro || '—',
+        rua: p.rua || '—',
+        numero: p.numero || 'S/N',
+        quadra: p.quadra || '—',
+        lote: p.lote || '—',
+        complemento: p.complemento || '—',
       })),
     };
   }
