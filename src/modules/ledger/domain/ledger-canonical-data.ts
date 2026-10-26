@@ -2,7 +2,7 @@ import type {
   LedgerAccount,
   ICitizenSummary,
   IFinancialProfile,
-} from './ledger-models';
+} from './ledger-models.ts';
 
 // ----------------------------------------------------------------------
 // Canonical D1 Double-Entry Ledger Data (V16)
