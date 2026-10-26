@@ -37,10 +37,11 @@ export * from './illustrations';
 export * from './custom-dialog';
 export * from './empty-content';
 
+export * from './abnt-document';
 export * from './loading-screen';
 export * from './custom-popover';
 export * from './filters-result';
 export * from './file-thumbnail';
-export * from './search-not-found';
 
+export * from './search-not-found';
 export * from './custom-breadcrumbs';
