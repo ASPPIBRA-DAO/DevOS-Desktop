@@ -482,8 +482,8 @@ export function RealEstateSpreadsheetTable({
                 const bairroDisplay = prop.bairro || '—';
                 const ruaDisplay = prop.rua || '—';
                 const numeroDisplay = prop.numero || 'S/N';
-                const quadraDisplay = prop.quadra ? `Qd. ${prop.quadra}` : '—';
-                const loteDisplay = prop.lote ? `Lt. ${prop.lote}` : '—';
+                const quadraDisplay = prop.quadra || '—';
+                const loteDisplay = prop.lote || '—';
                 const complementoDisplay = prop.complemento || '—';
                 const isConflict = prop.status === 'COM_INCONSISTENCIA';
 
@@ -602,38 +602,16 @@ export function RealEstateSpreadsheetTable({
 
                     {/* Quadra */}
                     <TableCell align="center">
-                      {prop.quadra ? (
-                        <Chip
-                          size="small"
-                          label={quadraDisplay}
-                          sx={{
-                            fontSize: '0.7rem',
-                            height: 20,
-                            fontWeight: 600,
-                            bgcolor: 'rgba(15, 23, 42, 0.06)',
-                          }}
-                        />
-                      ) : (
-                        '—'
-                      )}
+                      <Typography variant="body2" sx={{ fontSize: '0.82rem', fontWeight: 500 }}>
+                        {quadraDisplay}
+                      </Typography>
                     </TableCell>
 
                     {/* Lote */}
                     <TableCell align="center">
-                      {prop.lote ? (
-                        <Chip
-                          size="small"
-                          label={loteDisplay}
-                          sx={{
-                            fontSize: '0.7rem',
-                            height: 20,
-                            fontWeight: 600,
-                            bgcolor: 'rgba(15, 23, 42, 0.06)',
-                          }}
-                        />
-                      ) : (
-                        '—'
-                      )}
+                      <Typography variant="body2" sx={{ fontSize: '0.82rem', fontWeight: 500 }}>
+                        {loteDisplay}
+                      </Typography>
                     </TableCell>
 
                     {/* Complemento */}
