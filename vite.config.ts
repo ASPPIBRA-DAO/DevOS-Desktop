@@ -6,6 +6,7 @@ import react from '@vitejs/plugin-react-swc';
 import { createRequire } from 'node:module';
 
 import { cockpitRealEstateSqlitePlugin } from './vite-real-estate-plugin.ts';
+import { cockpitLedgerPlugin } from './vite-ledger-plugin.ts';
 
 const require = createRequire(import.meta.url);
 
@@ -28,6 +29,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [
       cockpitRealEstateSqlitePlugin(),
+      cockpitLedgerPlugin(),
       react(),
       checker({
         typescript: true,
