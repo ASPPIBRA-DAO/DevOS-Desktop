@@ -112,7 +112,7 @@ export function RealEstateView() {
                 <Typography variant="body2" sx={{ fontWeight: 600 }}>Rio de Janeiro (RJ)</Typography>
                 <Typography variant="caption" sx={{ color: 'text.disabled' }}>❯</Typography>
                 <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary' }}>
-                  Maricá (Base Ativa)
+                  Maricá
                 </Typography>
               </Box>
             </Box>
