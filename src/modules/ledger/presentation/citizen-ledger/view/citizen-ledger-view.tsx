@@ -26,6 +26,7 @@ import { FinancialSummaryHeader } from '../components/financial-summary-header';
 import { FinancialTransactionsTable } from '../components/financial-transactions-table';
 import {
   exportCitizenLedgerPdf,
+  printCitizenLedgerHtml,
   type ExportCitizenLedgerPdfPayload,
 } from '../../../services/ledger-export-service';
 
@@ -148,7 +149,7 @@ export function CitizenLedgerView() {
         },
       };
 
-      const result = await exportCitizenLedgerPdf(payload);
+      const result = await exportCitizenLedgerPdf(payload, profileToRender, dataFiltered);
       toast.success(`Relatório compilado com sucesso! Arquivo: ${result.file_name || result.file_path}`);
     } catch (err: any) {
       toast.error(err.message || 'Falha ao compilar relatório em PDF');
@@ -280,10 +281,7 @@ export function CitizenLedgerView() {
               variant="outlined"
               color="inherit"
               startIcon={<Iconify icon={'solar:printer-bold' as any} />}
-              onClick={() => {
-                setOpenPreview(false);
-                setTimeout(() => window.print(), 150);
-              }}
+              onClick={() => printCitizenLedgerHtml()}
               sx={{ borderRadius: 1.5 }}
             >
               Imprimir Folha A4
