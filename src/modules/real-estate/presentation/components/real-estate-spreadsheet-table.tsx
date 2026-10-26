@@ -157,26 +157,9 @@ export function RealEstateSpreadsheetTable({
           >
             <Iconify icon="solar:document-text-bold" width={24} />
           </Box>
-          <Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-              <Typography variant="h6" sx={{ fontWeight: 800 }}>
-                Planilha Cadastral Territorial
-              </Typography>
-              <Chip
-                size="small"
-                label="Base SQLite WAL"
-                sx={{
-                  fontFamily: 'monospace',
-                  fontSize: '0.72rem',
-                  fontWeight: 700,
-                  bgcolor: 'rgba(15, 23, 42, 0.08)',
-                }}
-              />
-            </Box>
-            <Typography variant="caption" sx={{ color: colors.text.secondary }}>
-              Espelho tabular normalizado do cadastro territorial de Maricá — RJ com proveniência e integridade auditável
-            </Typography>
-          </Box>
+          <Typography variant="h6" sx={{ fontWeight: 800 }}>
+            Planilha Cadastral Territorial
+          </Typography>
         </Box>
 
         {onRefresh && (
