@@ -159,7 +159,7 @@ export function CitizenLedgerView() {
 
   return (
     <>
-      <Box>
+      <Box className="no-print">
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', mb: 3 }}>
           <Box sx={{ display: 'flex', gap: 1.5 }}>
             <Button
@@ -170,7 +170,7 @@ export function CitizenLedgerView() {
               sx={{ borderRadius: 1.5 }}
               disabled={!profile}
             >
-              Visualizar Relatório
+              Visualizar Extrato A4
             </Button>
 
             <Button
@@ -187,7 +187,7 @@ export function CitizenLedgerView() {
               disabled={exporting || !profile}
               sx={{ borderRadius: 1.5 }}
             >
-              {exporting ? 'Compilando via Typst...' : 'Exportar PDF'}
+              {exporting ? 'Compilando via Typst...' : 'Exportar PDF A4'}
             </Button>
           </Box>
         </Box>
@@ -226,6 +226,13 @@ export function CitizenLedgerView() {
           </>
         )}
       </Box>
+
+      {/* Extrato Oficial Fiduciário A4 Padrão (Garante que a impressão e PDF gerem sempre a folha A4 e nunca a interface) */}
+      <FinancialHistoryPrint
+        transactions={dataFiltered}
+        profile={profileToRender}
+        preview={false}
+      />
 
       {/* Modal de Pré-Visualização do Relatório Oficial em Alta Fidelidade */}
       <Dialog
@@ -269,6 +276,19 @@ export function CitizenLedgerView() {
           </Box>
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Button
+              variant="outlined"
+              color="inherit"
+              startIcon={<Iconify icon={'solar:printer-bold' as any} />}
+              onClick={() => {
+                setOpenPreview(false);
+                setTimeout(() => window.print(), 150);
+              }}
+              sx={{ borderRadius: 1.5 }}
+            >
+              Imprimir Folha A4
+            </Button>
+
             <Button
               variant="contained"
               color="primary"
