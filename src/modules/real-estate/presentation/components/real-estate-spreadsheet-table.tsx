@@ -190,7 +190,7 @@ export function RealEstateSpreadsheetTable({
           {/* Busca por texto */}
           <TextField
             size="small"
-            placeholder="Buscar por Matrícula, Contribuinte, Rua, Bairro..."
+            placeholder="Buscar imóvel..."
             value={searchTerm}
             onChange={(e) => {
               setSearchTerm(e.target.value);
@@ -200,28 +200,71 @@ export function RealEstateSpreadsheetTable({
               input: {
                 startAdornment: (
                   <InputAdornment position="start">
-                    <Iconify icon="solar:magnifer-bold" width={18} color="text.secondary" />
+                    <Iconify icon="solar:magnifer-linear" width={18} sx={{ color: 'text.disabled' }} />
                   </InputAdornment>
                 ),
                 endAdornment: searchTerm ? (
                   <InputAdornment position="end">
-                    <IconButton size="small" onClick={() => setSearchTerm('')}>
-                      <Iconify icon="solar:close-circle-bold" width={16} />
+                    <IconButton size="small" onClick={() => setSearchTerm('')} sx={{ p: 0.5 }}>
+                      <Iconify icon="solar:close-circle-bold" width={16} sx={{ color: 'text.disabled', '&:hover': { color: 'text.primary' } }} />
                     </IconButton>
                   </InputAdornment>
                 ) : undefined,
               },
             }}
             sx={{
-              minWidth: { xs: '100%', sm: 220, md: 260 },
+              minWidth: { xs: '100%', sm: 220, md: 280 },
               flex: { xs: '1 1 100%', sm: '1 1 240px' },
               bgcolor: 'background.paper',
               borderRadius: 1.5,
+              '& .MuiOutlinedInput-root': {
+                borderRadius: 1.5,
+                transition: 'all 0.2s ease-in-out',
+                '& fieldset': {
+                  borderColor: 'rgba(145, 158, 171, 0.24)',
+                },
+                '&:hover fieldset': {
+                  borderColor: 'rgba(0, 167, 111, 0.4)',
+                },
+                '&.Mui-focused fieldset': {
+                  borderColor: colors.primary.main,
+                  borderWidth: 1.5,
+                  boxShadow: '0 0 0 3px rgba(0, 167, 111, 0.12)',
+                },
+              },
+              '& .MuiInputBase-input': {
+                fontSize: '0.875rem',
+                '&::placeholder': {
+                  color: 'text.disabled',
+                  opacity: 1,
+                },
+              },
             }}
           />
 
           {/* Filtro por Bairro */}
-          <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 160 }, bgcolor: 'background.paper' }}>
+          <FormControl
+            size="small"
+            sx={{
+              minWidth: { xs: '100%', sm: 160 },
+              bgcolor: 'background.paper',
+              '& .MuiOutlinedInput-root': {
+                borderRadius: 1.5,
+                transition: 'all 0.2s ease-in-out',
+                '& fieldset': {
+                  borderColor: 'rgba(145, 158, 171, 0.24)',
+                },
+                '&:hover fieldset': {
+                  borderColor: 'rgba(0, 167, 111, 0.4)',
+                },
+                '&.Mui-focused fieldset': {
+                  borderColor: colors.primary.main,
+                  borderWidth: 1.5,
+                  boxShadow: '0 0 0 3px rgba(0, 167, 111, 0.12)',
+                },
+              },
+            }}
+          >
             <InputLabel id="neighborhood-filter-label">Bairro</InputLabel>
             <Select
               labelId="neighborhood-filter-label"
