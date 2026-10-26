@@ -533,38 +533,15 @@ export function RealEstateSpreadsheetTable({
 
                     {/* Titular / Contribuinte */}
                     <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Box
-                          sx={{
-                            width: 26,
-                            height: 26,
-                            borderRadius: '50%',
-                            bgcolor: 'rgba(145, 158, 171, 0.16)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '0.65rem',
-                            fontWeight: 800,
-                            color: colors.text.secondary,
-                            flexShrink: 0,
-                          }}
-                        >
-                          {titularDisplay.charAt(0) || '—'}
-                        </Box>
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            fontWeight: 600,
-                            fontSize: '0.82rem',
-                            maxWidth: 220,
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                          }}
-                        >
-                          {titularDisplay}
-                        </Typography>
-                      </Box>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontWeight: 600,
+                          fontSize: '0.82rem',
+                        }}
+                      >
+                        {titularDisplay}
+                      </Typography>
                     </TableCell>
 
                     {/* Bairro */}
