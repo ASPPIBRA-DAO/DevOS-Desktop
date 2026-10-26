@@ -122,6 +122,9 @@ export function RealEstateSpreadsheetTable({
         border: '1px solid rgba(145, 158, 171, 0.2)',
         bgcolor: 'background.paper',
         boxShadow: '0 4px 20px -2px rgba(15, 23, 42, 0.06)',
+        width: '100%',
+        maxWidth: '100%',
+        boxSizing: 'border-box',
       }}
     >
       {/* 1. CABEÇALHO DA PLANILHA & METADADOS DO BANCO */}
@@ -135,9 +138,11 @@ export function RealEstateSpreadsheetTable({
           justifyContent: 'space-between',
           gap: 2,
           bgcolor: 'rgba(0, 167, 111, 0.03)',
+          width: '100%',
+          boxSizing: 'border-box',
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
           <Box
             sx={{
               width: 42,
@@ -153,7 +158,7 @@ export function RealEstateSpreadsheetTable({
             <Iconify icon="solar:document-text-bold" width={24} />
           </Box>
           <Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
               <Typography variant="h6" sx={{ fontWeight: 800 }}>
                 Planilha Cadastral Territorial
               </Typography>
@@ -194,9 +199,11 @@ export function RealEstateSpreadsheetTable({
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: 2,
+          width: '100%',
+          boxSizing: 'border-box',
         }}
       >
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1.5, flex: 1 }}>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1.5, flex: 1, minWidth: 0 }}>
           {/* Busca por texto */}
           <TextField
             size="small"
@@ -223,14 +230,15 @@ export function RealEstateSpreadsheetTable({
               },
             }}
             sx={{
-              minWidth: { xs: '100%', sm: 300, md: 360 },
+              minWidth: { xs: '100%', sm: 220, md: 260 },
+              flex: { xs: '1 1 100%', sm: '1 1 240px' },
               bgcolor: 'background.paper',
               borderRadius: 1.5,
             }}
           />
 
           {/* Filtro por Bairro */}
-          <FormControl size="small" sx={{ minWidth: 180, bgcolor: 'background.paper' }}>
+          <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 160 }, bgcolor: 'background.paper' }}>
             <InputLabel id="neighborhood-filter-label">Bairro</InputLabel>
             <Select
               labelId="neighborhood-filter-label"
@@ -294,9 +302,11 @@ export function RealEstateSpreadsheetTable({
           maxHeight: 650,
           border: 'none',
           borderRadius: 0,
+          overflowX: 'auto',
+          width: '100%',
         }}
       >
-        <Table stickyHeader size="small" sx={{ minWidth: 1000 }}>
+        <Table stickyHeader size="small" sx={{ minWidth: 860, width: '100%' }}>
           <TableHead>
             <TableRow
               sx={{
@@ -311,15 +321,15 @@ export function RealEstateSpreadsheetTable({
                 },
               }}
             >
-              <TableCell align="center" sx={{ width: 60 }}># ID</TableCell>
-              <TableCell sx={{ minWidth: 120 }}>Matrícula</TableCell>
-              <TableCell sx={{ minWidth: 200 }}>Contribuinte</TableCell>
-              <TableCell sx={{ minWidth: 140 }}>Bairro</TableCell>
-              <TableCell sx={{ minWidth: 180 }}>Rua</TableCell>
-              <TableCell align="center" sx={{ width: 80 }}>Nº</TableCell>
-              <TableCell align="center" sx={{ width: 80 }}>Quadra</TableCell>
-              <TableCell align="center" sx={{ width: 80 }}>Lote</TableCell>
-              <TableCell sx={{ minWidth: 140 }}>Complemento</TableCell>
+              <TableCell align="center" sx={{ width: 50 }}># ID</TableCell>
+              <TableCell sx={{ minWidth: 100 }}>Matrícula</TableCell>
+              <TableCell sx={{ minWidth: 180 }}>Contribuinte</TableCell>
+              <TableCell sx={{ minWidth: 120 }}>Bairro</TableCell>
+              <TableCell sx={{ minWidth: 150 }}>Rua</TableCell>
+              <TableCell align="center" sx={{ width: 60 }}>Nº</TableCell>
+              <TableCell align="center" sx={{ width: 70 }}>Quadra</TableCell>
+              <TableCell align="center" sx={{ width: 70 }}>Lote</TableCell>
+              <TableCell sx={{ minWidth: 130 }}>Complemento</TableCell>
             </TableRow>
           </TableHead>
 

@@ -60,7 +60,7 @@ export function RealEstateView() {
   }, [loadStatsAndData]);
 
   return (
-    <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: 1400, mx: 'auto' }}>
+    <Box sx={{ p: { xs: 1.5, sm: 2, md: 2.5 }, width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
       {/* 1. VISÃO A: HUB TERRITORIAL (SELETOR DE ESTADOS E MUNICÍPIOS) */}
       {!selectedCityId ? (
         <TerritorialHubSelector
@@ -121,7 +121,7 @@ export function RealEstateView() {
               </Box>
             </Box>
 
-            <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
               <ReconciliationReportButton
                 stats={stats}
                 batches={batches}
@@ -143,7 +143,7 @@ export function RealEstateView() {
       <RealEstateMetricsBar stats={stats} />
 
       {/* Planilha Cadastral Territorial (Espelho Direto do Banco SQLite WAL) */}
-      <Box sx={{ mt: 3.5 }}>
+      <Box sx={{ mt: 3.5, width: '100%', maxWidth: '100%', overflow: 'hidden' }}>
         <RealEstateSpreadsheetTable
           properties={properties}
           isLoading={isLoading}
