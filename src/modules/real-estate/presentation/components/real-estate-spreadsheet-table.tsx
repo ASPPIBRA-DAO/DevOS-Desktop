@@ -30,6 +30,28 @@ import {
 
 // ----------------------------------------------------------------------
 
+/**
+ * Normaliza strings para o padrão Title Case elegante (primeira letra maiúscula),
+ * preservando preposições e artigos em minúsculo.
+ */
+function toTitleCase(str: string): string {
+  if (!str || str === '—' || str === 'S/N') return str;
+  const lowerExceptions = new Set(['de', 'da', 'do', 'das', 'dos', 'e', 'em']);
+  return str
+    .toLowerCase()
+    .split(' ')
+    .filter(Boolean)
+    .map((word, index) => {
+      if (index > 0 && lowerExceptions.has(word)) {
+        return word;
+      }
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    })
+    .join(' ');
+}
+
+// ----------------------------------------------------------------------
+
 interface RealEstateSpreadsheetTableProps {
   properties: PropertySummary[];
   preview?: XlsxPreviewReport | null;
@@ -278,7 +300,7 @@ export function RealEstateSpreadsheetTable({
               <MenuItem value="ALL">Todos</MenuItem>
               {uniqueNeighborhoods.map((n) => (
                 <MenuItem key={n} value={n}>
-                  {n}
+                  {toTitleCase(n)}
                 </MenuItem>
               ))}
             </Select>
@@ -454,13 +476,13 @@ export function RealEstateSpreadsheetTable({
               paginatedProperties.map((prop, idx) => {
                 const matriculaDisplay = prop.matricula || prop.identifier || '—';
                 const hasMatricula = Boolean(prop.matricula || prop.identifier);
-                const titularDisplay = prop.titular || '—';
-                const bairroDisplay = prop.bairro || '—';
-                const ruaDisplay = prop.rua || '—';
+                const titularDisplay = toTitleCase(prop.titular || '—');
+                const bairroDisplay = toTitleCase(prop.bairro || '—');
+                const ruaDisplay = toTitleCase(prop.rua || '—');
                 const numeroDisplay = prop.numero || 'S/N';
                 const quadraDisplay = prop.quadra || '—';
                 const loteDisplay = prop.lote || '—';
-                const complementoDisplay = prop.complemento || '—';
+                const complementoDisplay = toTitleCase(prop.complemento || '—');
                 const isConflict = prop.status === 'COM_INCONSISTENCIA';
 
                 return (
@@ -478,7 +500,7 @@ export function RealEstateSpreadsheetTable({
                   >
                     {/* ID */}
                     <TableCell align="center">
-                      <Typography variant="body2" sx={{ fontSize: '0.82rem', fontWeight: 600, color: 'text.secondary' }}>
+                      <Typography variant="body2" sx={{ fontSize: '0.82rem', fontWeight: 400, color: 'text.secondary' }}>
                         #{prop.id}
                       </Typography>
                     </TableCell>
@@ -489,7 +511,7 @@ export function RealEstateSpreadsheetTable({
                         <Typography
                           variant="body2"
                           sx={{
-                            fontWeight: 600,
+                            fontWeight: 400,
                             fontSize: '0.82rem',
                             color: colors.primary.main,
                           }}
@@ -511,7 +533,7 @@ export function RealEstateSpreadsheetTable({
                       <Typography
                         variant="body2"
                         sx={{
-                          fontWeight: 600,
+                          fontWeight: 400,
                           fontSize: '0.82rem',
                           color: 'text.primary',
                         }}
