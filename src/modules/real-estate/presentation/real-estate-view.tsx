@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
-import Chip from '@mui/material/Chip';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 
@@ -112,12 +111,9 @@ export function RealEstateView() {
                 <Typography variant="caption" sx={{ color: 'text.disabled' }}>❯</Typography>
                 <Typography variant="body2" sx={{ fontWeight: 600 }}>Rio de Janeiro (RJ)</Typography>
                 <Typography variant="caption" sx={{ color: 'text.disabled' }}>❯</Typography>
-                <Chip
-                  size="small"
-                  label="Maricá (Base Ativa)"
-                  color="primary"
-                  sx={{ fontWeight: 800, fontSize: '0.75rem' }}
-                />
+                <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                  Maricá (Base Ativa)
+                </Typography>
               </Box>
             </Box>
 
