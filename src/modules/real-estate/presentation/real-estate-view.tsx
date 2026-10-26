@@ -8,7 +8,6 @@ import Typography from '@mui/material/Typography';
 import { colors } from '../../../shared/theme/palette';
 import { ReconciliationReportButton } from '../../reports';
 import { Iconify } from '../../../shared/components/iconify';
-import { StatusBadge } from '../../../shared/components/StatusBadge';
 import { RealEstateMetricsBar } from './components/real-estate-metrics-bar';
 import { TerritorialHubSelector } from './components/territorial-hub-selector';
 import { RealEstateSpreadsheetTable } from './components/real-estate-spreadsheet-table';
@@ -133,31 +132,6 @@ export function RealEstateView() {
                 Atualizar Painel
               </Button>
             </Box>
-          </Box>
-
-          {/* Header Institucional de Maricá */}
-          <Box sx={{ mb: 4, pb: 2.5, borderBottom: `1px solid ${colors.background.border}` }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2, mb: 1 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                <Typography variant="h3" sx={{ fontWeight: 800 }}>
-                  Maricá — Cadastro Territorial & Auditoria
-                </Typography>
-                <StatusBadge status="ACTIVE" label="Base Operacional" />
-                <Chip
-                  size="small"
-                  label="real_estate.sqlite (WAL)"
-                  sx={{
-                    bgcolor: 'rgba(0, 167, 111, 0.12)',
-                    color: colors.primary.main,
-                    fontWeight: 700,
-                    fontSize: '0.75rem',
-                  }}
-                />
-              </Box>
-            </Box>
-            <Typography variant="body2" sx={{ color: colors.text.secondary }}>
-              Ingestão rastreável de cadastros territoriais, proveniência criptográfica (SHA-256) e normalização idempotente para o município de <strong>Maricá - RJ</strong>.
-            </Typography>
           </Box>
 
       {/* Métricas Consolidadas */}
