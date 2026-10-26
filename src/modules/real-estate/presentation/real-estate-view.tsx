@@ -11,27 +11,18 @@ import { Iconify } from '../../../shared/components/iconify';
 import { StatusBadge } from '../../../shared/components/StatusBadge';
 import { RealEstateMetricsBar } from './components/real-estate-metrics-bar';
 import { TerritorialHubSelector } from './components/territorial-hub-selector';
-import { RealEstateImporterCard } from './components/real-estate-importer-card';
 import { RealEstateSpreadsheetTable } from './components/real-estate-spreadsheet-table';
 import {
   RealEstateBridge,
   type PropertySummary,
   type RealEstateStats,
-  type XlsxPreviewReport,
   type ImportBatchSummary,
   type AuditFindingSummary,
-  type ImportExecutionReport,
 } from '../../../platform/tauri/real-estate/real-estate-bridge';
 
 export function RealEstateView() {
   const [stats, setStats] = useState<RealEstateStats | null>(null);
-  const [filePath, setFilePath] = useState('/home/sandro/Downloads/Mapa5.xlsx');
-  const [sheetName, setSheetName] = useState('endereco');
-  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
-  const [isImporting, setIsImporting] = useState(false);
-  const [preview, setPreview] = useState<XlsxPreviewReport | null>(null);
-  const [executionReport, setExecutionReport] = useState<ImportExecutionReport | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Controle Hierárquico Territorial (Estado / Município)
   const [selectedStateUf, setSelectedStateUf] = useState('RJ');
@@ -42,12 +33,13 @@ export function RealEstateView() {
     return null;
   });
 
-  // Dados auxiliares para as abas
+  // Dados auxiliares
   const [batches, setBatches] = useState<ImportBatchSummary[]>([]);
   const [findings, setFindings] = useState<AuditFindingSummary[]>([]);
   const [properties, setProperties] = useState<PropertySummary[]>([]);
 
   const loadStatsAndData = useCallback(async () => {
+    setIsLoading(true);
     try {
       const s = await RealEstateBridge.getStats();
       setStats(s);
@@ -59,51 +51,14 @@ export function RealEstateView() {
       setProperties(p);
     } catch (err: unknown) {
       console.warn('Erro ao carregar dados imobiliários:', err);
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
     loadStatsAndData();
   }, [loadStatsAndData]);
-
-  const handleGeneratePreview = async () => {
-    setErrorMessage(null);
-    setIsLoadingPreview(true);
-    setExecutionReport(null);
-    try {
-      const rep = await RealEstateBridge.previewImport(filePath, sheetName);
-      setPreview(rep);
-    } catch (err: unknown) {
-      setErrorMessage(err instanceof Error ? err.message : String(err));
-    } finally {
-      setIsLoadingPreview(false);
-    }
-  };
-
-  const handleExecuteImport = async (limit?: number) => {
-    setErrorMessage(null);
-    setIsImporting(true);
-    try {
-      const rep = await RealEstateBridge.executeImport(filePath, sheetName, limit);
-      setExecutionReport(rep);
-      await loadStatsAndData();
-    } catch (err: unknown) {
-      setErrorMessage(err instanceof Error ? err.message : String(err));
-    } finally {
-      setIsImporting(false);
-    }
-  };
-
-  const handlePickFile = async () => {
-    try {
-      const selected = await RealEstateBridge.selectFile();
-      if (selected) {
-        setFilePath(selected);
-      }
-    } catch (err: unknown) {
-      console.warn('Falha ao abrir seletor nativo:', err);
-    }
-  };
 
   return (
     <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: 1400, mx: 'auto' }}>
@@ -208,31 +163,12 @@ export function RealEstateView() {
       {/* Métricas Consolidadas */}
       <RealEstateMetricsBar stats={stats} />
 
-      {/* Caixa de Importação Cadastral V1 */}
-      <RealEstateImporterCard
-        filePath={filePath}
-        setFilePath={setFilePath}
-        sheetName={sheetName}
-        setSheetName={setSheetName}
-        isLoadingPreview={isLoadingPreview}
-        isImporting={isImporting}
-        preview={preview}
-        executionReport={executionReport}
-        errorMessage={errorMessage}
-        handlePickFile={handlePickFile}
-        handleGeneratePreview={handleGeneratePreview}
-        handleExecuteImport={handleExecuteImport}
-      />
-
       {/* Planilha Cadastral Territorial (Espelho Direto do Banco SQLite WAL) */}
       <Box sx={{ mt: 3.5 }}>
         <RealEstateSpreadsheetTable
           properties={properties}
-          preview={preview}
-          isLoading={isLoadingPreview || isImporting}
+          isLoading={isLoading}
           onRefresh={loadStatsAndData}
-          onTriggerPreview={handleGeneratePreview}
-          onTriggerPilot={() => handleExecuteImport(50)}
         />
       </Box>
         </>

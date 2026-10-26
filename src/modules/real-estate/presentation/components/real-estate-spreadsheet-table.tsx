@@ -409,8 +409,8 @@ export function RealEstateSpreadsheetTable({
                     <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 0.75 }}>
                       O Banco de Dados Territorial de Maricá está Pronto
                     </Typography>
-                    <Typography variant="body2" sx={{ color: colors.text.secondary, mb: 3 }}>
-                      A base <strong>real_estate.sqlite (WAL)</strong> está estruturada e isolada. Utilize o importador acima para carregar as linhas da planilha oficial <strong>Mapa5.xlsx</strong> (aba <em>endereco</em>).
+                    <Typography variant="body2" sx={{ color: colors.text.secondary, mb: onTriggerPreview || onTriggerPilot ? 3 : 0 }}>
+                      A base territorial <strong>real_estate.sqlite (WAL)</strong> está estruturada e pronta para consulta e auditoria de <strong>Maricá - RJ</strong>.
                     </Typography>
 
                     <Box sx={{ display: 'flex', gap: 1.5, justifyContent: 'center' }}>
