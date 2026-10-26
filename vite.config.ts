@@ -5,6 +5,8 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react-swc';
 import { createRequire } from 'node:module';
 
+import { cockpitRealEstateSqlitePlugin } from './vite-real-estate-plugin.ts';
+
 const require = createRequire(import.meta.url);
 
 const PORT = 8080;
@@ -25,6 +27,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [
+      cockpitRealEstateSqlitePlugin(),
       react(),
       checker({
         typescript: true,

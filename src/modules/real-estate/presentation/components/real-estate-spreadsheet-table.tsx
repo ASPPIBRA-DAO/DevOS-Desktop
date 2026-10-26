@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -24,6 +24,7 @@ import InputAdornment from '@mui/material/InputAdornment';
 import { colors } from '../../../../shared/theme/palette';
 import { Iconify } from '../../../../shared/components/iconify';
 import {
+  RealEstateBridge,
   type PropertySummary,
   type XlsxPreviewReport,
 } from '../../../../platform/tauri/real-estate/real-estate-bridge';
@@ -77,15 +78,30 @@ export function RealEstateSpreadsheetTable({
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
 
-  // Lista dinâmica de Bairros únicos presentes nos dados cadastrados
+  // Lista dinâmica de Bairros carregada do banco de dados oficial
+  const [bairrosDb, setBairrosDb] = useState<string[]>([]);
+
+  useEffect(() => {
+    RealEstateBridge.listNeighborhoods()
+      .then((data) => {
+        if (data && data.length > 0) {
+          setBairrosDb(data);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const uniqueNeighborhoods = useMemo(() => {
+    if (bairrosDb.length > 0) {
+      return bairrosDb;
+    }
     const set = new Set<string>();
     properties.forEach((p) => {
       const b = p.bairro?.trim();
       if (b) set.add(b);
     });
     return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [properties]);
+  }, [bairrosDb, properties]);
 
   // Filtragem dos registros
   const filteredProperties = useMemo(() => properties.filter((p) => {

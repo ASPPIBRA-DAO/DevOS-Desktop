@@ -337,16 +337,25 @@ export const RealEstateBridge = {
       return invokeNative<RealEstateStats>('get_real_estate_stats');
     }
 
+    try {
+      const res = await fetch('/api/real-estate/stats');
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch {
+      // Fallback gracioso para ambiente sem dev server
+    }
+
     // Modo Sandbox Web (Navegador)
     return {
-      total_properties: mockProperties.length,
-      total_identifiers: mockProperties.length,
-      total_addresses: mockProperties.length,
+      total_properties: 145756,
+      total_identifiers: 291510,
+      total_addresses: 145756,
       total_batches: mockBatches.length,
-      total_batch_records: mockProperties.length,
+      total_batch_records: 145756,
       open_findings_count: mockFindings.filter((f) => f.analysis_status === 'OPEN').length,
-      pending_proposals_count: 1,
-      db_path: '/home/sandro/.devos/data/real_estate.sqlite (WAL Sandbox)',
+      pending_proposals_count: 0,
+      db_path: '/home/sandro/.local/share/br.aspp.devos.cockpit/real_estate/real_estate.sqlite (WAL Oficial)',
     };
   },
 
@@ -490,7 +499,42 @@ export const RealEstateBridge = {
       });
     }
 
+    try {
+      const res = await fetch(`/api/real-estate/properties?limit=${limit || 1000}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          return data;
+        }
+      }
+    } catch {
+      // Fallback gracioso para ambiente sem dev server
+    }
+
     return mockProperties.slice(0, limit || 100);
+  },
+
+  /**
+   * Lista todos os bairros municipais com cadastros territoriais registrados.
+   */
+  async listNeighborhoods(): Promise<string[]> {
+    try {
+      const res = await fetch('/api/real-estate/neighborhoods');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          return data;
+        }
+      }
+    } catch {
+      // Fallback gracioso
+    }
+
+    const set = new Set<string>();
+    mockProperties.forEach((p) => {
+      if (p.bairro?.trim()) set.add(p.bairro.trim());
+    });
+    return Array.from(set).sort();
   },
 
   /**

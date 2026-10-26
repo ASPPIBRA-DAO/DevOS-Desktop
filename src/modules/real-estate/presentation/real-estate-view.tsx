@@ -45,7 +45,7 @@ export function RealEstateView() {
       setBatches(b);
       const f = await RealEstateBridge.listFindings(50);
       setFindings(f);
-      const p = await RealEstateBridge.listProperties(50);
+      const p = await RealEstateBridge.listProperties(1000);
       setProperties(p);
     } catch (err: unknown) {
       console.warn('Erro ao carregar dados imobiliários:', err);
