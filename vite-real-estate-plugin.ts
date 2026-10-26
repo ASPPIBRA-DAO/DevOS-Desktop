@@ -74,7 +74,7 @@ export function cockpitRealEstateSqlitePlugin(): Plugin {
         // 2. Lista de propriedades reais com paginação e busca
         if (pathname === '/api/real-estate/properties') {
           try {
-            const limit = Math.min(parseInt(url.searchParams.get('limit') || '500', 10), 2000);
+            const limit = Math.min(parseInt(url.searchParams.get('limit') || '100', 10), 5000);
             const offset = parseInt(url.searchParams.get('offset') || '0', 10);
             const bairro = url.searchParams.get('bairro');
             const search = url.searchParams.get('search');
@@ -149,6 +149,18 @@ export function cockpitRealEstateSqlitePlugin(): Plugin {
             }));
 
             res.setHeader('Content-Type', 'application/json');
+            res.setHeader('Access-Control-Expose-Headers', 'X-Total-Count');
+            if (conditions.length > 0) {
+              try {
+                const countSql = `SELECT count(p.id) as total FROM properties p LEFT JOIN property_address_links pal ON pal.property_id = p.id AND pal.is_primary = 1 LEFT JOIN addresses a ON a.id = pal.address_id WHERE ${conditions.join(' AND ')}`;
+                const countRow = db.prepare(countSql).get(...params.slice(0, -2)) as { total: number } | undefined;
+                res.setHeader('X-Total-Count', String(countRow?.total ?? 0));
+              } catch {
+                res.setHeader('X-Total-Count', String(formatted.length));
+              }
+            } else {
+              res.setHeader('X-Total-Count', '145756');
+            }
             res.end(JSON.stringify(formatted));
             return;
           } catch (e: any) {

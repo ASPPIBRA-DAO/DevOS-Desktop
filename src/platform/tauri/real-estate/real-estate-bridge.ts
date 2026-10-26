@@ -490,9 +490,14 @@ export const RealEstateBridge = {
   },
 
   /**
-   * Lista propriedades cadastradas no banco local.
+   * Lista propriedades cadastradas no banco local com suporte a rolagem contínua e filtros.
    */
-  async listProperties(limit?: number): Promise<PropertySummary[]> {
+  async listProperties(
+    limit?: number,
+    offset?: number,
+    bairro?: string,
+    search?: string
+  ): Promise<PropertySummary[]> {
     if (isTauriDesktop()) {
       return invokeNative<PropertySummary[]>('list_properties', {
         limit: limit ?? null,
@@ -500,10 +505,16 @@ export const RealEstateBridge = {
     }
 
     try {
-      const res = await fetch(`/api/real-estate/properties?limit=${limit || 1000}`);
+      const params = new URLSearchParams();
+      if (limit) params.set('limit', String(limit));
+      if (offset) params.set('offset', String(offset));
+      if (bairro && bairro !== 'ALL') params.set('bairro', bairro);
+      if (search && search.trim()) params.set('search', search.trim());
+
+      const res = await fetch(`/api/real-estate/properties?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data)) {
           return data;
         }
       }
@@ -511,7 +522,22 @@ export const RealEstateBridge = {
       // Fallback gracioso para ambiente sem dev server
     }
 
-    return mockProperties.slice(0, limit || 100);
+    let result = [...mockProperties];
+    if (bairro && bairro !== 'ALL') {
+      result = result.filter((p) => p.bairro === bairro);
+    }
+    if (search && search.trim()) {
+      const s = search.toLowerCase();
+      result = result.filter(
+        (p) =>
+          (p.titular || '').toLowerCase().includes(s) ||
+          (p.matricula || '').toLowerCase().includes(s) ||
+          (p.rua || '').toLowerCase().includes(s)
+      );
+    }
+    const start = offset || 0;
+    const end = start + (limit || 100);
+    return result.slice(start, end);
   },
 
   /**

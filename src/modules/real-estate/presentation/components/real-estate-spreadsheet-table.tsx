@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useRef, useMemo, useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -20,6 +20,7 @@ import IconButton from '@mui/material/IconButton';
 import FormControl from '@mui/material/FormControl';
 import TableContainer from '@mui/material/TableContainer';
 import InputAdornment from '@mui/material/InputAdornment';
+import CircularProgress from '@mui/material/CircularProgress';
 
 import { colors } from '../../../../shared/theme/palette';
 import { Iconify } from '../../../../shared/components/iconify';
@@ -72,11 +73,16 @@ export function RealEstateSpreadsheetTable({
 }: RealEstateSpreadsheetTableProps) {
   // Filtros de Planilha
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedNeighborhood, setSelectedNeighborhood] = useState('ALL');
 
-  // Paginação (fixada em 25 registros para máxima performance sem travamentos)
-  const [page, setPage] = useState(0);
-  const rowsPerPage = 25;
+  // Registros carregados dinamicamente para Rolagem Contínua (Infinite Scroll)
+  const [items, setItems] = useState<PropertySummary[]>(properties || []);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [totalCount, setTotalCount] = useState(145756);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
 
   // Lista dinâmica de Bairros carregada do banco de dados oficial
   const [bairrosDb, setBairrosDb] = useState<string[]>([]);
@@ -89,7 +95,71 @@ export function RealEstateSpreadsheetTable({
         }
       })
       .catch(() => {});
+
+    RealEstateBridge.getStats()
+      .then((s) => {
+        if (s?.total_properties) {
+          setTotalCount(s.total_properties);
+        }
+      })
+      .catch(() => {});
   }, []);
+
+  // Debounce da busca textual em 300ms
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Carga inicial e sob mudança de filtros diretamente no banco de dados SQLite
+  const loadData = useCallback(async (bairro: string, search: string) => {
+    setIsSearching(true);
+    try {
+      const data = await RealEstateBridge.listProperties(100, 0, bairro, search);
+      setItems(data);
+      setHasMore(data.length === 100);
+      tableContainerRef.current?.scrollTo({ top: 0 });
+    } catch (err) {
+      console.warn('Erro ao carregar dados territoriais:', err);
+    } finally {
+      setIsSearching(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData(selectedNeighborhood, debouncedSearch);
+  }, [selectedNeighborhood, debouncedSearch, loadData]);
+
+  // Rolagem Contínua: carrega mais registros automaticamente conforme o usuário desce a barra de rolagem
+  const handleScroll = useCallback(
+    async (e: React.UIEvent<HTMLDivElement>) => {
+      const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+      if (scrollHeight - scrollTop - clientHeight < 450 && !isLoadingMore && hasMore && !isSearching) {
+        setIsLoadingMore(true);
+        try {
+          const nextData = await RealEstateBridge.listProperties(
+            100,
+            items.length,
+            selectedNeighborhood,
+            debouncedSearch
+          );
+          if (nextData && nextData.length > 0) {
+            setItems((prev) => [...prev, ...nextData]);
+            setHasMore(nextData.length === 100);
+          } else {
+            setHasMore(false);
+          }
+        } catch (err) {
+          console.warn('Erro ao carregar mais registros:', err);
+        } finally {
+          setIsLoadingMore(false);
+        }
+      }
+    },
+    [isLoadingMore, hasMore, isSearching, items.length, selectedNeighborhood, debouncedSearch]
+  );
 
   const uniqueNeighborhoods = useMemo(() => {
     if (bairrosDb.length > 0) {
@@ -103,48 +173,10 @@ export function RealEstateSpreadsheetTable({
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [bairrosDb, properties]);
 
-  // Filtragem dos registros
-  const filteredProperties = useMemo(() => properties.filter((p) => {
-      // 1. Filtro de Bairro
-      if (selectedNeighborhood !== 'ALL' && p.bairro?.trim() !== selectedNeighborhood) {
-        return false;
-      }
-
-      // 2. Busca por texto livre (Matrícula, Contribuinte, Rua, Bairro, UUID)
-      if (searchTerm.trim()) {
-        const query = searchTerm.toLowerCase().trim();
-        const mat = (p.matricula || p.identifier || '').toLowerCase();
-        const tit = (p.titular || '').toLowerCase();
-        const rua = (p.rua || '').toLowerCase();
-        const bai = (p.bairro || '').toLowerCase();
-        const addr = (p.address || '').toLowerCase();
-        const uid = p.uuid.toLowerCase();
-
-        return (
-          mat.includes(query) ||
-          tit.includes(query) ||
-          rua.includes(query) ||
-          bai.includes(query) ||
-          addr.includes(query) ||
-          uid.includes(query)
-        );
-      }
-
-      return true;
-    }), [properties, selectedNeighborhood, searchTerm]);
-
-  // Registros paginados
-  const paginatedProperties = useMemo(() => {
-    const start = page * rowsPerPage;
-    return filteredProperties.slice(start, start + rowsPerPage);
-  }, [filteredProperties, page, rowsPerPage]);
-
-  const totalPages = Math.ceil(filteredProperties.length / rowsPerPage);
-
   const handleResetFilters = () => {
     setSearchTerm('');
+    setDebouncedSearch('');
     setSelectedNeighborhood('ALL');
-    setPage(0);
   };
 
   const hasActiveFilters = Boolean(
@@ -230,10 +262,7 @@ export function RealEstateSpreadsheetTable({
             size="small"
             placeholder="Buscar imóvel..."
             value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              setPage(0);
-            }}
+            onChange={(e) => setSearchTerm(e.target.value)}
             slotProps={{
               input: {
                 startAdornment: (
@@ -308,10 +337,7 @@ export function RealEstateSpreadsheetTable({
               labelId="neighborhood-filter-label"
               value={selectedNeighborhood}
               label="Bairro"
-              onChange={(e) => {
-                setSelectedNeighborhood(e.target.value);
-                setPage(0);
-              }}
+              onChange={(e) => setSelectedNeighborhood(e.target.value)}
             >
               <MenuItem value="ALL">Todos</MenuItem>
               {uniqueNeighborhoods.map((n) => (
@@ -337,15 +363,18 @@ export function RealEstateSpreadsheetTable({
         </Box>
       </Box>
 
-      {/* 3. GRADE DA PLANILHA (DATA GRID COM ESTILIZAÇÃO COMPLETA) */}
+      {/* 3. GRADE DA PLANILHA (DATA GRID COM ESTILIZAÇÃO COMPLETA & ROLAGEM CONTÍNUA) */}
       <TableContainer
+        ref={tableContainerRef}
         component={Paper}
         elevation={0}
+        onScroll={handleScroll}
         sx={{
           maxHeight: 650,
           border: 'none',
           borderRadius: 0,
           overflowX: 'auto',
+          overflowY: 'auto',
           width: '100%',
         }}
       >
@@ -454,7 +483,19 @@ export function RealEstateSpreadsheetTable({
                   </Box>
                 </TableCell>
               </TableRow>
-            ) : paginatedProperties.length === 0 ? (
+            ) : isSearching && items.length === 0 ? (
+              /* CARREGANDO DADOS DA BUSCA / FILTRO */
+              <TableRow>
+                <TableCell colSpan={9} align="center" sx={{ py: 6 }}>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
+                    <CircularProgress size={28} sx={{ color: colors.primary.main }} />
+                    <Typography variant="body2" sx={{ color: colors.text.secondary }}>
+                      Consultando base cadastral de Maricá no SQLite WAL...
+                    </Typography>
+                  </Box>
+                </TableCell>
+              </TableRow>
+            ) : items.length === 0 ? (
               /* CASO 2: NENHUM REGISTRO ENCONTRADO PELOS FILTROS */
               <TableRow>
                 <TableCell colSpan={9} align="center" sx={{ py: 5 }}>
@@ -468,138 +509,153 @@ export function RealEstateSpreadsheetTable({
               </TableRow>
             ) : (
               /* CASO 3: REGISTROS ENCONTRADOS */
-              paginatedProperties.map((prop, idx) => {
-                const matriculaDisplay = prop.matricula || prop.identifier || '—';
-                const hasMatricula = Boolean(prop.matricula || prop.identifier);
-                const titularDisplay = toTitleCase(prop.titular || '—');
-                const bairroDisplay = toTitleCase(prop.bairro || '—');
-                const ruaDisplay = toTitleCase(prop.rua || '—');
-                const numeroDisplay = prop.numero || 'S/N';
-                const quadraDisplay = prop.quadra || '—';
-                const loteDisplay = prop.lote || '—';
-                const complementoDisplay = toTitleCase(prop.complemento || '—');
-                const isConflict = prop.status === 'COM_INCONSISTENCIA';
+              <>
+                {items.map((prop) => {
+                  const matriculaDisplay = prop.matricula || prop.identifier || '—';
+                  const hasMatricula = Boolean(prop.matricula || prop.identifier);
+                  const titularDisplay = toTitleCase(prop.titular || '—');
+                  const bairroDisplay = toTitleCase(prop.bairro || '—');
+                  const ruaDisplay = toTitleCase(prop.rua || '—');
+                  const numeroDisplay = prop.numero || 'S/N';
+                  const quadraDisplay = prop.quadra || '—';
+                  const loteDisplay = prop.lote || '—';
+                  const complementoDisplay = toTitleCase(prop.complemento || '—');
+                  const isConflict = prop.status === 'COM_INCONSISTENCIA';
 
-                return (
-                  <TableRow
-                    key={prop.id}
-                    hover
-                    sx={{
-                      '&:hover': {
-                        bgcolor: 'rgba(0, 167, 111, 0.04)',
-                      },
-                      borderLeft: isConflict
-                        ? '3px solid #FFAB00'
-                        : '3px solid transparent',
-                    }}
-                  >
-                    {/* ID */}
-                    <TableCell align="center">
-                      <Typography variant="body2" sx={{ fontSize: '0.82rem', fontWeight: 400, color: 'text.secondary' }}>
-                        #{prop.id}
-                      </Typography>
-                    </TableCell>
+                  return (
+                    <TableRow
+                      key={prop.id}
+                      hover
+                      sx={{
+                        '&:hover': {
+                          bgcolor: 'rgba(0, 167, 111, 0.04)',
+                        },
+                        borderLeft: isConflict
+                          ? '3px solid #FFAB00'
+                          : '3px solid transparent',
+                      }}
+                    >
+                      {/* ID */}
+                      <TableCell align="center">
+                        <Typography variant="body2" sx={{ fontSize: '0.82rem', fontWeight: 400, color: 'text.secondary' }}>
+                          #{prop.id}
+                        </Typography>
+                      </TableCell>
 
-                    {/* Matrícula */}
-                    <TableCell>
-                      {hasMatricula ? (
+                      {/* Matrícula */}
+                      <TableCell>
+                        {hasMatricula ? (
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              fontWeight: 400,
+                              fontSize: '0.82rem',
+                              color: colors.primary.main,
+                            }}
+                          >
+                            {matriculaDisplay}
+                          </Typography>
+                        ) : (
+                          <Chip
+                            size="small"
+                            label="SEM MATRÍCULA"
+                            variant="outlined"
+                            sx={{ fontSize: '0.65rem', color: colors.text.secondary }}
+                          />
+                        )}
+                      </TableCell>
+
+                      {/* Titular / Contribuinte */}
+                      <TableCell>
                         <Typography
                           variant="body2"
                           sx={{
                             fontWeight: 400,
                             fontSize: '0.82rem',
-                            color: colors.primary.main,
+                            color: 'text.primary',
                           }}
                         >
-                          {matriculaDisplay}
+                          {titularDisplay}
                         </Typography>
-                      ) : (
-                        <Chip
-                          size="small"
-                          label="SEM MATRÍCULA"
-                          variant="outlined"
-                          sx={{ fontSize: '0.65rem', color: colors.text.secondary }}
-                        />
-                      )}
-                    </TableCell>
+                      </TableCell>
 
-                    {/* Titular / Contribuinte */}
-                    <TableCell>
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          fontWeight: 400,
-                          fontSize: '0.82rem',
-                          color: 'text.primary',
-                        }}
-                      >
-                        {titularDisplay}
-                      </Typography>
-                    </TableCell>
+                      {/* Bairro */}
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontSize: '0.82rem', fontWeight: 400, color: 'text.primary' }}>
+                          {bairroDisplay}
+                        </Typography>
+                      </TableCell>
 
-                    {/* Bairro */}
-                    <TableCell>
-                      <Typography variant="body2" sx={{ fontSize: '0.82rem', fontWeight: 400, color: 'text.primary' }}>
-                        {bairroDisplay}
-                      </Typography>
-                    </TableCell>
+                      {/* Rua */}
+                      <TableCell>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            fontSize: '0.82rem',
+                            fontWeight: 400,
+                            color: 'text.primary',
+                          }}
+                        >
+                          {ruaDisplay}
+                        </Typography>
+                      </TableCell>
 
-                    {/* Rua */}
-                    <TableCell>
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          fontSize: '0.82rem',
-                          fontWeight: 400,
-                          color: 'text.primary',
-                        }}
-                      >
-                        {ruaDisplay}
-                      </Typography>
-                    </TableCell>
+                      {/* Nº */}
+                      <TableCell align="center">
+                        <Typography variant="body2" sx={{ fontSize: '0.82rem', fontWeight: 400, color: 'text.primary' }}>
+                          {numeroDisplay}
+                        </Typography>
+                      </TableCell>
 
-                    {/* Nº */}
-                    <TableCell align="center">
-                      <Typography variant="body2" sx={{ fontSize: '0.82rem', fontWeight: 400, color: 'text.primary' }}>
-                        {numeroDisplay}
-                      </Typography>
-                    </TableCell>
+                      {/* Quadra */}
+                      <TableCell align="center">
+                        <Typography variant="body2" sx={{ fontSize: '0.82rem', fontWeight: 400, color: 'text.primary' }}>
+                          {quadraDisplay}
+                        </Typography>
+                      </TableCell>
 
-                    {/* Quadra */}
-                    <TableCell align="center">
-                      <Typography variant="body2" sx={{ fontSize: '0.82rem', fontWeight: 400, color: 'text.primary' }}>
-                        {quadraDisplay}
-                      </Typography>
-                    </TableCell>
+                      {/* Lote */}
+                      <TableCell align="center">
+                        <Typography variant="body2" sx={{ fontSize: '0.82rem', fontWeight: 400, color: 'text.primary' }}>
+                          {loteDisplay}
+                        </Typography>
+                      </TableCell>
 
-                    {/* Lote */}
-                    <TableCell align="center">
-                      <Typography variant="body2" sx={{ fontSize: '0.82rem', fontWeight: 400, color: 'text.primary' }}>
-                        {loteDisplay}
-                      </Typography>
-                    </TableCell>
+                      {/* Complemento */}
+                      <TableCell>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            fontSize: '0.82rem',
+                            fontWeight: 400,
+                            color: 'text.secondary',
+                            maxWidth: 160,
+                            display: 'block',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                          }}
+                        >
+                          {complementoDisplay}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
 
-                    {/* Complemento */}
-                    <TableCell>
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          fontSize: '0.82rem',
-                          fontWeight: 400,
-                          color: 'text.secondary',
-                          maxWidth: 160,
-                          display: 'block',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                        }}
-                      >
-                        {complementoDisplay}
-                      </Typography>
+                {isLoadingMore && (
+                  <TableRow>
+                    <TableCell colSpan={9} align="center" sx={{ py: 2, bgcolor: 'rgba(0, 167, 111, 0.04)' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, color: colors.primary.main }}>
+                        <CircularProgress size={16} color="inherit" thickness={4} />
+                        <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                          Carregando mais cadastros...
+                        </Typography>
+                      </Box>
                     </TableCell>
                   </TableRow>
-                );
-              })
+                )}
+              </>
             )}
           </TableBody>
         </Table>
@@ -620,49 +676,40 @@ export function RealEstateSpreadsheetTable({
       >
         <Typography variant="caption" sx={{ color: colors.text.secondary, display: 'flex', alignItems: 'center', gap: 0.75 }}>
           <Iconify icon="solar:shield-check-bold" width={14} color="primary.main" />
-          Registros espelhados e validados na base SQLite local em modo <strong>WAL (Write-Ahead Logging)</strong>
+          Base Territorial Municipal: <strong>{totalCount.toLocaleString('pt-BR')} Imóveis</strong> | Maricá - RJ
         </Typography>
 
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="caption" sx={{ color: colors.text.secondary }}>
-            Página {totalPages > 0 ? page + 1 : 0} de {totalPages} ({filteredProperties.length} registros)
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          {isLoadingMore && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, color: colors.primary.main }}>
+              <CircularProgress size={14} color="inherit" thickness={4} />
+              <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                Carregando...
+              </Typography>
+            </Box>
+          )}
+
+          <Typography variant="caption" sx={{ color: colors.text.secondary, fontWeight: 600 }}>
+            {selectedNeighborhood === 'ALL' && !debouncedSearch
+              ? `Exibindo ${items.length.toLocaleString('pt-BR')} de ${totalCount.toLocaleString('pt-BR')} registros (Rolagem Direta)`
+              : `Exibindo ${items.length.toLocaleString('pt-BR')} registros filtrados (Rolagem Direta)`}
           </Typography>
 
-          <Button
-            size="small"
-            disabled={page === 0}
-            onClick={() => setPage(0)}
-            sx={{ minWidth: 28, px: 1, fontSize: '0.75rem' }}
-          >
-            Início
-          </Button>
-
-          <IconButton
-            size="small"
-            disabled={page === 0}
-            onClick={() => setPage((prev) => Math.max(0, prev - 1))}
-            sx={{ p: 0.5 }}
-          >
-            <Iconify icon="solar:arrow-left-linear" width={16} />
-          </IconButton>
-
-          <IconButton
-            size="small"
-            disabled={page >= totalPages - 1}
-            onClick={() => setPage((prev) => Math.min(totalPages - 1, prev + 1))}
-            sx={{ p: 0.5 }}
-          >
-            <Iconify icon="solar:arrow-right-linear" width={16} />
-          </IconButton>
-
-          <Button
-            size="small"
-            disabled={page >= totalPages - 1}
-            onClick={() => setPage(totalPages - 1)}
-            sx={{ minWidth: 28, px: 1, fontSize: '0.75rem' }}
-          >
-            Fim
-          </Button>
+          {items.length > 50 && (
+            <IconButton
+              size="small"
+              title="Voltar ao início da tabela"
+              onClick={() => tableContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' })}
+              sx={{
+                p: 0.5,
+                color: colors.primary.main,
+                bgcolor: 'rgba(0, 167, 111, 0.08)',
+                '&:hover': { bgcolor: 'rgba(0, 167, 111, 0.18)' },
+              }}
+            >
+              <Iconify icon="solar:arrow-up-linear" width={16} />
+            </IconButton>
+          )}
         </Box>
       </Box>
     </Card>
