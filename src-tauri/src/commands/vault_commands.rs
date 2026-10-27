@@ -2,12 +2,19 @@ use std::path::PathBuf;
 use tauri::State;
 
 use crate::storage::local_database::LocalDatabase;
-use crate::vault::access_control::{VaultHeader, VaultStatus};
+use crate::vault::access_control::{VaultHeader, VaultSession, VaultStatus};
 use crate::vault::encryption::VaultCrypto;
 
 #[tauri::command]
-pub fn get_vault_status(db: State<'_, LocalDatabase>) -> Result<VaultStatus, String> {
-    db.get_status(false).map_err(|e| e.to_string())
+pub fn get_vault_status(
+    db: State<'_, LocalDatabase>,
+    session: State<'_, VaultSession>,
+) -> Result<VaultStatus, String> {
+    let is_unlocked = session.is_unlocked();
+    db.get_status(is_unlocked).map_err(|e| {
+        log::error!("[Vault Security] Falha ao consultar integridade do cofre: {}", e);
+        "VAULT_STORAGE_ERR: Falha de acesso ao armazenamento seguro local.".to_string()
+    })
 }
 
 fn is_marginal_whitespace_or_invisible(c: char) -> bool {
@@ -78,17 +85,31 @@ pub fn init_master_password(
 }
 
 #[tauri::command]
-pub fn unlock_vault(db: State<'_, LocalDatabase>, master_password: String) -> Result<bool, String> {
+pub fn unlock_vault(
+    db: State<'_, LocalDatabase>,
+    session: State<'_, VaultSession>,
+    master_password: String,
+) -> Result<bool, String> {
     let header = db
         .get_header()
-        .map_err(|e| e.to_string())?
+        .map_err(|e| {
+            log::error!("[Vault Security] Erro ao recuperar cabeçalho para desbloqueio: {}", e);
+            "VAULT_STORAGE_ERR: Falha ao ler cabeçalho do cofre.".to_string()
+        })?
         .ok_or_else(|| "Cofre não inicializado. Crie a senha mestre primeiro.".to_string())?;
 
     if header.verify_password(&master_password) {
+        session.set_unlocked(true);
         Ok(true)
     } else {
         Err("Senha mestre incorreta.".to_string())
     }
+}
+
+#[tauri::command]
+pub fn lock_vault(session: State<'_, VaultSession>) -> Result<bool, String> {
+    session.set_unlocked(false);
+    Ok(true)
 }
 
 #[tauri::command]
