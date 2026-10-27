@@ -40,6 +40,8 @@ export interface BootstrapContextValue {
   errorMessage: string | null;
   retry: () => void;
   unlock: (password: string) => Promise<boolean>;
+  lock: () => Promise<void>;
+  refreshStatus: () => Promise<VaultStatus | null>;
 }
 
 const BootstrapContext = createContext<BootstrapContextValue | null>(null);
@@ -179,12 +181,43 @@ export function AppBootstrapProvider({ children, timeoutMs = 4500 }: Props) {
     return false;
   }, []);
 
+  const lock = useCallback(async (): Promise<void> => {
+    try {
+      await VaultBridge.lock();
+    } finally {
+      setState('READY_LOCKED');
+    }
+  }, []);
+
+  const refreshStatus = useCallback(async (): Promise<VaultStatus | null> => {
+    try {
+      const status = await VaultBridge.getStatus();
+      setVaultStatus(status);
+      if (!status.is_initialized && status.is_unlocked) {
+        setErrorMessage('Inconsistência de integridade na sessão do cofre.');
+        setState('FATAL_ERROR');
+      } else if (!status.is_initialized) {
+        setState('UNINITIALIZED');
+      } else if (!status.is_unlocked) {
+        setState('READY_LOCKED');
+      } else {
+        setState('READY_UNLOCKED');
+      }
+      return status;
+    } catch {
+      setState('READY_LOCKED');
+      return null;
+    }
+  }, []);
+
   const value: BootstrapContextValue = {
     state,
     vaultStatus,
     errorMessage,
     retry: runBootstrap,
     unlock,
+    lock,
+    refreshStatus,
   };
 
   return (

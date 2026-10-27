@@ -24,6 +24,13 @@ export const VaultBridge = {
   },
 
   /**
+   * Bloqueia a sessão do cofre no backend Rust imediatamente
+   */
+  async lock(): Promise<boolean> {
+    return invokeNative<boolean>('lock_vault');
+  },
+
+  /**
    * Exporta a frase mnemônica de forma autorizada mediante senha mestre
    */
   async exportAuthorizedSecret(masterPassword: string, vaultId: string): Promise<string> {
