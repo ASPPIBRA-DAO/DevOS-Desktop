@@ -2,14 +2,16 @@ import React from 'react';
 import { HashRouter } from 'react-router';
 
 import { AppRouter } from './router';
-import { ThemeProvider, ErrorBoundary } from './providers';
+import { ThemeProvider, ErrorBoundary, AppBootstrapProvider } from './providers';
 
 export function App() {
   return (
     <ThemeProvider>
       <HashRouter>
         <ErrorBoundary>
-          <AppRouter />
+          <AppBootstrapProvider>
+            <AppRouter />
+          </AppBootstrapProvider>
         </ErrorBoundary>
       </HashRouter>
     </ThemeProvider>
