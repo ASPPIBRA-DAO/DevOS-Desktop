@@ -55,7 +55,8 @@ pub mod tests {
 
     #[test]
     fn test_compile_minimal_typst_document() {
-        let template = "#set page(paper: \"a4\")\n= Documento de Teste\nCompilação pura em memória.";
+        let template =
+            "#set page(paper: \"a4\")\n= Documento de Teste\nCompilação pura em memória.";
         let options = TypstCompileOptions {
             template_source: template,
             fonts: &[],
@@ -63,7 +64,11 @@ pub mod tests {
         };
 
         let result = compile_typst_document(options);
-        assert!(result.is_ok(), "Falha ao compilar documento mínimo: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Falha ao compilar documento mínimo: {:?}",
+            result.err()
+        );
         let bytes = result.unwrap();
         assert!(!bytes.is_empty());
         assert!(bytes.starts_with(b"%PDF-"));
@@ -82,7 +87,11 @@ pub mod tests {
         };
 
         let result = compile_typst_document(options);
-        assert!(result.is_ok(), "Falha ao compilar com inputs injetados: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Falha ao compilar com inputs injetados: {:?}",
+            result.err()
+        );
         let bytes = result.unwrap();
         assert!(bytes.starts_with(b"%PDF-"));
     }
@@ -97,7 +106,10 @@ pub mod tests {
         };
 
         let result = compile_typst_document(options);
-        assert!(result.is_err(), "Sintaxe Typst inválida deve retornar TypstEngineError::CompilationFailed");
+        assert!(
+            result.is_err(),
+            "Sintaxe Typst inválida deve retornar TypstEngineError::CompilationFailed"
+        );
         match result.unwrap_err() {
             TypstEngineError::CompilationFailed(_) => {}
             other => panic!("Esperava CompilationFailed, obteve: {:?}", other),

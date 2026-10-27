@@ -50,7 +50,10 @@ pub mod tests {
             }
         });
         let payload: Result<CitizenLedgerPayload, _> = serde_json::from_value(val);
-        assert!(payload.is_ok(), "Falha na deserializacao de CitizenLedgerPayload");
+        assert!(
+            payload.is_ok(),
+            "Falha na deserializacao de CitizenLedgerPayload"
+        );
         let p = payload.unwrap();
         assert_eq!(p.associate_id, Some("ASSOC123".to_string()));
     }
@@ -84,7 +87,10 @@ pub mod tests {
             "d1_protocol": "D1-PROT-12345"
         });
         let payload: Result<InvoiceReportPayload, _> = serde_json::from_value(val);
-        assert!(payload.is_ok(), "Falha na deserializacao de InvoiceReportPayload");
+        assert!(
+            payload.is_ok(),
+            "Falha na deserializacao de InvoiceReportPayload"
+        );
         let p = payload.unwrap();
         assert_eq!(p.id, "INV-2023-001");
         assert_eq!(p.items.len(), 1);

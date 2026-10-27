@@ -430,8 +430,12 @@ impl RealEstateDatabase {
             let open_findings: i64 = row.get(9)?;
             let created_at: String = row.get(10)?;
 
-            let quadra = raw_addr.as_deref().and_then(|r| parse_address_token(r, "Qd:"));
-            let lote = raw_addr.as_deref().and_then(|r| parse_address_token(r, "Lt:"));
+            let quadra = raw_addr
+                .as_deref()
+                .and_then(|r| parse_address_token(r, "Qd:"));
+            let lote = raw_addr
+                .as_deref()
+                .and_then(|r| parse_address_token(r, "Lt:"));
 
             let status = if open_findings > 0 {
                 "COM_INCONSISTENCIA".to_string()

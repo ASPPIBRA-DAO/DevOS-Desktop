@@ -1,5 +1,5 @@
-use std::fs;
 use serde::{Deserialize, Serialize};
+use std::fs;
 
 use crate::modules::documents::{
     DocumentKind, DocumentMetadata, DocumentRequest, DocumentScope, DocumentsService,
@@ -97,7 +97,11 @@ pub mod tests {
         };
 
         let result = generate_document(payload);
-        assert!(result.is_ok(), "Falha ao executar comando generate_document: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Falha ao executar comando generate_document: {:?}",
+            result.err()
+        );
 
         let res = result.unwrap();
         assert!(res.success);
@@ -148,7 +152,11 @@ pub mod tests {
         };
 
         let result = generate_document(payload);
-        assert!(result.is_ok(), "Falha ao executar comando generate_document para fatura: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Falha ao executar comando generate_document para fatura: {:?}",
+            result.err()
+        );
 
         let res = result.unwrap();
         assert!(res.success);

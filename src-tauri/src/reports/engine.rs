@@ -69,10 +69,17 @@ pub mod tests {
         };
 
         let result = compile_citizen_ledger_pdf(&payload);
-        assert!(result.is_ok(), "Falha ao compilar PDF em memória via Typst: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Falha ao compilar PDF em memória via Typst: {:?}",
+            result.err()
+        );
         let bytes = result.unwrap();
         assert!(!bytes.is_empty(), "Buffer de PDF gerado não pode ser vazio");
-        assert!(bytes.starts_with(b"%PDF-"), "Cabeçalho do binário deve ser PDF válido (%PDF-)");
+        assert!(
+            bytes.starts_with(b"%PDF-"),
+            "Cabeçalho do binário deve ser PDF válido (%PDF-)"
+        );
     }
 
     #[test]
@@ -90,25 +97,33 @@ pub mod tests {
             settled_date: Some("2023-08-08".to_string()),
             payment_method: "Pix Dinâmico / D1".to_string(),
             status: "paid".to_string(),
-            items: vec![
-                InvoiceReportItem {
-                    id: "item-1".to_string(),
-                    description: "Mensalidade Associativa".to_string(),
-                    service: Some("Contribuição Regular".to_string()),
-                    quantity: 1.0,
-                    price: 5000.0,
-                    total: 5000.0,
-                }
-            ],
+            items: vec![InvoiceReportItem {
+                id: "item-1".to_string(),
+                description: "Mensalidade Associativa".to_string(),
+                service: Some("Contribuição Regular".to_string()),
+                quantity: 1.0,
+                price: 5000.0,
+                total: 5000.0,
+            }],
             taxes: Some(0.0),
             discount: Some(0.0),
-            d1_protocol: Some("05d4084730d36b1073d62c37ab83e9c425d795b5ff34ed949083cdbf02fd7b33::INV-2023-001".to_string()),
+            d1_protocol: Some(
+                "05d4084730d36b1073d62c37ab83e9c425d795b5ff34ed949083cdbf02fd7b33::INV-2023-001"
+                    .to_string(),
+            ),
         };
 
         let result = compile_invoice_pdf(&payload);
-        assert!(result.is_ok(), "Falha ao compilar fatura PDF em memória via Typst: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Falha ao compilar fatura PDF em memória via Typst: {:?}",
+            result.err()
+        );
         let bytes = result.unwrap();
         assert!(!bytes.is_empty(), "Buffer de fatura PDF não pode ser vazio");
-        assert!(bytes.starts_with(b"%PDF-"), "Cabeçalho da fatura deve ser PDF válido (%PDF-)");
+        assert!(
+            bytes.starts_with(b"%PDF-"),
+            "Cabeçalho da fatura deve ser PDF válido (%PDF-)"
+        );
     }
 }

@@ -1,11 +1,11 @@
-use std::collections::HashMap;
 use chrono::Utc;
+use std::collections::HashMap;
 
 use crate::modules::documents::models::{
     DocumentError, DocumentKind, DocumentMetadata, DocumentOutput, DocumentRequest,
 };
 use crate::modules::documents::ports::DocumentRenderer;
-use crate::platform::typst_engine::{compile_typst_document, TypstCompileOptions};
+use crate::platform::typst_engine::{TypstCompileOptions, compile_typst_document};
 use crate::wallets::address::keccak256;
 
 static CITIZEN_TEMPLATE: &str = include_str!("../../../templates/extrato_citizen_ledger.typ");
@@ -22,14 +22,20 @@ impl DocumentsService {
     }
 
     /// Ponto de entrada padrão para orquestração documental
-    pub fn generate_document(&self, request: DocumentRequest) -> Result<DocumentOutput, DocumentError> {
+    pub fn generate_document(
+        &self,
+        request: DocumentRequest,
+    ) -> Result<DocumentOutput, DocumentError> {
         self.render(request)
     }
 }
 
 impl DocumentRenderer for DocumentsService {
     fn supports(&self, kind: DocumentKind) -> bool {
-        matches!(kind, DocumentKind::CitizenLedger | DocumentKind::InvoiceBill)
+        matches!(
+            kind,
+            DocumentKind::CitizenLedger | DocumentKind::InvoiceBill
+        )
     }
 
     fn render(&self, request: DocumentRequest) -> Result<DocumentOutput, DocumentError> {
@@ -120,7 +126,11 @@ pub mod tests {
         let request = DocumentRequest::CitizenLedger(payload);
         let result = service.generate_document(request);
 
-        assert!(result.is_ok(), "Falha ao gerar documento de extrato: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Falha ao gerar documento de extrato: {:?}",
+            result.err()
+        );
         let output = result.unwrap();
         assert!(!output.pdf_bytes.is_empty());
         assert!(output.pdf_bytes.starts_with(b"%PDF-"));

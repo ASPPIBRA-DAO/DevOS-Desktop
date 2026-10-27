@@ -12,7 +12,10 @@ pub fn get_vault_status(
 ) -> Result<VaultStatus, String> {
     let is_unlocked = session.is_unlocked();
     db.get_status(is_unlocked).map_err(|e| {
-        log::error!("[Vault Security] Falha ao consultar integridade do cofre: {}", e);
+        log::error!(
+            "[Vault Security] Falha ao consultar integridade do cofre: {}",
+            e
+        );
         "VAULT_STORAGE_ERR: Falha de acesso ao armazenamento seguro local.".to_string()
     })
 }
@@ -96,7 +99,10 @@ pub fn unlock_vault(
     let header = db
         .get_header()
         .map_err(|e| {
-            log::error!("[Vault Security] Erro ao recuperar cabeçalho para desbloqueio: {}", e);
+            log::error!(
+                "[Vault Security] Erro ao recuperar cabeçalho para desbloqueio: {}",
+                e
+            );
             "VAULT_STORAGE_ERR: Falha ao ler cabeçalho do cofre.".to_string()
         })?
         .ok_or_else(|| "Cofre não inicializado. Crie a senha mestre primeiro.".to_string())?;
@@ -106,7 +112,10 @@ pub fn unlock_vault(
         if session.try_unlock(epoch_at_start) {
             Ok(true)
         } else {
-            Err("Operação de desbloqueio abortada: cofre foi bloqueado concorrentemente.".to_string())
+            Err(
+                "Operação de desbloqueio abortada: cofre foi bloqueado concorrentemente."
+                    .to_string(),
+            )
         }
     } else {
         Err("Senha mestre incorreta.".to_string())

@@ -1,4 +1,6 @@
-use crate::modules::documents::models::{DocumentError, DocumentKind, DocumentOutput, DocumentRequest};
+use crate::modules::documents::models::{
+    DocumentError, DocumentKind, DocumentOutput, DocumentRequest,
+};
 
 /// Trait abstrato (Port) para motores e adaptadores de renderização de documentos
 pub trait DocumentRenderer: Send + Sync {
