@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use tauri::State;
 
 use crate::storage::local_database::{LocalDatabase, StoredSecret, StoredWallet};
+use crate::vault::access_control::VaultSession;
 use crate::vault::encryption::VaultCrypto;
 use crate::wallets::creation_session::GLOBAL_CREATION_STORE;
 use crate::wallets::derivation::{DerivationService, DerivedWalletPreview};
@@ -64,9 +65,17 @@ pub fn generate_seed_and_preview(
 #[tauri::command]
 pub fn reveal_pending_mnemonic(
     db: State<'_, LocalDatabase>,
+    session: State<'_, VaultSession>,
     session_id: String,
     master_password: String,
 ) -> Result<String, String> {
+    // Autorização de Backend Mandatória: cofre DEVE estar desbloqueado na sessão
+    if !session.is_unlocked() {
+        return Err("Acesso negado: o cofre precisa estar desbloqueado.".to_string());
+    }
+
+    let master_password = zeroize::Zeroizing::new(master_password);
+
     let header = db.get_header().map_err(|e| e.to_string())?.ok_or_else(|| {
         "Cofre não inicializado. Defina a senha mestre antes de inspecionar segredos.".to_string()
     })?;
@@ -97,8 +106,14 @@ pub fn cancel_pending_creation(session_id: String) -> Result<bool, String> {
 #[tauri::command]
 pub fn confirm_and_save_wallets(
     db: State<'_, LocalDatabase>,
+    session: State<'_, VaultSession>,
     mut request: SaveWalletsRequest,
 ) -> Result<Vec<StoredWallet>, String> {
+    // Autorização de Backend Mandatória: cofre DEVE estar desbloqueado na sessão
+    if !session.is_unlocked() {
+        return Err("Acesso negado: o cofre precisa estar desbloqueado.".to_string());
+    }
+
     // 1. Valida senha mestre
     let header = db.get_header().map_err(|e| e.to_string())?.ok_or_else(|| {
         "Cofre não inicializado. Defina a senha mestre antes de salvar carteiras.".to_string()

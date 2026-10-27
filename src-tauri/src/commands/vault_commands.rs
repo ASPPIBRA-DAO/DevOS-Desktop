@@ -93,7 +93,10 @@ pub fn unlock_vault(
     session: State<'_, VaultSession>,
     master_password: String,
 ) -> Result<bool, String> {
-    // 1. Captura a época atômica no início da operação de validação da senha
+    // 1. Encapsulamento IMEDIATO na entrada: descarte e zeragem segura de memória (zeroize) em qualquer saída de escopo
+    let master_password = zeroize::Zeroizing::new(master_password);
+
+    // 2. Captura a época atômica no início da operação de validação da senha
     let epoch_at_start = session.current_epoch();
 
     let header = db
@@ -108,7 +111,7 @@ pub fn unlock_vault(
         .ok_or_else(|| "Cofre não inicializado. Crie a senha mestre primeiro.".to_string())?;
 
     if header.verify_password(&master_password) {
-        // 2. Validação atômica de concorrência: se lock() foi acionado durante verify_password, aborta o desbloqueio
+        // 3. Validação atômica de concorrência: se lock() foi acionado durante verify_password, aborta o desbloqueio
         if session.try_unlock(epoch_at_start) {
             Ok(true)
         } else {
@@ -131,9 +134,17 @@ pub fn lock_vault(session: State<'_, VaultSession>) -> Result<bool, String> {
 #[tauri::command]
 pub fn export_authorized_secret(
     db: State<'_, LocalDatabase>,
+    session: State<'_, VaultSession>,
     master_password: String,
     vault_id: String,
 ) -> Result<String, String> {
+    // Autorização de Backend Mandatória: cofre DEVE estar desbloqueado na sessão
+    if !session.is_unlocked() {
+        return Err("Acesso negado: o cofre precisa estar desbloqueado.".to_string());
+    }
+
+    let master_password = zeroize::Zeroizing::new(master_password);
+
     let header = db
         .get_header()
         .map_err(|e| e.to_string())?
@@ -166,9 +177,17 @@ pub fn export_authorized_secret(
 #[tauri::command]
 pub fn export_vault_backup(
     db: State<'_, LocalDatabase>,
+    session: State<'_, VaultSession>,
     master_password: String,
     destination_path: String,
 ) -> Result<u64, String> {
+    // Autorização de Backend Mandatória: cofre DEVE estar desbloqueado na sessão
+    if !session.is_unlocked() {
+        return Err("Acesso negado: o cofre precisa estar desbloqueado.".to_string());
+    }
+
+    let master_password = zeroize::Zeroizing::new(master_password);
+
     let header = db
         .get_header()
         .map_err(|e| e.to_string())?
@@ -188,6 +207,7 @@ pub fn restore_vault_backup(
     master_password: String,
     source_path: String,
 ) -> Result<bool, String> {
+    let master_password = zeroize::Zeroizing::new(master_password);
     let src = PathBuf::from(source_path);
 
     if let Ok(Some(header)) = db.get_header()
