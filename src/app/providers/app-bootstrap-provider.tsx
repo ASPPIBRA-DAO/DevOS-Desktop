@@ -18,6 +18,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 
 import { isTauriDesktop } from 'src/platform/tauri/core/invoke';
 import { VaultBridge } from 'src/platform/tauri/vault/vault-bridge';
+import { WindowBridge } from 'src/platform/tauri/window/window-bridge';
 
 import { SplashScreen } from 'src/shared/components/loading-screen';
 
@@ -61,9 +62,14 @@ export function useBootstrap(): BootstrapContextValue {
 type Props = {
   children: React.ReactNode;
   timeoutMs?: number;
+  enableThreeAnimation?: boolean;
 };
 
-export function AppBootstrapProvider({ children, timeoutMs = 4500 }: Props) {
+export function AppBootstrapProvider({
+  children,
+  timeoutMs = 4500,
+  enableThreeAnimation = true,
+}: Props) {
   const [state, setState] = useState<BootstrapState>('INITIALIZING');
   const [vaultStatus, setVaultStatus] = useState<VaultStatus | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -72,6 +78,19 @@ export function AppBootstrapProvider({ children, timeoutMs = 4500 }: Props) {
   const attemptSeqRef = useRef(0);
   const activeAttemptIdRef = useRef<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Portão Duplo de Inicialização: IPC Ready + Animation Done
+  const isAnimationDoneRef = useRef<boolean>(!enableThreeAnimation);
+  const pendingTargetStateRef = useRef<BootstrapState | null>(null);
+
+  const handleAnimationComplete = useCallback(() => {
+    isAnimationDoneRef.current = true;
+    if (pendingTargetStateRef.current) {
+      const next = pendingTargetStateRef.current;
+      pendingTargetStateRef.current = null;
+      setState(next);
+    }
+  }, []);
 
   const runBootstrap = useCallback(() => {
     // 1. Limpa timer ativo da tentativa anterior
@@ -84,21 +103,32 @@ export function AppBootstrapProvider({ children, timeoutMs = 4500 }: Props) {
     const attemptId = ++attemptSeqRef.current;
     activeAttemptIdRef.current = attemptId;
 
+    // Reseta portão duplo e estado de janela para nova tentativa
+    WindowBridge.reset();
+    isAnimationDoneRef.current = !enableThreeAnimation;
+    pendingTargetStateRef.current = null;
+
     setState('INITIALIZING');
     setErrorMessage(null);
 
     // 3. Verificação de ambiente: se não for Tauri Desktop, transiciona diretamente para WEB_PREVIEW
     if (!isTauriDesktop()) {
       activeAttemptIdRef.current = null;
-      setState('WEB_PREVIEW');
+      if (isAnimationDoneRef.current) {
+        setState('WEB_PREVIEW');
+      } else {
+        pendingTargetStateRef.current = 'WEB_PREVIEW';
+      }
       return;
     }
 
-    // 4. Timer de UX (4.5s): invalida a tentativa ativa IMEDIATAMENTE no timeout
+    // 4. Timer de UX (4.5s): invalida a tentativa ativa IMEDIATAMENTE no timeout e interrompe animação
     timerRef.current = setTimeout(() => {
       if (activeAttemptIdRef.current === attemptId) {
         // Regra fiduciária: a tentativa expirada é invalidada aqui (impede Caso A)
         activeAttemptIdRef.current = null;
+        pendingTargetStateRef.current = null;
+        isAnimationDoneRef.current = true;
         setState('TIMEOUT_WARNING');
       }
     }, timeoutMs);
@@ -122,19 +152,33 @@ export function AppBootstrapProvider({ children, timeoutMs = 4500 }: Props) {
         setVaultStatus(status);
 
         // Invariante de Segurança Fiduciária — Tratamento Exaustivo das 4 Combinações:
+        let targetState: BootstrapState;
         if (!status.is_initialized && status.is_unlocked) {
           // Combinação Anômala: desbloqueado sem estar inicializado
           setErrorMessage('Inconsistência de integridade na sessão do cofre.');
-          setState('FATAL_ERROR');
+          targetState = 'FATAL_ERROR';
         } else if (!status.is_initialized) {
-          // Primeiro Acesso Normal: cofre virgem não inicializado
-          setState('UNINITIALIZED');
+          targetState = 'UNINITIALIZED';
         } else if (!status.is_unlocked) {
-          // Operação Normal Trancada: cofre inicializado aguardando senha mestre
-          setState('READY_LOCKED');
+          targetState = 'READY_LOCKED';
         } else {
-          // Operação Normal Destrancada: cofre inicializado E desbloqueado
-          setState('READY_UNLOCKED');
+          targetState = 'READY_UNLOCKED';
+        }
+
+        // Falha crítica interrompe imediatamente a animação
+        if (targetState === 'FATAL_ERROR') {
+          pendingTargetStateRef.current = null;
+          isAnimationDoneRef.current = true;
+          setState('FATAL_ERROR');
+          return;
+        }
+
+        // Portão Duplo: Se a animação já concluiu, transiciona para o estado alvo
+        if (isAnimationDoneRef.current) {
+          setState(targetState);
+        } else {
+          // Aguarda conclusão da animação (tempo regular ou Esc/Pular)
+          pendingTargetStateRef.current = targetState;
         }
       })
       .catch((err: unknown) => {
@@ -144,6 +188,8 @@ export function AppBootstrapProvider({ children, timeoutMs = 4500 }: Props) {
         }
 
         activeAttemptIdRef.current = null;
+        pendingTargetStateRef.current = null;
+        isAnimationDoneRef.current = true;
         if (timerRef.current) {
           clearTimeout(timerRef.current);
           timerRef.current = null;
@@ -157,7 +203,7 @@ export function AppBootstrapProvider({ children, timeoutMs = 4500 }: Props) {
         setErrorMessage(sanitized);
         setState('FATAL_ERROR');
       });
-  }, [timeoutMs]);
+  }, [timeoutMs, enableThreeAnimation]);
 
   useEffect(() => {
     runBootstrap();
@@ -171,6 +217,13 @@ export function AppBootstrapProvider({ children, timeoutMs = 4500 }: Props) {
       }
     };
   }, [runBootstrap]);
+
+  // Restauração da Janela: ao concluir o bootstrap, sai de tela cheia para o dashboard
+  useEffect(() => {
+    if (state !== 'INITIALIZING') {
+      void WindowBridge.restoreWindowAfterBoot();
+    }
+  }, [state]);
 
   const unlock = useCallback(async (password: string): Promise<boolean> => {
     const ok = await VaultBridge.unlock(password);
@@ -223,7 +276,12 @@ export function AppBootstrapProvider({ children, timeoutMs = 4500 }: Props) {
   return (
     <BootstrapContext.Provider value={value}>
       {/* 1. Tela de Carregamento Inicial (Splash) */}
-      {state === 'INITIALIZING' && <SplashScreen />}
+      {state === 'INITIALIZING' && (
+        <SplashScreen
+          enableThree={enableThreeAnimation}
+          onAnimationComplete={handleAnimationComplete}
+        />
+      )}
 
       {/* 2. Tela de Aviso de Timeout da Interface (> 4.5s) */}
       {state === 'TIMEOUT_WARNING' && (

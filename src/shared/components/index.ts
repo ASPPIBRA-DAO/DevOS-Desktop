@@ -45,3 +45,4 @@ export * from './file-thumbnail';
 
 export * from './search-not-found';
 export * from './custom-breadcrumbs';
+export * from './window-mode-toggle';

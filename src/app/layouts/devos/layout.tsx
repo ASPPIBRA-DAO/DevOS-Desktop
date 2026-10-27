@@ -13,6 +13,8 @@ import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
 import { styled, useTheme } from '@mui/material/styles';
 
+import { WindowModeToggle } from 'src/shared/components/window-mode-toggle';
+
 import { paths } from 'src/routes/paths';
 import { Logo } from 'src/components/logo';
 import { usePathname } from 'src/routes/hooks';
@@ -345,7 +347,11 @@ export function DevOSLayout({ children, navData: userNavData }: Props) {
             </Typography>
           </Stack>
         ),
-        rightArea: null,
+        rightArea: (
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+            <WindowModeToggle />
+          </Stack>
+        ),
       }}
       slotProps={{
         container: {

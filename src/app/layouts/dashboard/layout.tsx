@@ -10,6 +10,8 @@ import Alert from '@mui/material/Alert';
 import { useTheme } from '@mui/material/styles';
 import { iconButtonClasses } from '@mui/material/IconButton';
 
+import { WindowModeToggle } from 'src/shared/components/window-mode-toggle';
+
 import { allLangs } from 'src/locales';
 import { Logo } from 'src/components/logo';
 import { useAuthContext } from 'src/auth/hooks';
@@ -206,6 +208,9 @@ export function DashboardLayout({
 
           {/** @slot Contacts popover */}
           <ContactsPopover data={_contacts} />
+
+          {/** @slot Window mode toggle */}
+          <WindowModeToggle />
 
           {/** @slot Settings button */}
           <SettingsButton />

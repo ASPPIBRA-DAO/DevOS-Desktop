@@ -20,6 +20,10 @@
     "allow-restore-vault-backup",
     "allow-fetch-wallet-balance",
     "allow-batch-fetch-wallet-balances",
-    "allow-generate-document"
+    "allow-generate-document",
+    "core:window:allow-set-fullscreen",
+    "core:window:allow-is-fullscreen",
+    "core:window:allow-center",
+    "core:window:allow-set-size"
   ]
 }

@@ -65,6 +65,17 @@ export default defineConfig(({ mode }) => {
         },
       ],
     },
+    optimizeDeps: {
+      include: [
+        'three',
+        'three-globe',
+        '@react-three/fiber',
+        '@react-three/drei',
+        '@tauri-apps/api/core',
+        '@tauri-apps/api/window',
+        '@tauri-apps/api/dpi',
+      ],
+    },
     server: {
       port: PORT,
       host: true,
