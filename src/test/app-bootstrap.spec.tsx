@@ -225,4 +225,20 @@ describe('Arquitetura de Inicialização — AppBootstrapProvider & State Machin
     expect(ok).toBe(true);
     expect(VaultBridge.unlock).toHaveBeenCalledWith('secret123');
   });
+
+  it('Cenário 9: deve recusar liberação se o cofre retornar combinação inconsistente (is_unlocked true mas is_initialized false)', async () => {
+    vi.spyOn(VaultBridge, 'getStatus').mockResolvedValueOnce({
+      is_initialized: false,
+      is_unlocked: true,
+      dao_wallets_count: 0,
+      client_wallets_count: 0,
+    });
+
+    const status = await VaultBridge.getStatus();
+    expect(status.is_initialized).toBe(false);
+    expect(status.is_unlocked).toBe(true);
+
+    const isCoherent = status.is_initialized && status.is_unlocked;
+    expect(isCoherent).toBe(false);
+  });
 });
