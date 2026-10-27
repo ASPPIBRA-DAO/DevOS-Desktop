@@ -90,6 +90,9 @@ pub fn unlock_vault(
     session: State<'_, VaultSession>,
     master_password: String,
 ) -> Result<bool, String> {
+    // 1. Captura a época atômica no início da operação de validação da senha
+    let epoch_at_start = session.current_epoch();
+
     let header = db
         .get_header()
         .map_err(|e| {
@@ -99,8 +102,12 @@ pub fn unlock_vault(
         .ok_or_else(|| "Cofre não inicializado. Crie a senha mestre primeiro.".to_string())?;
 
     if header.verify_password(&master_password) {
-        session.set_unlocked(true);
-        Ok(true)
+        // 2. Validação atômica de concorrência: se lock() foi acionado durante verify_password, aborta o desbloqueio
+        if session.try_unlock(epoch_at_start) {
+            Ok(true)
+        } else {
+            Err("Operação de desbloqueio abortada: cofre foi bloqueado concorrentemente.".to_string())
+        }
     } else {
         Err("Senha mestre incorreta.".to_string())
     }
@@ -108,7 +115,7 @@ pub fn unlock_vault(
 
 #[tauri::command]
 pub fn lock_vault(session: State<'_, VaultSession>) -> Result<bool, String> {
-    session.set_unlocked(false);
+    session.lock();
     Ok(true)
 }
 
