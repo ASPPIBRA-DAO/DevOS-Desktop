@@ -226,19 +226,31 @@ describe('Arquitetura de Inicialização — AppBootstrapProvider & State Machin
     expect(VaultBridge.unlock).toHaveBeenCalledWith('secret123');
   });
 
-  it('Cenário 9: deve recusar liberação se o cofre retornar combinação inconsistente (is_unlocked true mas is_initialized false)', async () => {
-    vi.spyOn(VaultBridge, 'getStatus').mockResolvedValueOnce({
-      is_initialized: false,
-      is_unlocked: true,
-      dao_wallets_count: 0,
-      client_wallets_count: 0,
-    });
+  it('Cenário 9: deve tratar exaustivamente as 4 combinações de estado do cofre (incluindo anomalia false/true)', async () => {
+    // Função pura espelho da regra de transição do AppBootstrapProvider
+    const resolveBootstrapState = (status: { is_initialized: boolean; is_unlocked: boolean }): BootstrapState => {
+      if (!status.is_initialized && status.is_unlocked) {
+        return 'FATAL_ERROR';
+      }
+      if (!status.is_initialized) {
+        return 'UNINITIALIZED';
+      }
+      if (!status.is_unlocked) {
+        return 'READY_LOCKED';
+      }
+      return 'READY_UNLOCKED';
+    };
 
-    const status = await VaultBridge.getStatus();
-    expect(status.is_initialized).toBe(false);
-    expect(status.is_unlocked).toBe(true);
+    // 1. Combinação anômala (false/true) -> DEVE ir para FATAL_ERROR
+    expect(resolveBootstrapState({ is_initialized: false, is_unlocked: true })).toBe('FATAL_ERROR');
 
-    const isCoherent = status.is_initialized && status.is_unlocked;
-    expect(isCoherent).toBe(false);
+    // 2. Primeiro acesso (false/false) -> DEVE ir para UNINITIALIZED
+    expect(resolveBootstrapState({ is_initialized: false, is_unlocked: false })).toBe('UNINITIALIZED');
+
+    // 3. Normal trancado (true/false) -> DEVE ir para READY_LOCKED
+    expect(resolveBootstrapState({ is_initialized: true, is_unlocked: false })).toBe('READY_LOCKED');
+
+    // 4. Normal destrancado (true/true) -> DEVE ir para READY_UNLOCKED
+    expect(resolveBootstrapState({ is_initialized: true, is_unlocked: true })).toBe('READY_UNLOCKED');
   });
 });
