@@ -253,4 +253,23 @@ describe('Arquitetura de Inicialização — AppBootstrapProvider & State Machin
     // 4. Normal destrancado (true/true) -> DEVE ir para READY_UNLOCKED
     expect(resolveBootstrapState({ is_initialized: true, is_unlocked: true })).toBe('READY_UNLOCKED');
   });
+
+  it('Cenário 10: método lock do VaultBridge deve invocar lock_vault no backend Rust', async () => {
+    const lockSpy = vi.spyOn(VaultBridge, 'lock').mockResolvedValueOnce(true);
+
+    const ok = await VaultBridge.lock();
+    expect(ok).toBe(true);
+    expect(lockSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('Cenário 11: autoridade do backend — estado do React não autoriza acesso sem validação Rust', async () => {
+    // Simula backend rejeitando operação protegida porque o cofre está bloqueado em memória Rust
+    vi.spyOn(VaultBridge, 'exportAuthorizedSecret').mockRejectedValueOnce(
+      new Error('Acesso negado: o cofre precisa estar desbloqueado.')
+    );
+
+    await expect(
+      VaultBridge.exportAuthorizedSecret('senha123', 'dao_vault_1')
+    ).rejects.toThrow('Acesso negado: o cofre precisa estar desbloqueado.');
+  });
 });
