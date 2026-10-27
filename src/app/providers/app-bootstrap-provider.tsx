@@ -119,17 +119,20 @@ export function AppBootstrapProvider({ children, timeoutMs = 4500 }: Props) {
 
         setVaultStatus(status);
 
-        // Invariante de Segurança Fiduciária:
-        // READY_UNLOCKED EXIGE ESTRITAMENTE que o cofre esteja inicializado E desbloqueado.
-        if (!status.is_initialized) {
-          setState('UNINITIALIZED');
-        } else if (!status.is_unlocked) {
-          setState('READY_LOCKED');
-        } else if (status.is_initialized && status.is_unlocked) {
-          setState('READY_UNLOCKED');
-        } else {
+        // Invariante de Segurança Fiduciária — Tratamento Exaustivo das 4 Combinações:
+        if (!status.is_initialized && status.is_unlocked) {
+          // Combinação Anômala: desbloqueado sem estar inicializado
           setErrorMessage('Inconsistência de integridade na sessão do cofre.');
           setState('FATAL_ERROR');
+        } else if (!status.is_initialized) {
+          // Primeiro Acesso Normal: cofre virgem não inicializado
+          setState('UNINITIALIZED');
+        } else if (!status.is_unlocked) {
+          // Operação Normal Trancada: cofre inicializado aguardando senha mestre
+          setState('READY_LOCKED');
+        } else {
+          // Operação Normal Destrancada: cofre inicializado E desbloqueado
+          setState('READY_UNLOCKED');
         }
       })
       .catch((err: unknown) => {
