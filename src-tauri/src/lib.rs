@@ -38,6 +38,7 @@ pub fn run() {
             storage::MigrationManager::run_migrations(&vault_db)
                 .map_err(|e| format!("Falha nas migrações do cofre: {}", e))?;
             app.manage(vault_db);
+            app.manage(vault::VaultSession::new());
 
             // 3. Inicializar banco do Cadastro Imobiliário (real_estate.sqlite) exclusivamente na edição Cockpit
             let is_cockpit = app.config().identifier == "br.aspp.devos.cockpit";
@@ -56,6 +57,7 @@ pub fn run() {
             commands::get_vault_status,
             commands::init_master_password,
             commands::unlock_vault,
+            commands::lock_vault,
             commands::generate_seed_and_preview,
             commands::reveal_pending_mnemonic,
             commands::cancel_pending_creation,
