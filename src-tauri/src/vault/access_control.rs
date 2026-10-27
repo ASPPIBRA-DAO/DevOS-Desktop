@@ -24,6 +24,30 @@ pub struct VaultStatus {
     pub client_wallets_count: usize,
 }
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
+/// Gerenciador autoritativo da sessão do cofre em memória
+#[derive(Default)]
+pub struct VaultSession {
+    unlocked: AtomicBool,
+}
+
+impl VaultSession {
+    pub fn new() -> Self {
+        Self {
+            unlocked: AtomicBool::new(false),
+        }
+    }
+
+    pub fn is_unlocked(&self) -> bool {
+        self.unlocked.load(Ordering::SeqCst)
+    }
+
+    pub fn set_unlocked(&self, unlocked: bool) {
+        self.unlocked.store(unlocked, Ordering::SeqCst);
+    }
+}
+
 /// Token em memória de sessão desbloqueada com descarte seguro
 #[derive(Default, Zeroize, ZeroizeOnDrop)]
 pub struct SessionKey(pub Option<String>);
