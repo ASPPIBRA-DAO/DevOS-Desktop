@@ -1,6 +1,7 @@
 import type { BoxProps } from '@mui/material/Box';
 
 import Box from '@mui/material/Box';
+
 import { Iconify } from 'src/shared/components/iconify';
 
 export function PasswordIcon({ sx, ...other }: BoxProps) {

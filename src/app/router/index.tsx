@@ -2,17 +2,17 @@ import React from 'react';
 import currentEdition from '@edition';
 import { Route, Routes } from 'react-router';
 
-import { useBootstrap } from '../providers/app-bootstrap-provider';
+import { DevOSLayout } from '../layouts/devos/layout';
+import { NotFoundView } from '../pages/not-found-view';
 import { AuthCenteredLayout } from '../../layouts/auth-centered';
+import { useBootstrap } from '../providers/app-bootstrap-provider';
 import {
   JwtSignInView,
   JwtSignUpView,
+  JwtVerifyView,
   JwtResetPasswordView,
   JwtUpdatePasswordView,
-  JwtVerifyView,
 } from '../../auth/view/jwt';
-import { DevOSLayout } from '../layouts/devos/layout';
-import { NotFoundView } from '../pages/not-found-view';
 
 export function AppRouter() {
   const { state } = useBootstrap();

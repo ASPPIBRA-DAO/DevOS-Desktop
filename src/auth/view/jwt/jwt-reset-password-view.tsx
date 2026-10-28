@@ -8,14 +8,14 @@ import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 
-import { paths } from 'src/routes/paths';
-import { RouterLink } from 'src/routes/components';
-import { useRouter } from 'src/routes/hooks';
-
-import { PasswordIcon } from 'src/assets/icons';
+import { toast } from 'src/shared/components/snackbar';
 import { Iconify } from 'src/shared/components/iconify';
 import { Form, Field, schemaUtils } from 'src/shared/components/hook-form';
-import { toast } from 'src/shared/components/snackbar';
+
+import { paths } from 'src/routes/paths';
+import { useRouter } from 'src/routes/hooks';
+import { PasswordIcon } from 'src/assets/icons';
+import { RouterLink } from 'src/routes/components';
 
 import { getErrorMessage } from '../../utils/error-message';
 import { IdentitySessionService } from '../../application/identity-session.service';

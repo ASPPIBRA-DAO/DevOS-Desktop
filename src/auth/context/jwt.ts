@@ -1,5 +1,5 @@
-import { VaultBridge } from 'src/platform/tauri/vault/vault-bridge';
 import { isTauriDesktop } from 'src/platform/tauri/core/invoke';
+import { VaultBridge } from 'src/platform/tauri/vault/vault-bridge';
 
 export interface SignInParams {
   email?: string;

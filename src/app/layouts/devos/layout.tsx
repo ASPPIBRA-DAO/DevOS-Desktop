@@ -14,8 +14,6 @@ import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 import { styled, useTheme } from '@mui/material/styles';
 
-import { useBootstrap } from '../../providers/app-bootstrap-provider';
-
 import { WindowModeToggle } from 'src/shared/components/window-mode-toggle';
 
 import { paths } from 'src/routes/paths';
@@ -26,6 +24,7 @@ import { NavSectionMini, NavSectionVertical } from 'src/components/nav-section';
 
 import { MenuButton } from '../components/menu-button';
 import { NavToggleButton } from '../components/nav-toggle-button';
+import { useBootstrap } from '../../providers/app-bootstrap-provider';
 import { MainSection, layoutClasses, HeaderSection, LayoutSection } from '../core';
 
 // ----------------------------------------------------------------------
