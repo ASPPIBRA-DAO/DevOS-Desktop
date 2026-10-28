@@ -203,6 +203,10 @@ export function Web3GlobeScene({
   durationMs,
   onProgress,
   onFinished,
+  style,
+  className,
+  cameraPosition = [0, 0, 380],
+  autoRotateSpeed = 0.6,
 }: Web3GlobeSceneProps) {
   const config = useMemo(
     () => ({
@@ -238,23 +242,25 @@ export function Web3GlobeScene({
   return (
     <div
       data-testid="web3-globe-canvas-container"
+      className={className}
       style={{
-        width: '100vw',
-        height: '100vh',
+        width: '100%',
+        height: '100%',
         position: 'absolute',
         top: 0,
         left: 0,
         overflow: 'hidden',
+        ...style,
       }}
     >
       <Canvas dpr={[1, 2]} gl={{ antialias: true, alpha: true }}>
-        <PerspectiveCamera makeDefault position={[0, 0, 380]} fov={50} />
+        <PerspectiveCamera makeDefault position={cameraPosition} fov={50} />
 
         <OrbitControls
           enableZoom={false}
           enablePan={false}
           autoRotate
-          autoRotateSpeed={0.6}
+          autoRotateSpeed={autoRotateSpeed}
           minPolarAngle={Math.PI / 2}
           maxPolarAngle={Math.PI / 2}
         />

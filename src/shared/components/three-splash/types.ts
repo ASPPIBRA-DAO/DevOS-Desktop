@@ -67,5 +67,9 @@ export interface Web3GlobeSceneProps {
   durationMs?: number;
   onProgress?: (progress: number) => void;
   onFinished?: () => void;
+  style?: React.CSSProperties;
+  className?: string;
+  cameraPosition?: [number, number, number];
+  autoRotateSpeed?: number;
 }
 

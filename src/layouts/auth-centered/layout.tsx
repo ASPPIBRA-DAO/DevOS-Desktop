@@ -16,6 +16,7 @@ import { RouterLink } from 'src/routes/components';
 import { AuthCenteredContent } from './content';
 import { SettingsButton } from '../components/settings-button';
 import { MainSection, LayoutSection, HeaderSection } from '../core';
+import { AuthGlobeBackground, type AuthGlobeBackgroundProps } from './globe-background';
 
 // ----------------------------------------------------------------------
 
@@ -23,6 +24,8 @@ type LayoutBaseProps = Pick<LayoutSectionProps, 'sx' | 'children' | 'cssVars'>;
 
 export type AuthCenteredLayoutProps = LayoutBaseProps & {
   layoutQuery?: Breakpoint;
+  disableBackgroundGlobe?: boolean;
+  globeProps?: Partial<AuthGlobeBackgroundProps>;
   slotProps?: {
     header?: HeaderSectionProps;
     main?: MainSectionProps;
@@ -36,6 +39,8 @@ export function AuthCenteredLayout({
   children,
   slotProps,
   layoutQuery = 'md',
+  disableBackgroundGlobe = false,
+  globeProps,
 }: AuthCenteredLayoutProps) {
   const renderHeader = () => {
     const headerSlotProps: HeaderSectionProps['slotProps'] = { container: { maxWidth: false } };
@@ -140,6 +145,9 @@ export function AuthCenteredLayout({
         ...(Array.isArray(sx) ? sx : [sx]),
       ]}
     >
+      {/** @slot 3D Web3 Rotating Globe Background */}
+      {!disableBackgroundGlobe && <AuthGlobeBackground {...globeProps} />}
+
       {renderMain()}
     </LayoutSection>
   );
