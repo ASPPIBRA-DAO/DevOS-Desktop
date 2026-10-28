@@ -2,12 +2,15 @@ import type { Breakpoint } from '@mui/material/styles';
 import type { AuthCenteredContentProps } from './content';
 import type { MainSectionProps, HeaderSectionProps, LayoutSectionProps } from '../core';
 
+import { useEffect } from 'react';
 import { merge } from 'es-toolkit';
 
 import Box from '@mui/material/Box';
 import Link from '@mui/material/Link';
 import Alert from '@mui/material/Alert';
 import Typography from '@mui/material/Typography';
+
+import { WindowBridge } from 'src/platform/tauri/window/window-bridge';
 
 import { Logo } from 'src/shared/components/logo';
 
@@ -43,6 +46,9 @@ export function AuthCenteredLayout({
   disableBackgroundGlobe = false,
   globeProps,
 }: AuthCenteredLayoutProps) {
+  useEffect(() => {
+    void WindowBridge.setFullscreen(true);
+  }, []);
   const renderHeader = () => {
     const headerSlotProps: HeaderSectionProps['slotProps'] = { container: { maxWidth: false } };
 

@@ -218,9 +218,13 @@ export function AppBootstrapProvider({
     };
   }, [runBootstrap]);
 
-  // Restauração da Janela: ao concluir o bootstrap, sai de tela cheia para o dashboard
+  // Restauração da Janela: as telas de inicialização e credenciais (UNINITIALIZED / READY_LOCKED)
+  // permanecem em tela cheia fluida total (100vw x 100vh), exatamente como a tela de carregamento (splash).
+  // Apenas após a liberação do cofre (READY_UNLOCKED) é que a janela é restaurada para as dimensões de trabalho.
   useEffect(() => {
-    if (state !== 'INITIALIZING') {
+    if (state === 'UNINITIALIZED' || state === 'READY_LOCKED') {
+      void WindowBridge.setFullscreen(true);
+    } else if (state === 'READY_UNLOCKED') {
       void WindowBridge.restoreWindowAfterBoot();
     }
   }, [state]);

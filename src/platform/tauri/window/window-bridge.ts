@@ -34,6 +34,9 @@ export class WindowBridge {
   static async setFullscreen(fullscreen: boolean): Promise<boolean> {
     if (!isTauriDesktop()) return false;
     try {
+      if (fullscreen) {
+        this.hasRestored = false;
+      }
       const appWindow = getCurrentWindow();
       await appWindow.setFullscreen(fullscreen);
       if (!fullscreen) {
