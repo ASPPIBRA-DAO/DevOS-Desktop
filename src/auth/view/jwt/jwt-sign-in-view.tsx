@@ -173,6 +173,7 @@ export function JwtSignInView() {
           input: {
             sx: {
               borderRadius: 1,
+              bgcolor: 'rgba(2, 8, 23, 0.65)',
               '& input': {
                 fontFamily: 'var(--font-orbitron), sans-serif',
                 color: 'info.main',
@@ -182,7 +183,7 @@ export function JwtSignInView() {
                   transition: 'background-color 5000s ease-in-out 0s',
                 },
               },
-              '& fieldset': { borderColor: alpha(theme.palette.info.main, 0.2) },
+              '& fieldset': { borderColor: alpha(theme.palette.info.main, 0.25) },
               '&:hover fieldset': { borderColor: `${theme.palette.info.main} !important` },
               '&.Mui-focused fieldset': { borderColor: `${theme.palette.info.main} !important` },
             },
@@ -208,6 +209,7 @@ export function JwtSignInView() {
             input: {
               sx: {
                 borderRadius: 1,
+                bgcolor: 'rgba(2, 8, 23, 0.65)',
                 '& input': {
                   fontFamily: 'var(--font-orbitron), sans-serif',
                   color: 'info.main',
@@ -217,7 +219,7 @@ export function JwtSignInView() {
                     transition: 'background-color 5000s ease-in-out 0s',
                   },
                 },
-                '& fieldset': { borderColor: alpha(theme.palette.info.main, 0.2) },
+                '& fieldset': { borderColor: alpha(theme.palette.info.main, 0.25) },
                 '&:hover fieldset': { borderColor: `${theme.palette.info.main} !important` },
                 '&.Mui-focused fieldset': { borderColor: `${theme.palette.info.main} !important` },
               },
@@ -321,6 +323,8 @@ export function JwtSignInView() {
           color: 'info.main',
           fontFamily: 'var(--font-orbitron), sans-serif',
           fontWeight: 900,
+          letterSpacing: '0.06em',
+          textShadow: '0 0 25px rgba(0, 184, 217, 0.45)',
         }}
       >
         ACESSO AO COFRE

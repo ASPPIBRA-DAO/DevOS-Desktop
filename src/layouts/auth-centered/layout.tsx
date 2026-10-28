@@ -7,6 +7,7 @@ import { merge } from 'es-toolkit';
 import Box from '@mui/material/Box';
 import Link from '@mui/material/Link';
 import Alert from '@mui/material/Alert';
+import Typography from '@mui/material/Typography';
 
 import { Logo } from 'src/shared/components/logo';
 
@@ -52,20 +53,87 @@ export function AuthCenteredLayout({
         </Alert>
       ),
       leftArea: (
-        <>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           {/** @slot Logo */}
           <Logo />
-        </>
+          <Box sx={{ display: { xs: 'none', sm: 'flex' }, flexDirection: 'column' }}>
+            <Typography
+              variant="overline"
+              sx={{
+                color: 'info.main',
+                fontFamily: 'var(--font-orbitron), sans-serif',
+                letterSpacing: 2,
+                fontWeight: 700,
+                fontSize: '0.72rem',
+                lineHeight: 1.2,
+              }}
+            >
+              DevOS // Secure Enterprise
+            </Typography>
+            <Typography
+              variant="caption"
+              sx={{
+                color: 'text.disabled',
+                fontSize: '0.65rem',
+                letterSpacing: 1,
+              }}
+            >
+              Ambiente Nativo de Hardware
+            </Typography>
+          </Box>
+        </Box>
       ),
       rightArea: (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 1.5 } }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 2 } }}>
+          <Box
+            sx={{
+              display: { xs: 'none', md: 'flex' },
+              alignItems: 'center',
+              gap: 0.8,
+              px: 1.2,
+              py: 0.4,
+              borderRadius: 1,
+              bgcolor: 'rgba(34, 197, 94, 0.08)',
+              border: '1px solid rgba(34, 197, 94, 0.25)',
+            }}
+          >
+            <Box
+              sx={{
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                bgcolor: 'success.main',
+                boxShadow: '0 0 8px #22c55e',
+              }}
+            />
+            <Typography
+              variant="caption"
+              sx={{
+                color: 'success.main',
+                fontFamily: 'var(--font-orbitron), sans-serif',
+                fontWeight: 700,
+                fontSize: '0.68rem',
+                letterSpacing: 1,
+              }}
+            >
+              HSM ATIVO
+            </Typography>
+          </Box>
+
           {/** @slot Help link */}
           <Link
             href={paths.faqs || '#'}
             component={RouterLink}
-            sx={{ typography: 'subtitle2', color: 'info.main', fontFamily: 'var(--font-orbitron), sans-serif', textDecoration: 'none' }}
+            sx={{
+              typography: 'subtitle2',
+              color: 'info.main',
+              fontFamily: 'var(--font-orbitron), sans-serif',
+              textDecoration: 'none',
+              fontSize: '0.8rem',
+              '&:hover': { textShadow: '0 0 8px rgba(0, 184, 217, 0.8)' },
+            }}
           >
-            Need help?
+            Precisa de ajuda?
           </Link>
 
           {/** @slot Settings button */}
@@ -89,7 +157,44 @@ export function AuthCenteredLayout({
     );
   };
 
-  const renderFooter = () => null;
+  const renderFooter = () => (
+    <Box
+      component="footer"
+      sx={{
+        py: 1.5,
+        px: { xs: 2, md: 4 },
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        zIndex: 2,
+        pointerEvents: 'none',
+      }}
+    >
+      <Typography
+        variant="caption"
+        sx={{
+          color: 'text.disabled',
+          fontFamily: 'var(--font-orbitron), sans-serif',
+          fontSize: '0.68rem',
+          letterSpacing: 1,
+        }}
+      >
+        DEVOS COCKPIT // HARDWARE SECURITY MODULE
+      </Typography>
+      <Typography
+        variant="caption"
+        sx={{
+          color: 'info.main',
+          fontFamily: 'var(--font-orbitron), sans-serif',
+          fontSize: '0.68rem',
+          letterSpacing: 1,
+          opacity: 0.8,
+        }}
+      >
+        DEPIN MESH // ONLINE
+      </Typography>
+    </Box>
+  );
 
   const renderMain = () => (
     <MainSection
@@ -125,7 +230,7 @@ export function AuthCenteredLayout({
       /** **************************************
        * @Styles
        *************************************** */
-      cssVars={{ '--layout-auth-content-width': '420px', ...cssVars }}
+      cssVars={{ '--layout-auth-content-width': '520px', ...cssVars }}
       sx={[
         {
           position: 'relative',

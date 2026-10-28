@@ -3,7 +3,6 @@ import type { BoxProps } from '@mui/material/Box';
 import { mergeClasses } from 'minimal-shared/utils';
 
 import Box from '@mui/material/Box';
-import { alpha } from '@mui/material/styles';
 
 import { layoutClasses } from '../core';
 
@@ -21,45 +20,24 @@ export function AuthCenteredContent({
     <Box
       className={mergeClasses([layoutClasses.content, className])}
       sx={[
-        (theme) => ({
-          py: { xs: 2.5, sm: 3 },
-          px: { xs: 2.5, sm: 3.5 },
+        () => ({
+          py: { xs: 2, sm: 3 },
+          px: { xs: 2, sm: 3 },
           my: 'auto',
           width: 1,
           zIndex: 2,
-          borderRadius: 2,
           display: 'flex',
           flexDirection: 'column',
-          maxWidth: 'var(--layout-auth-content-width)',
+          maxWidth: { xs: '100%', sm: 480, md: 520 },
           position: 'relative',
 
-          /** * ✅ ESTILO CRYSTAL (SocialFi 2026)
-           * Fundo Deep Midnight + Estabilidade Total WebKitGTK
+          /**
+           * ✅ HUD ABERTO FLUIDO (100vw × 100vh)
+           * Sem borda de caixa fechada - fundo radial suave para legibilidade cristalina
+           * mantendo o Globo 3D visível e integrado em tela cheia.
            */
-          bgcolor: alpha('#020817', 0.95),
-
-          /** * ✅ BORDA CRYSTAL REATIVA
-           * Efeito de "fio de luz" gradiente (Ciano -> Branco -> Âmbar)
-           */
-          border: '1px solid rgba(0, 184, 217, 0.25)',
-          '&::before': {
-            content: '""',
-            position: 'absolute',
-            inset: 0,
-            borderRadius: 'inherit',
-            padding: '1px',
-            background: `linear-gradient(180deg, 
-              ${alpha(theme.palette.info.main, 0.9)} 0%, 
-              ${alpha(theme.palette.common.white, 0.1)} 50%, 
-              ${alpha(theme.palette.warning.main, 0.9)} 100%
-            )`,
-            WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
-            WebkitMaskComposite: 'xor',
-            maskComposite: 'exclude',
-            pointerEvents: 'none',
-          },
-
-          boxShadow: `0 20px 40px ${alpha(theme.palette.common.black, 0.5)}, 0 0 30px rgba(0, 184, 217, 0.15)`,
+          background:
+            'radial-gradient(ellipse at center, rgba(2, 8, 23, 0.7) 0%, rgba(2, 8, 23, 0.35) 75%, transparent 100%)',
         }),
         ...(Array.isArray(sx) ? sx : [sx]),
       ]}
