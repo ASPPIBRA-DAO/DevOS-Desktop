@@ -68,7 +68,7 @@ type Props = {
 export function AppBootstrapProvider({
   children,
   timeoutMs = 4500,
-  enableThreeAnimation = true,
+  enableThreeAnimation = false,
 }: Props) {
   const [state, setState] = useState<BootstrapState>('INITIALIZING');
   const [vaultStatus, setVaultStatus] = useState<VaultStatus | null>(null);
@@ -226,6 +226,17 @@ export function AppBootstrapProvider({
       void WindowBridge.setFullscreen(true);
     } else if (state === 'READY_UNLOCKED') {
       void WindowBridge.restoreWindowAfterBoot();
+    }
+  }, [state]);
+
+  // Transição suave e descarte da 1ª página de carregamento nativa (index.html)
+  useEffect(() => {
+    if (state !== 'INITIALIZING') {
+      const finishSplash = (window as unknown as { __DEVOS_FINISH_SPLASH__?: () => void })
+        .__DEVOS_FINISH_SPLASH__;
+      if (typeof finishSplash === 'function') {
+        finishSplash();
+      }
     }
   }, [state]);
 

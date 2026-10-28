@@ -38,6 +38,10 @@ export class WindowBridge {
         this.hasRestored = false;
       }
       const appWindow = getCurrentWindow();
+      const current = await appWindow.isFullscreen().catch(() => null);
+      if (current === fullscreen) {
+        return fullscreen;
+      }
       await appWindow.setFullscreen(fullscreen);
       if (!fullscreen) {
         setTimeout(async () => {
