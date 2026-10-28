@@ -10,6 +10,15 @@ export const paths = {
   faqs: '#',
   pricing: '#',
   minimalStore: '#',
+  auth: {
+    jwt: {
+      signIn: '/login',
+      signUp: '/register',
+      resetPassword: '/forgot-password',
+      updatePassword: '/reset-password',
+      verify: '/verify',
+    },
+  },
   dashboard: {
     root: '/',
     designSystem: '/design-system',

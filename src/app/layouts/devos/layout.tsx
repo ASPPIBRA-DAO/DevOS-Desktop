@@ -11,7 +11,10 @@ import Stack from '@mui/material/Stack';
 import Drawer from '@mui/material/Drawer';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
+import IconButton from '@mui/material/IconButton';
 import { styled, useTheme } from '@mui/material/styles';
+
+import { useBootstrap } from '../../providers/app-bootstrap-provider';
 
 import { WindowModeToggle } from 'src/shared/components/window-mode-toggle';
 
@@ -298,6 +301,7 @@ const NavRoot = styled('div', {
 export function DevOSLayout({ children, navData: userNavData }: Props) {
   const theme = useTheme();
   const pathname = usePathname();
+  const { lock } = useBootstrap();
   const navData = userNavData ?? DEVOS_NAV_DATA;
 
   const isNavMini = useBoolean(false);
@@ -349,6 +353,22 @@ export function DevOSLayout({ children, navData: userNavData }: Props) {
         ),
         rightArea: (
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+            <IconButton
+              size="small"
+              onClick={() => void lock()}
+              title="Trancar Cofre"
+              sx={{
+                color: 'warning.main',
+                border: '1px solid rgba(255, 171, 0, 0.24)',
+                bgcolor: 'rgba(255, 171, 0, 0.08)',
+                '&:hover': {
+                  bgcolor: 'rgba(255, 171, 0, 0.16)',
+                  borderColor: 'warning.main',
+                },
+              }}
+            >
+              <Iconify icon="solar:lock-keyhole-bold" width={18} />
+            </IconButton>
             <WindowModeToggle />
           </Stack>
         ),

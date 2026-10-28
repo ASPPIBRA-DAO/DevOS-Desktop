@@ -6,5 +6,9 @@ export function useAuthContext() {
       email: 'operador@asppibra.com',
       role: 'dev',
     },
+    checkUserSession: async () => {
+      // Sincroniza sessão
+      return true;
+    },
   };
 }
