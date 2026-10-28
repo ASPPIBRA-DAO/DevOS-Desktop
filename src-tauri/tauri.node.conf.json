@@ -35,6 +35,10 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "publisher": "ASPPIBRA-DAO",
+    "category": "Utility",
+    "shortDescription": "Plataforma de Governança Descentralizada & Nó Operador DePIN",
+    "longDescription": "ASPPIBRA DevOS Desktop (Edição Node) — Nó operador de infraestrutura física descentralizada com cofre local e telemetria de rede.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
