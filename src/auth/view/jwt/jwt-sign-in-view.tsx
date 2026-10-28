@@ -156,7 +156,7 @@ export function JwtSignInView() {
   };
 
   const renderForm = () => (
-    <Box sx={{ gap: 3, display: 'flex', flexDirection: 'column' }}>
+    <Box sx={{ gap: 2, display: 'flex', flexDirection: 'column' }}>
       <Field.Text
         name="email"
         label="Identificador / E-mail"
@@ -279,11 +279,11 @@ export function JwtSignInView() {
         variant="outlined"
         loading={isSubmitting}
         sx={{
-          height: 60,
-          fontSize: 18,
+          height: 48,
+          fontSize: 15,
           fontFamily: 'var(--font-orbitron), sans-serif',
           fontWeight: 900,
-          letterSpacing: '0.15em',
+          letterSpacing: '0.12em',
           textTransform: 'uppercase',
           bgcolor: alpha('#020817', 0.8),
           color: 'info.main',
@@ -309,7 +309,7 @@ export function JwtSignInView() {
         width: 1,
         display: 'flex',
         flexDirection: 'column',
-        gap: 3,
+        gap: 2,
       }}
     >
       <Typography
@@ -474,10 +474,11 @@ export function JwtSignInView() {
           <Iconify icon="logos:metamask-icon" width={24} />
         }
         sx={{
-          height: 54,
+          height: 48,
+          fontSize: 14,
           fontFamily: 'var(--font-orbitron), sans-serif',
           fontWeight: 900,
-          letterSpacing: 1.5,
+          letterSpacing: 1,
           color: 'info.main',
           bgcolor: alpha('#020817', 0.9),
           border: `1px solid ${alpha(theme.palette.info.main, 0.4)}`,

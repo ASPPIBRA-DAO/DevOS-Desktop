@@ -22,8 +22,9 @@ export function AuthCenteredContent({
       className={mergeClasses([layoutClasses.content, className])}
       sx={[
         (theme) => ({
-          py: 5,
-          px: 3,
+          py: { xs: 2.5, sm: 3 },
+          px: { xs: 2.5, sm: 3.5 },
+          my: 'auto',
           width: 1,
           zIndex: 2,
           borderRadius: 2,

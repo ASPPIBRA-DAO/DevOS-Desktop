@@ -92,11 +92,13 @@ export function AuthCenteredLayout({
       sx={[
         (theme) => ({
           alignItems: 'center',
-          p: theme.spacing(3, 2, 10, 2),
-          [theme.breakpoints.up(layoutQuery)]: {
-            justifyContent: 'center',
-            p: theme.spacing(10, 0, 10, 0),
-          },
+          justifyContent: 'center',
+          flex: '1 1 auto',
+          display: 'flex',
+          flexDirection: 'column',
+          pt: { xs: 7, md: 8 },
+          pb: { xs: 2.5, md: 3 },
+          px: 2,
         }),
         ...(Array.isArray(slotProps?.main?.sx) ? slotProps.main.sx : [slotProps?.main?.sx]),
       ]}
@@ -122,9 +124,18 @@ export function AuthCenteredLayout({
       sx={[
         {
           position: 'relative',
-          overflow: 'hidden',
+          overflowX: 'hidden',
+          overflowY: 'auto',
           bgcolor: '#030712',
           minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          '&::-webkit-scrollbar': { width: 6 },
+          '&::-webkit-scrollbar-thumb': {
+            bgcolor: 'rgba(0, 184, 217, 0.25)',
+            borderRadius: 3,
+            '&:hover': { bgcolor: 'rgba(0, 184, 217, 0.5)' },
+          },
         },
         ...(Array.isArray(sx) ? sx : [sx]),
       ]}

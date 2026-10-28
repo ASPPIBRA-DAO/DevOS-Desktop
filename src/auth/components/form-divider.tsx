@@ -14,7 +14,7 @@ export function FormDivider({ sx, label = 'OU' }: FormDividerProps) {
     <Divider
       sx={[
         () => ({
-          my: 3,
+          my: 2,
           typography: 'overline',
           color: 'text.disabled',
           fontFamily: 'var(--font-orbitron), sans-serif',

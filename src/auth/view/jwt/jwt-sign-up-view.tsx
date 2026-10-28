@@ -102,9 +102,9 @@ export function JwtSignUpView({ isInitVault = false }: JwtSignUpViewProps) {
   });
 
   const renderForm = () => (
-    <Box sx={{ gap: 3, display: 'flex', flexDirection: 'column' }}>
+    <Box sx={{ gap: 2, display: 'flex', flexDirection: 'column' }}>
       <Box
-        sx={{ display: 'flex', gap: { xs: 3, sm: 2 }, flexDirection: { xs: 'column', sm: 'row' } }}
+        sx={{ display: 'flex', gap: { xs: 2, sm: 2 }, flexDirection: { xs: 'column', sm: 'row' } }}
       >
         <Field.Text
           name="firstName"
@@ -260,11 +260,11 @@ export function JwtSignUpView({ isInitVault = false }: JwtSignUpViewProps) {
         variant="contained"
         loading={isSubmitting}
         sx={{
-          height: 60,
-          fontSize: 18,
+          height: 48,
+          fontSize: 15,
           fontFamily: 'var(--font-orbitron), sans-serif',
           fontWeight: 900,
-          letterSpacing: '0.15em',
+          letterSpacing: '0.12em',
           textTransform: 'uppercase',
           bgcolor: alpha('#020817', 0.9),
           color: 'common.white',
@@ -305,16 +305,16 @@ export function JwtSignUpView({ isInitVault = false }: JwtSignUpViewProps) {
         width: 1,
         display: 'flex',
         flexDirection: 'column',
-        gap: 2,
+        gap: 1.5,
       }}
     >
-      <Box sx={{ mb: 2, textAlign: 'center' }}>
+      <Box sx={{ mb: 1, textAlign: 'center' }}>
         <Typography
           variant="h5"
           component="h1"
           sx={{
             color: 'info.main',
-            mb: 1,
+            mb: 0.5,
             fontWeight: 900,
             fontFamily: 'var(--font-orbitron), sans-serif',
           }}
@@ -410,7 +410,7 @@ export function JwtSignUpView({ isInitVault = false }: JwtSignUpViewProps) {
         </Button>
       </Box>
 
-      <SignUpTerms sx={{ color: 'grey.600', mt: 2 }} />
+      <SignUpTerms sx={{ color: 'grey.600', mt: 0.5, fontSize: 11 }} />
     </Box>
   );
 }

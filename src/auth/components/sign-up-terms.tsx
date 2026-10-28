@@ -11,7 +11,7 @@ export function SignUpTerms({ sx, ...other }: BoxProps) {
       component="span"
       sx={[
         () => ({
-          mt: 3,
+          mt: 1.5,
           display: 'block',
           textAlign: 'center',
           typography: 'caption',
