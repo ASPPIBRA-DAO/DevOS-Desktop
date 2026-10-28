@@ -34,6 +34,10 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "publisher": "ASPPIBRA-DAO",
+    "category": "Utility",
+    "shortDescription": "Plataforma de Governança Descentralizada & Infraestrutura DePIN",
+    "longDescription": "ASPPIBRA DevOS Desktop — Plataforma de Governança Descentralizada e Infraestrutura Física Descentralizada com cofre criptográfico local BIP-44 e conectividade IPFS.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
