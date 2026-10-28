@@ -18,12 +18,8 @@ pub fn run() {
     #[cfg(target_os = "linux")]
     {
         unsafe {
-            if std::env::var("WEBKIT_DISABLE_DMABUF_RENDERER").is_err() {
-                std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
-            }
-            if std::env::var("GDK_BACKEND").is_err() {
-                std::env::set_var("GDK_BACKEND", "x11");
-            }
+            std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+            std::env::set_var("GDK_BACKEND", "x11");
         }
     }
 

@@ -4,15 +4,11 @@
 fn main() {
     #[cfg(target_os = "linux")]
     {
-        // Fix para WebKitGTK em Linux (Intel Sandy Bridge HD 3000 / Wayland / Mesa)
+        // Fix para WebKitGTK em Linux (Intel HD Graphics 620 / Wayland / Mesa)
         // Impede o crash do WebProcess ("internallyFailedLoadTimerFired" / tela preta)
         unsafe {
-            if std::env::var("WEBKIT_DISABLE_DMABUF_RENDERER").is_err() {
-                std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
-            }
-            if std::env::var("GDK_BACKEND").is_err() {
-                std::env::set_var("GDK_BACKEND", "x11");
-            }
+            std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+            std::env::set_var("GDK_BACKEND", "x11");
         }
     }
 
