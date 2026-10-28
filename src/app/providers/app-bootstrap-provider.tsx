@@ -111,6 +111,21 @@ export function AppBootstrapProvider({
     setState('INITIALIZING');
     setErrorMessage(null);
 
+    const notifySplashStage = (stageText: string, targetP?: number) => {
+      if (typeof window !== 'undefined') {
+        const updater = (
+          window as unknown as {
+            __DEVOS_UPDATE_SPLASH_STAGE__?: (text: string, p?: number) => void;
+          }
+        ).__DEVOS_UPDATE_SPLASH_STAGE__;
+        if (typeof updater === 'function') {
+          updater(stageText, targetP);
+        }
+      }
+    };
+
+    notifySplashStage('VALIDANDO AMBIENTE DE SEGURANÇA...', 20);
+
     // 3. Verificação de ambiente: se não for Tauri Desktop, transiciona diretamente para WEB_PREVIEW
     if (!isTauriDesktop()) {
       activeAttemptIdRef.current = null;
@@ -134,6 +149,8 @@ export function AppBootstrapProvider({
     }, timeoutMs);
 
     // 5. Execução do handshake IPC seguro com o motor Rust
+    notifySplashStage('VERIFICANDO DISPONIBILIDADE DO COFRE LOCAL...', 45);
+
     VaultBridge.getStatus()
       .then((status) => {
         // Verificação estrita: se a tentativa ativa não for EXATAMENTE este attemptId, descarta
@@ -150,6 +167,7 @@ export function AppBootstrapProvider({
         }
 
         setVaultStatus(status);
+        notifySplashStage('VERIFICANDO CONECTIVIDADE COM A REDE IPFS...', 75);
 
         // Invariante de Segurança Fiduciária — Tratamento Exaustivo das 4 Combinações:
         let targetState: BootstrapState;
@@ -172,6 +190,8 @@ export function AppBootstrapProvider({
           setState('FATAL_ERROR');
           return;
         }
+
+        notifySplashStage('PREPARANDO AMBIENTE DE OPERAÇÃO...', 90);
 
         // Portão Duplo: Se a animação já concluiu, transiciona para o estado alvo
         if (isAnimationDoneRef.current) {

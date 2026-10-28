@@ -54,17 +54,26 @@
     <!-- 1ª Página de Inicialização: Splash Nativo Autônomo com HUD Gamer e Barra de Telemetria -->
     <div id="devos-initial-splash" style="position:fixed;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;background-color:#0b0f19;color:#f9fafb;z-index:99999;font-family:'Orbitron',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;user-select:none;transition:opacity 0.4s ease-out;">
       
-      <!-- HUD Superior Esquerdo: Identificação do Motor Nativo -->
-      <div style="position:absolute;top:32px;left:40px;display:flex;flex-direction:column;gap:4px;">
-        <div style="color:#00b8d9;font-size:12px;font-weight:700;letter-spacing:3px;text-transform:uppercase;">
-          DEVOS // SECURE ENTERPRISE ENGINE
+      <!-- HUD Superior Esquerdo: Identificação Institucional e Rede -->
+      <div style="position:absolute;top:32px;left:40px;display:flex;flex-direction:column;gap:5px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="color:#00b8d9;font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;">
+            ASPPIBRA DevOS
+          </span>
+          <span style="color:rgba(255,255,255,0.3);font-size:12px;">//</span>
+          <span style="color:#f9fafb;font-size:11px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;">
+            DAO ENTERPRISE
+          </span>
         </div>
-        <div style="color:rgba(255,255,255,0.6);font-size:11px;letter-spacing:1.5px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-          Carregando ambiente nativo...
+        <div style="color:#00b8d9;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;opacity:0.9;">
+          GLOBAL DePIN NETWORK
+        </div>
+        <div style="color:rgba(255,255,255,0.6);font-size:11px;letter-spacing:1px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;margin-top:2px;">
+          Plataforma de Governança Descentralizada & Infraestrutura DePIN
         </div>
       </div>
 
-      <!-- Centro: Globo 2D Pulsante e Status HSM -->
+      <!-- Centro: Globo 2D Pulsante e Declaração de Princípios Web3 -->
       <div class="devos-globe-wrapper">
         <svg width="100%" height="100%" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
           <defs>
@@ -77,23 +86,23 @@
           <path fill="url(#splash-globe-grad)" d="M49.947 0A50 50 0 0 0 0 50a50 50 0 0 0 50 50a50 50 0 0 0 50-50A50 50 0 0 0 50 0zM52.5 5.682c5.268.896 10.302 5.236 14.268 12.437c1.278 2.321 2.42 4.927 3.408 7.75H52.5zm-5 .197v19.99H30.75c.988-2.823 2.13-5.429 3.408-7.75C37.89 11.341 42.571 7.102 47.5 5.88M35.98 7.232c-2.324 2.352-4.41 5.22-6.203 8.475c-1.68 3.05-3.125 6.467-4.312 10.162H12.01c5.535-8.706 13.975-15.37 23.97-18.637m29.41.463c9.398 3.413 17.32 9.868 22.6 18.174H75.455c-1.184-3.695-2.627-7.112-4.307-10.162c-1.676-3.045-3.613-5.749-5.757-8.012M9.257 30.87h14.808c-1.245 5.162-2.008 10.76-2.203 16.631H5.072a44.8 44.8 0 0 1 4.184-16.63m19.974 0H47.5V47.5H26.867c.212-5.935 1.043-11.554 2.363-16.63m23.27 0h19.195c1.32 5.077 2.152 10.696 2.364 16.631H52.5zm24.355 0h13.89a44.8 44.8 0 0 1 4.182 16.63H79.053c-.194-5.872-.955-11.468-2.198-16.63M5.072 52.5h16.762c.129 5.856.82 11.454 1.994 16.63H9.256A44.8 44.8 0 0 1 5.072 52.5m21.762 0H47.5v16.63H28.98c-1.245-5.1-2.006-10.715-2.146-16.63m25.666 0h21.592c-.14 5.915-.902 11.53-2.147 16.63H52.5zm26.576 0h15.852a44.8 44.8 0 0 1-4.184 16.63H77.09c1.17-5.177 1.857-10.775 1.986-16.63M12.01 74.13h13.136c1.242 4.085 2.8 7.84 4.631 11.165c1.438 2.61 3.068 4.969 4.854 7.017c-9.407-3.41-17.336-9.869-22.621-18.181m18.394 0H47.5v20.798c-.308-.017-.612-.048-.918-.07c-4.59-1.5-8.924-5.62-12.424-11.975c-1.428-2.594-2.692-5.537-3.754-8.752m22.096 0h18.021c-1.06 3.216-2.325 6.159-3.753 8.753c-3.428 6.225-7.656 10.308-12.141 11.883a46 46 0 0 1-2.127.162zm23.275 0H87.99a45.06 45.06 0 0 1-21.228 17.641c1.604-1.92 3.075-4.094 4.386-6.476c1.831-3.325 3.388-7.08 4.627-11.164" />
         </svg>
       </div>
-      <div style="margin-top:24px;font-size:12px;font-weight:600;letter-spacing:1px;color:#00b8d9;text-align:center;">
-        DEVOS // HARDWARE SECURITY MODULE
+      <div style="margin-top:28px;font-size:11px;font-weight:700;letter-spacing:2px;color:#00b8d9;text-align:center;text-transform:uppercase;text-shadow:0 0 12px rgba(0,184,217,0.35);">
+        SUAS CHAVES • SUA INFRAESTRUTURA • PRIVACIDADE SOB SEU CONTROLE
       </div>
 
       <!-- HUD Inferior: Barra de Telemetria e Progresso + Ação Pular -->
       <div style="position:absolute;bottom:36px;left:40px;right:40px;display:flex;align-items:center;justify-content:space-between;gap:24px;">
-        <div style="flex:1;max-width:420px;">
+        <div style="flex:1;max-width:440px;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-            <span style="color:rgba(255,255,255,0.7);font-size:11px;letter-spacing:1px;font-weight:600;">
-              INICIALIZAÇÃO DO SUBSISTEMA
+            <span id="splash-stage-label" style="color:rgba(255,255,255,0.75);font-size:11px;letter-spacing:1px;font-weight:600;">
+              VALIDANDO AMBIENTE DE SEGURANÇA...
             </span>
             <span id="splash-progress-counter" style="color:#00b8d9;font-weight:700;font-size:11px;">
               0%
             </span>
           </div>
           <div style="width:100%;height:4px;border-radius:2px;background:rgba(255,255,255,0.08);overflow:hidden;">
-            <div id="splash-progress-bar" style="width:0%;height:100%;background:linear-gradient(90deg, #0c68e9 0%, #00b8d9 100%);transition:width 0.08s ease-out;"></div>
+            <div id="splash-progress-bar" style="width:0%;height:100%;background:linear-gradient(90deg, #0c68e9 0%, #00b8d9 100%);transition:width 0.12s ease-out;"></div>
           </div>
         </div>
 
@@ -118,6 +127,7 @@
         var p = 0;
         var bar = document.getElementById('splash-progress-bar');
         var counter = document.getElementById('splash-progress-counter');
+        var label = document.getElementById('splash-stage-label');
         var splash = document.getElementById('devos-initial-splash');
         var isDismissed = false;
 
@@ -127,20 +137,43 @@
           if (counter) counter.textContent = p + '%';
         }
 
-        // Incremento dinâmico de telemetria durante a carga inicial
+        function setStage(text, targetP) {
+          if (label && text) label.textContent = text;
+          if (typeof targetP === 'number' && targetP > p) {
+            setProgress(targetP);
+          }
+        }
+
+        // Fases operacionais dinâmicas durante o carregamento inicial
         var stepTimer = setInterval(function() {
           if (!isDismissed && p < 92) {
             p += Math.floor(Math.random() * 3) + 2;
             setProgress(p);
+
+            if (p < 25) {
+              if (label) label.textContent = "VALIDANDO AMBIENTE DE SEGURANÇA...";
+            } else if (p < 55) {
+              if (label) label.textContent = "VERIFICANDO DISPONIBILIDADE DO COFRE LOCAL...";
+            } else if (p < 80) {
+              if (label) label.textContent = "VERIFICANDO CONECTIVIDADE COM A REDE IPFS...";
+            } else {
+              if (label) label.textContent = "PREPARANDO AMBIENTE DE OPERAÇÃO...";
+            }
           }
         }, 35);
+
+        // API para o React sincronizar as etapas operacionais reais do sistema
+        window.__DEVOS_UPDATE_SPLASH_STAGE__ = function(stageText, targetPercent) {
+          if (isDismissed) return;
+          setStage(stageText, targetPercent);
+        };
 
         // Controlador de transição suave e descarte
         function dismiss() {
           if (isDismissed) return;
           isDismissed = true;
           clearInterval(stepTimer);
-          setProgress(100);
+          setStage("SISTEMA PRONTO. LIBERANDO ACESSO À SESSÃO...", 100);
           if (splash) {
             splash.style.opacity = '0';
             splash.style.pointerEvents = 'none';
