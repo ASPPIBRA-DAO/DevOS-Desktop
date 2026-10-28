@@ -7,7 +7,7 @@ import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import LinearProgress from '@mui/material/LinearProgress';
 
-import { AnimateLogoZoom } from '../animate';
+import { Logo } from '../logo';
 import { Web3GlobeScene } from './web3-globe-scene';
 import { isWebGLAvailable, isReducedMotionPreferred } from './webgl-detector';
 
@@ -86,7 +86,7 @@ export function ThreeSplashView({
           p: 3,
         }}
       >
-        <AnimateLogoZoom />
+        <Logo disabled sx={{ width: 64, height: 64 }} />
         <Typography
           variant="caption"
           sx={{
@@ -217,8 +217,7 @@ export function ThreeSplashView({
               letterSpacing: 1,
               px: 2,
               py: 0.5,
-              backdropFilter: 'blur(8px)',
-              bgcolor: 'rgba(11, 15, 25, 0.5)',
+              bgcolor: '#0f172a',
               '&:hover': {
                 borderColor: '#00b8d9',
                 color: '#00b8d9',

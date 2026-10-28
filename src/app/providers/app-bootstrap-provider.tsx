@@ -68,7 +68,7 @@ type Props = {
 export function AppBootstrapProvider({
   children,
   timeoutMs = 4500,
-  enableThreeAnimation = false,
+  enableThreeAnimation = true,
 }: Props) {
   const [state, setState] = useState<BootstrapState>('INITIALIZING');
   const [vaultStatus, setVaultStatus] = useState<VaultStatus | null>(null);
@@ -275,8 +275,8 @@ export function AppBootstrapProvider({
 
   return (
     <BootstrapContext.Provider value={value}>
-      {/* 1. Tela de Carregamento Inicial (Splash) - Removida por padrão para eliminar a 2ª tela desnecessária */}
-      {state === 'INITIALIZING' && enableThreeAnimation && (
+      {/* 1. Tela com a Animação do Globo (Three.js Web3 Globe) */}
+      {state === 'INITIALIZING' && (
         <SplashScreen
           enableThree={enableThreeAnimation}
           onAnimationComplete={handleAnimationComplete}

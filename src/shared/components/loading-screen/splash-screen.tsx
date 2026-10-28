@@ -1,17 +1,11 @@
 import type { Theme, SxProps } from '@mui/material/styles';
-import type { AnimateLogoProps } from '../animate';
 
-import React, { Suspense, Fragment } from 'react';
+import React, { Fragment } from 'react';
 
 import Portal from '@mui/material/Portal';
 import { styled } from '@mui/material/styles';
 
-import { AnimateLogoZoom } from '../animate';
-
-// Carregamento sob demanda (Lazy) para garantir impacto ZERO no bundle inicial
-const LazyThreeSplash = React.lazy(() =>
-  import('../three-splash').then((m) => ({ default: m.ThreeSplashView }))
-);
+import { ThreeSplashView } from '../three-splash';
 
 // ----------------------------------------------------------------------
 
@@ -26,13 +20,12 @@ export type SplashScreenProps = React.ComponentProps<'div'> & {
   };
   slotProps?: {
     wrapper?: React.ComponentProps<typeof LoadingWrapper>;
-    logo?: AnimateLogoProps;
   };
 };
 
 export function SplashScreen({
   portal = true,
-  enableThree = false,
+  enableThree = true,
   onAnimationComplete,
   slots,
   slotProps,
@@ -41,38 +34,19 @@ export function SplashScreen({
 }: SplashScreenProps) {
   const PortalWrapper = portal ? Portal : Fragment;
 
-  // Se o modo Three.js estiver habilitado, renderiza a cena 3D cinematográfica sob demanda
+  // Renderiza a cena com a animação do globo Three.js
   if (enableThree) {
     return (
       <PortalWrapper>
-        <Suspense
-          fallback={
-            <LoadingWrapper {...slotProps?.wrapper}>
-              <LoadingContent sx={sx} {...other}>
-                {slots?.logo ?? <AnimateLogoZoom {...slotProps?.logo} />}
-              </LoadingContent>
-            </LoadingWrapper>
-          }
-        >
-          <LazyThreeSplash
-            onComplete={onAnimationComplete}
-            slots={{ customScene: slots?.threeScene }}
-          />
-        </Suspense>
+        <ThreeSplashView
+          onComplete={onAnimationComplete}
+          slots={{ customScene: slots?.threeScene }}
+        />
       </PortalWrapper>
     );
   }
 
-  // Fallback padrão: Logo animado 2D existente
-  return (
-    <PortalWrapper>
-      <LoadingWrapper {...slotProps?.wrapper}>
-        <LoadingContent sx={sx} {...other}>
-          {slots?.logo ?? <AnimateLogoZoom {...slotProps?.logo} />}
-        </LoadingContent>
-      </LoadingWrapper>
-    </PortalWrapper>
-  );
+  return null;
 }
 
 // ----------------------------------------------------------------------
