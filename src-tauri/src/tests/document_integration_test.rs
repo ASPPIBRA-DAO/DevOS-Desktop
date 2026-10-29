@@ -1,7 +1,7 @@
 use crate::commands::{GenerateDocumentPayload, generate_document};
 use crate::modules::documents::{DocumentKind, DocumentRequest};
 use crate::reports::models::{CitizenLedgerPayload, InvoiceReportItem, InvoiceReportPayload};
-use crate::wallets::address::keccak256;
+use sha2::{Digest, Sha256};
 use serde_json::json;
 use std::fs;
 use std::path::Path;
@@ -120,7 +120,7 @@ fn test_generate_document_integration_citizen_ledger_end_to_end() {
     );
 
     // Verificar se o checksum gerado pelo backend coincide com o hash do binário físico
-    let disk_checksum = hex::encode(keccak256(&read_bytes));
+    let disk_checksum = hex::encode(Sha256::digest(&read_bytes));
     assert_eq!(
         disk_checksum, result.metadata.sha256_checksum,
         "Checksum nos metadados deve coincidir com o hash do arquivo em disco"
@@ -199,7 +199,7 @@ fn test_generate_document_integration_invoice_bill_end_to_end() {
         "Cabeçalho do PDF de fatura deve ser canônico %PDF-"
     );
 
-    let disk_checksum = hex::encode(keccak256(&read_bytes));
+    let disk_checksum = hex::encode(Sha256::digest(&read_bytes));
     assert_eq!(
         disk_checksum, result.metadata.sha256_checksum,
         "Checksum nos metadados deve coincidir com o hash do binário de fatura em disco"

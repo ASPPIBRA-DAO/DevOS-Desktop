@@ -1,4 +1,5 @@
 use chrono::Utc;
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 
 use crate::modules::documents::models::{
@@ -6,12 +7,18 @@ use crate::modules::documents::models::{
 };
 use crate::modules::documents::ports::DocumentRenderer;
 use crate::platform::typst_engine::{TypstCompileOptions, compile_typst_document};
-use crate::wallets::address::keccak256;
 
-static CITIZEN_TEMPLATE: &str = include_str!("../../../templates/extrato_citizen_ledger.typ");
-static INVOICE_TEMPLATE: &str = include_str!("../../../templates/invoice_bill.typ");
-static ROBOTO_REGULAR: &[u8] = include_bytes!("../../../assets/fonts/Roboto-Regular.ttf");
-static ROBOTO_BOLD: &[u8] = include_bytes!("../../../assets/fonts/Roboto-Bold.ttf");
+static CITIZEN_TEMPLATE: &str =
+    include_str!("../../../templates/extrato_citizen_ledger.typ");
+
+static INVOICE_TEMPLATE: &str =
+    include_str!("../../../templates/invoice_bill.typ");
+
+static ROBOTO_REGULAR: &[u8] =
+    include_bytes!("../../../assets/fonts/Roboto-Regular.ttf");
+
+static ROBOTO_BOLD: &[u8] =
+    include_bytes!("../../../assets/fonts/Roboto-Bold.ttf");
 
 #[derive(Default, Clone)]
 pub struct DocumentsService;
@@ -21,7 +28,7 @@ impl DocumentsService {
         Self
     }
 
-    /// Ponto de entrada padrão para orquestração documental
+    /// Ponto de entrada padrão para orquestração documental.
     pub fn generate_document(
         &self,
         request: DocumentRequest,
@@ -38,20 +45,32 @@ impl DocumentRenderer for DocumentsService {
         )
     }
 
-    fn render(&self, request: DocumentRequest) -> Result<DocumentOutput, DocumentError> {
+    fn render(
+        &self,
+        request: DocumentRequest,
+    ) -> Result<DocumentOutput, DocumentError> {
         let kind = request.kind();
+
         let (template_source, json_payload) = match request {
             DocumentRequest::CitizenLedger(payload) => {
                 let json_str = serde_json::to_string(&payload.data)
-                    .map_err(|e| DocumentError::SerializationError(e.to_string()))?;
+                    .map_err(|error| {
+                        DocumentError::SerializationError(error.to_string())
+                    })?;
+
                 (CITIZEN_TEMPLATE, json_str)
             }
+
             DocumentRequest::InvoiceBill(payload) => {
-                let json_val = serde_json::json!({
+                let json_value = serde_json::json!({
                     "invoice": payload
                 });
-                let json_str = serde_json::to_string(&json_val)
-                    .map_err(|e| DocumentError::SerializationError(e.to_string()))?;
+
+                let json_str = serde_json::to_string(&json_value)
+                    .map_err(|error| {
+                        DocumentError::SerializationError(error.to_string())
+                    })?;
+
                 (INVOICE_TEMPLATE, json_str)
             }
         };
@@ -66,10 +85,15 @@ impl DocumentRenderer for DocumentsService {
         };
 
         let pdf_bytes = compile_typst_document(options)
-            .map_err(|err| DocumentError::CompilationError(err.to_string()))?;
+            .map_err(|error| {
+                DocumentError::CompilationError(error.to_string())
+            })?;
 
-        let checksum_bytes = keccak256(&pdf_bytes);
-        let sha256_checksum = hex::encode(checksum_bytes);
+        // O campo sha256_checksum deve conter SHA-256 dos bytes
+        // efetivamente retornados, e não Keccak-256.
+        let checksum = Sha256::digest(&pdf_bytes);
+        let sha256_checksum = hex::encode(checksum);
+
         let byte_size = pdf_bytes.len();
         let generated_at_utc = Utc::now().to_rfc3339();
 
@@ -89,14 +113,74 @@ impl DocumentRenderer for DocumentsService {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use super::*;
-    use crate::reports::models::{CitizenLedgerPayload, InvoiceReportItem, InvoiceReportPayload};
+
+    use crate::reports::models::{
+        CitizenLedgerPayload,
+        InvoiceReportItem,
+        InvoiceReportPayload,
+    };
+
     use serde_json::json;
+
+    fn assert_valid_document_output(
+        output: &DocumentOutput,
+        expected_kind: DocumentKind,
+    ) {
+        assert!(
+            !output.pdf_bytes.is_empty(),
+            "O PDF gerado não deve estar vazio"
+        );
+
+        assert!(
+            output.pdf_bytes.starts_with(b"%PDF-"),
+            "O PDF deve começar com o cabeçalho %PDF-"
+        );
+
+        assert_eq!(
+            output.metadata.document_kind,
+            expected_kind,
+            "O tipo documental dos metadados está incorreto"
+        );
+
+        assert_eq!(
+            output.metadata.byte_size,
+            output.pdf_bytes.len(),
+            "O tamanho registrado deve corresponder aos bytes do PDF"
+        );
+
+        let expected_checksum =
+            hex::encode(Sha256::digest(&output.pdf_bytes));
+
+        assert_eq!(
+            output.metadata.sha256_checksum,
+            expected_checksum,
+            "O hash SHA-256 deve corresponder aos bytes do PDF"
+        );
+
+        assert_eq!(
+            output.metadata.sha256_checksum.len(),
+            64,
+            "A representação hexadecimal de SHA-256 deve conter 64 caracteres"
+        );
+
+        assert_eq!(
+            output.metadata.template_id,
+            expected_kind.template_id(),
+            "O identificador do template está incorreto"
+        );
+
+        assert!(
+            !output.metadata.generated_at_utc.is_empty(),
+            "A data de geração deve estar preenchida"
+        );
+    }
 
     #[test]
     fn test_documents_service_generates_citizen_ledger() {
         let service = DocumentsService::new();
+
         let payload = CitizenLedgerPayload {
             associate_id: Some("MEMBER-123".to_string()),
             data: json!({
@@ -124,24 +208,25 @@ pub mod tests {
         };
 
         let request = DocumentRequest::CitizenLedger(payload);
-        let result = service.generate_document(request);
 
-        assert!(
-            result.is_ok(),
-            "Falha ao gerar documento de extrato: {:?}",
-            result.err()
+        let output = service
+            .generate_document(request)
+            .unwrap_or_else(|error| {
+                panic!(
+                    "Falha ao gerar documento de extrato: {error:?}"
+                )
+            });
+
+        assert_valid_document_output(
+            &output,
+            DocumentKind::CitizenLedger,
         );
-        let output = result.unwrap();
-        assert!(!output.pdf_bytes.is_empty());
-        assert!(output.pdf_bytes.starts_with(b"%PDF-"));
-        assert_eq!(output.metadata.document_kind, DocumentKind::CitizenLedger);
-        assert_eq!(output.metadata.byte_size, output.pdf_bytes.len());
-        assert!(!output.metadata.sha256_checksum.is_empty());
     }
 
     #[test]
     fn test_documents_service_generates_invoice_bill() {
         let service = DocumentsService::new();
+
         let payload = InvoiceReportPayload {
             id: "INV-2026-999".to_string(),
             member_name: "João Santos".to_string(),
@@ -169,14 +254,16 @@ pub mod tests {
         };
 
         let request = DocumentRequest::InvoiceBill(payload);
-        let result = service.generate_document(request);
 
-        assert!(result.is_ok(), "Falha ao gerar fatura: {:?}", result.err());
-        let output = result.unwrap();
-        assert!(!output.pdf_bytes.is_empty());
-        assert!(output.pdf_bytes.starts_with(b"%PDF-"));
-        assert_eq!(output.metadata.document_kind, DocumentKind::InvoiceBill);
-        assert_eq!(output.metadata.byte_size, output.pdf_bytes.len());
-        assert!(!output.metadata.sha256_checksum.is_empty());
+        let output = service
+            .generate_document(request)
+            .unwrap_or_else(|error| {
+                panic!("Falha ao gerar fatura: {error:?}")
+            });
+
+        assert_valid_document_output(
+            &output,
+            DocumentKind::InvoiceBill,
+        );
     }
 }
