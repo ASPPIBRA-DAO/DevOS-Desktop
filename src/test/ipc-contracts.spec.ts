@@ -11,9 +11,10 @@ import type {
   DeviceStatusResponse,
   DerivedWalletPreview,
   ImportExecutionReport,
-  GeneratePreviewResponse} from '../platform/tauri';
+  GeneratePreviewResponse,
+} from '../platform/tauri';
 
-import { it, expect, describe } from 'vitest';
+import { it, vi, expect, describe, afterEach } from 'vitest';
 
 import { mockIpcResponse } from './test-utils';
 import {
@@ -23,31 +24,47 @@ import {
   WalletBridge,
   MonitoringBridge,
   RealEstateBridge,
-  TauriErrorMapper
+  TauriErrorMapper,
 } from '../platform/tauri';
 
 describe('Onda 5 — IPC Contracts & Bridges Test Suite', () => {
+  afterEach(() => {
+    // Limpa o histórico das chamadas e mocks para isolamento entre testes.
+    vi.clearAllMocks();
+  });
+
   describe('Error Contracts & Sanitization', () => {
     it('deve sanitizar senhas e credenciais em mensagens de erro do IPC', () => {
-      const sensitiveMsg = 'Falha ao processar: password="SuperSecretPassword123" e private_key=abc123xyz';
+      const sensitiveMsg =
+        'Falha ao processar: password="SuperSecretPassword123" e private_key=abc123xyz com master_password=MyMasterPass999';
       const error = new IpcError(sensitiveMsg, 'BUSINESS_ERROR', 'unlock_vault');
 
       expect(error.message).not.toContain('SuperSecretPassword123');
       expect(error.message).not.toContain('abc123xyz');
+      expect(error.message).not.toContain('MyMasterPass999');
       expect(error.message).toContain('[REDACTED_CREDENTIAL]');
       expect(error.command).toBe('unlock_vault');
       expect(error.code).toBe('BUSINESS_ERROR');
     });
 
     it('deve categorizar erros com TauriErrorMapper', () => {
-      const validationErr = TauriErrorMapper.normalize('Invalid payload: required field missing', 'confirm_and_save_wallets');
+      const validationErr = TauriErrorMapper.normalize(
+        'Invalid payload: required field missing',
+        'confirm_and_save_wallets'
+      );
       expect(validationErr.code).toBe('VALIDATION_ERROR');
       expect(validationErr.command).toBe('confirm_and_save_wallets');
 
-      const notFoundErr = TauriErrorMapper.normalize('Registro nao encontrado no banco', 'list_stored_wallets');
+      const notFoundErr = TauriErrorMapper.normalize(
+        'Registro nao encontrado no banco',
+        'list_stored_wallets'
+      );
       expect(notFoundErr.code).toBe('NOT_FOUND_ERROR');
 
-      const unauthorizedErr = TauriErrorMapper.normalize('Permission denied by capability', 'list_audit_findings');
+      const unauthorizedErr = TauriErrorMapper.normalize(
+        'Permission denied by capability',
+        'list_audit_findings'
+      );
       expect(unauthorizedErr.code).toBe('PERMISSION_DENIED_ERROR');
     });
 
@@ -73,7 +90,11 @@ describe('Onda 5 — IPC Contracts & Bridges Test Suite', () => {
       circularObj.self = circularObj;
 
       const result = TauriErrorMapper.normalize(circularObj, 'test_cmd');
+      expect(result).toBeInstanceOf(IpcError);
       expect(result.code).toBe('VALIDATION_ERROR');
+      expect(result.command).toBe('test_cmd');
+      expect(typeof result.message).toBe('string');
+      expect(result.message.length).toBeGreaterThan(0);
       expect(result.message).toBe('Erro circular de validacao');
     });
   });
@@ -120,6 +141,39 @@ describe('Onda 5 — IPC Contracts & Bridges Test Suite', () => {
   });
 
   describe('WalletBridge Contracts', () => {
+    const mockSavedWallets: StoredWallet[] = [
+      {
+        id: 1,
+        target: 'DAO',
+        custody_type: 'CUSTODIAL_LOCAL',
+        user: 'admin',
+        label: 'DAO-001',
+        derivation_path: "m/44'/60'/0'/0/0",
+        network: 'ethereum',
+        address: '0x1111111111111111111111111111111111111111',
+        status: 'ACTIVE',
+        kyc_status: 'VERIFIED',
+        seed_words_count: 12,
+        created_at: '2026-10-25T00:00:00Z',
+      },
+    ];
+
+    const savePayload: SaveWalletsRequest = {
+      master_password: 'secretPassword123',
+      session_id: 'session-xyz',
+      target: 'DAO',
+      network: 'ethereum',
+      previews: [
+        {
+          index: 0,
+          derivation_path: "m/44'/60'/0'/0/0",
+          address: '0x1111111111111111111111111111111111111111',
+          label: 'DAO-001',
+          network: 'ethereum',
+        },
+      ],
+    };
+
     it('deve gerar seed e preview com GeneratePreviewResponse', async () => {
       const mockWallets: DerivedWalletPreview[] = [
         {
@@ -147,54 +201,26 @@ describe('Onda 5 — IPC Contracts & Bridges Test Suite', () => {
       };
       const preview = await WalletBridge.generateSeedAndPreview(options);
       expect(preview.session_id).toBe('session-xyz');
+      expect(preview.words_count).toBe(12);
+      expect(preview.previews).toHaveLength(1);
       expect(preview.previews[0].address).toBe('0x1111111111111111111111111111111111111111');
     });
 
-    it('deve salvar e listar carteiras com DTOs StoredWallet', async () => {
-      const mockSavedWallets: StoredWallet[] = [
-        {
-          id: 1,
-          target: 'DAO',
-          custody_type: 'CUSTODIAL_LOCAL',
-          user: 'admin',
-          label: 'DAO-001',
-          derivation_path: "m/44'/60'/0'/0/0",
-          network: 'ethereum',
-          address: '0x1111111111111111111111111111111111111111',
-          status: 'ACTIVE',
-          kyc_status: 'VERIFIED',
-          seed_words_count: 12,
-          created_at: '2026-10-25T00:00:00Z',
-        },
-      ];
-
-      const savePayload: SaveWalletsRequest = {
-        master_password: 'secretPassword123',
-        session_id: 'session-xyz',
-        target: 'DAO',
-        network: 'ethereum',
-        previews: [
-          {
-            index: 0,
-            derivation_path: "m/44'/60'/0'/0/0",
-            address: '0x1111111111111111111111111111111111111111',
-            label: 'DAO-001',
-            network: 'ethereum',
-          },
-        ],
-      };
-
+    it('deve salvar carteiras com DTOs StoredWallet', async () => {
       mockIpcResponse('confirm_and_save_wallets', mockSavedWallets);
       const saved = await WalletBridge.confirmAndSaveWallets(savePayload);
       expect(saved).toEqual(mockSavedWallets);
+    });
 
+    it('deve listar carteiras com DTOs StoredWallet', async () => {
       mockIpcResponse('list_stored_wallets', mockSavedWallets);
       const listed = await WalletBridge.listStoredWallets();
       expect(listed).toHaveLength(1);
       expect(listed[0].id).toBe(1);
+      expect(listed[0].address).toBe('0x1111111111111111111111111111111111111111');
     });
 
-    it('deve manter compatibilidade retroativa dos métodos proxies delegados', async () => {
+    it('deve preservar o método proxy de consulta do status do cofre', async () => {
       const mockVaultStatus: VaultStatus = {
         is_initialized: true,
         is_unlocked: false,
@@ -203,10 +229,11 @@ describe('Onda 5 — IPC Contracts & Bridges Test Suite', () => {
       };
       mockIpcResponse('get_vault_status', mockVaultStatus);
 
-      // Chamada via WalletBridge retrocompatível
       const vaultStatus = await WalletBridge.getVaultStatus();
       expect(vaultStatus).toEqual(mockVaultStatus);
+    });
 
+    it('deve preservar o método proxy de consulta de saldo', async () => {
       const mockBalance: WalletBalanceReport = {
         address: '0x123',
         network: 'ethereum',
@@ -217,8 +244,8 @@ describe('Onda 5 — IPC Contracts & Bridges Test Suite', () => {
       };
       mockIpcResponse('fetch_wallet_balance', mockBalance);
 
-      // Chamada via WalletBridge retrocompatível
       const balance = await WalletBridge.fetchWalletBalance('0x123', 'ethereum');
+      expect(balance).toEqual(mockBalance);
       expect(balance.formatted_balance).toBe('1.5000 ETH');
     });
   });
@@ -236,12 +263,43 @@ describe('Onda 5 — IPC Contracts & Bridges Test Suite', () => {
       mockIpcResponse('fetch_wallet_balance', mockBalance);
 
       const report = await MonitoringBridge.fetchWalletBalance('0x71C...897', 'ethereum');
+      expect(report).toEqual(mockBalance);
       expect(report.formatted_balance).toBe('2.5400 ETH');
       expect(report.network).toBe('ethereum');
     });
   });
 
   describe('RealEstateBridge Contracts', () => {
+    const mockPreview: XlsxPreviewReport = {
+      file_path: '/tmp/imoveis.xlsx',
+      file_hash_sha256: 'hash123',
+      file_size_bytes: 4096,
+      detected_sheets: ['Planilha1'],
+      target_sheet: 'Planilha1',
+      recognized_headers: ['Codigo', 'Endereco', 'Valor'],
+      total_rows_count: 10,
+      sample_rows: [],
+      empty_matricula_sample_count: 0,
+      empty_address_sample_count: 0,
+      duplicate_matricula_sample_count: 0,
+      already_imported_batch_id: null,
+      already_imported_status: null,
+      already_imported_mode: null,
+    };
+
+    const mockExecReport: ImportExecutionReport = {
+      batch_id: 1,
+      file_hash_sha256: 'hash123',
+      import_mode: 'APPEND',
+      status: 'COMPLETED',
+      total_rows_read: 10,
+      total_records_imported: 10,
+      total_inconsistencies_detected: 0,
+      message: 'Importação realizada com sucesso',
+      started_at: '2026-10-25T01:00:00Z',
+      completed_at: '2026-10-25T01:00:01Z',
+    };
+
     it('deve obter estatísticas do módulo imobiliário com RealEstateStats', async () => {
       const mockStats: RealEstateStats = {
         total_properties: 15,
@@ -256,48 +314,25 @@ describe('Onda 5 — IPC Contracts & Bridges Test Suite', () => {
       mockIpcResponse('get_real_estate_stats', mockStats);
 
       const stats = await RealEstateBridge.getStats();
+      expect(stats).toEqual(mockStats);
       expect(stats.total_properties).toBe(15);
       expect(stats.open_findings_count).toBe(3);
     });
 
-    it('deve realizar pré-visualização e importação de XLSX com relatórios tipados', async () => {
-      const mockPreview: XlsxPreviewReport = {
-        file_path: '/tmp/imoveis.xlsx',
-        file_hash_sha256: 'hash123',
-        file_size_bytes: 4096,
-        detected_sheets: ['Planilha1'],
-        target_sheet: 'Planilha1',
-        recognized_headers: ['Codigo', 'Endereco', 'Valor'],
-        total_rows_count: 10,
-        sample_rows: [],
-        empty_matricula_sample_count: 0,
-        empty_address_sample_count: 0,
-        duplicate_matricula_sample_count: 0,
-        already_imported_batch_id: null,
-        already_imported_status: null,
-        already_imported_mode: null,
-      };
+    it('deve realizar pré-visualização de importação XLSX', async () => {
       mockIpcResponse('preview_real_estate_import', mockPreview);
 
       const preview = await RealEstateBridge.previewImport('/tmp/imoveis.xlsx');
+      expect(preview).toEqual(mockPreview);
       expect(preview.file_path).toBe('/tmp/imoveis.xlsx');
       expect(preview.total_rows_count).toBe(10);
+    });
 
-      const mockExecReport: ImportExecutionReport = {
-        batch_id: 1,
-        file_hash_sha256: 'hash123',
-        import_mode: 'APPEND',
-        status: 'COMPLETED',
-        total_rows_read: 10,
-        total_records_imported: 10,
-        total_inconsistencies_detected: 0,
-        message: 'Importação realizada com sucesso',
-        started_at: '2026-10-25T01:00:00Z',
-        completed_at: '2026-10-25T01:00:01Z',
-      };
+    it('deve executar importação imobiliária e retornar relatório tipado', async () => {
       mockIpcResponse('execute_real_estate_import', mockExecReport);
 
       const exec = await RealEstateBridge.executeImport('/tmp/imoveis.xlsx', 'Planilha1');
+      expect(exec).toEqual(mockExecReport);
       expect(exec.status).toBe('COMPLETED');
       expect(exec.batch_id).toBe(1);
     });
@@ -322,6 +357,7 @@ describe('Onda 5 — IPC Contracts & Bridges Test Suite', () => {
       mockIpcResponse('list_import_batches', mockBatches);
 
       const batches = await RealEstateBridge.listBatches();
+      expect(batches).toEqual(mockBatches);
       expect(batches).toHaveLength(1);
       expect(batches[0].id).toBe(1);
     });
@@ -343,6 +379,7 @@ describe('Onda 5 — IPC Contracts & Bridges Test Suite', () => {
       mockIpcResponse('list_audit_findings', mockFindings);
 
       const findings = await RealEstateBridge.listFindings();
+      expect(findings).toEqual(mockFindings);
       expect(findings).toHaveLength(1);
       expect(findings[0].category).toBe('DUPLICATE_MATRICULA');
     });
