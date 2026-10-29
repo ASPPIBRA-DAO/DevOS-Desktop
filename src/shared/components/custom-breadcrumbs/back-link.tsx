@@ -1,8 +1,8 @@
 import type { LinkProps } from '@mui/material/Link';
 
-import { Link as RouterLink } from 'react-router';
-
 import Link from '@mui/material/Link';
+
+import { RouterLink } from 'src/routes/components';
 
 import { Iconify, iconifyClasses } from '../iconify';
 

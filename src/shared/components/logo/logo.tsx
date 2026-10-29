@@ -1,11 +1,12 @@
 import type { LinkProps } from '@mui/material/Link';
 
-import { Link as RouterLink } from 'react-router';
 import { mergeClasses } from 'minimal-shared/utils';
 
 import Box from '@mui/material/Box';
 import Link from '@mui/material/Link';
 import { styled, useTheme } from '@mui/material/styles';
+
+import { RouterLink } from 'src/routes/components';
 
 import { logoClasses } from './classes';
 import { GisGlobeO } from '../globe-wire';

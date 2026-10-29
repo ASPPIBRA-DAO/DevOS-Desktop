@@ -1,9 +1,9 @@
 import type { Theme, SxProps } from '@mui/material/styles';
 
-import { Link as RouterLink } from 'react-router';
-
 import Link from '@mui/material/Link';
 import { styled } from '@mui/material/styles';
+
+import { RouterLink } from 'src/routes/components';
 
 // ----------------------------------------------------------------------
 
