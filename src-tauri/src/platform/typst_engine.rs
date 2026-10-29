@@ -3,6 +3,8 @@ use thiserror::Error;
 use typst::foundations::{Dict, Value};
 use typst_as_lib::TypstEngine;
 
+const PDF_HEADER: &[u8] = b"%PDF-";
+
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum TypstEngineError {
     #[error("Erro de compilação Typst: {0}")]
@@ -13,20 +15,25 @@ pub enum TypstEngineError {
     InvalidPdfOutput,
 }
 
-/// Parâmetros de compilação para o motor Typst puramente técnico e em memória.
-/// Não contém regras de negócio, nomes de entidades ou caminhos de arquivos do disco.
+/// Parâmetros técnicos para compilação Typst inteiramente em memória.
+///
+/// Não contém regras de negócio nem caminhos de arquivos de destino.
 pub struct TypstCompileOptions<'a> {
     pub template_source: &'a str,
     pub fonts: &'a [&'a [u8]],
     pub string_inputs: HashMap<&'a str, String>,
 }
 
-/// Compila um documento Typst arbitrário fornecido em memória junto com as fontes e variáveis de entrada.
-/// Retorna o buffer vetorial do PDF sem dependência de janela, IPC ou operações de disco.
-pub fn compile_typst_document(options: TypstCompileOptions) -> Result<Vec<u8>, TypstEngineError> {
-    let mut dict = Dict::new();
-    for (key, val) in options.string_inputs {
-        dict.insert(key.into(), Value::Str(val.into()));
+/// Compila um documento Typst em memória e retorna os bytes do PDF.
+///
+/// A função não realiza operações explícitas de escrita em disco e não
+/// depende de janela, IPC ou serviços específicos da aplicação.
+pub fn compile_typst_document(
+    options: TypstCompileOptions<'_>,
+) -> Result<Vec<u8>, TypstEngineError> {
+    let mut inputs = Dict::new();
+    for (key, value) in options.string_inputs {
+        inputs.insert(key.into(), Value::Str(value.into()));
     }
 
     let engine = TypstEngine::builder()
@@ -34,15 +41,15 @@ pub fn compile_typst_document(options: TypstCompileOptions) -> Result<Vec<u8>, T
         .fonts(options.fonts.iter().copied())
         .build();
 
-    let doc = engine
-        .compile_with_input(dict)
+    let document = engine
+        .compile_with_input(inputs)
         .output
-        .map_err(|err| TypstEngineError::CompilationFailed(format!("{:?}", err)))?;
+        .map_err(|err| TypstEngineError::CompilationFailed(err.to_string()))?;
 
-    let pdf_bytes = typst_pdf::pdf(&doc, &Default::default())
-        .map_err(|err| TypstEngineError::PdfRenderingFailed(format!("{:?}", err)))?;
+    let pdf_bytes = typst_pdf::pdf(&document, &Default::default())
+        .map_err(|err| TypstEngineError::PdfRenderingFailed(format!("{err:?}")))?;
 
-    if !pdf_bytes.starts_with(b"%PDF-") {
+    if !pdf_bytes.starts_with(PDF_HEADER) {
         return Err(TypstEngineError::InvalidPdfOutput);
     }
 
@@ -50,69 +57,78 @@ pub fn compile_typst_document(options: TypstCompileOptions) -> Result<Vec<u8>, T
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use super::*;
+
+    fn assert_valid_pdf_header(bytes: &[u8]) {
+        assert!(!bytes.is_empty(), "O PDF gerado não deve estar vazio");
+        assert!(
+            bytes.starts_with(PDF_HEADER),
+            "O PDF gerado deve começar com o cabeçalho %PDF-"
+        );
+    }
 
     #[test]
     fn test_compile_minimal_typst_document() {
-        let template =
-            "#set page(paper: \"a4\")\n= Documento de Teste\nCompilação pura em memória.";
+        let template = concat!(
+            "#set page(paper: \"a4\")\n",
+            "= Documento de Teste\n",
+            "Compilação pura em memória."
+        );
         let options = TypstCompileOptions {
             template_source: template,
             fonts: &[],
             string_inputs: HashMap::new(),
         };
 
-        let result = compile_typst_document(options);
-        assert!(
-            result.is_ok(),
-            "Falha ao compilar documento mínimo: {:?}",
-            result.err()
-        );
-        let bytes = result.unwrap();
-        assert!(!bytes.is_empty());
-        assert!(bytes.starts_with(b"%PDF-"));
+        let bytes = compile_typst_document(options).unwrap_or_else(|error| {
+            panic!("Falha ao compilar documento mínimo: {error:?}")
+        });
+
+        assert_valid_pdf_header(&bytes);
     }
 
     #[test]
     fn test_compile_typst_document_with_inputs() {
-        let template = "#let nome = sys.inputs.at(\"nome\", default: \"Mundo\")\n#set page(paper: \"a4\")\nOlá, #nome!";
-        let mut inputs = HashMap::new();
-        inputs.insert("nome", "ASPPIBRA DevOS".to_string());
+        let template = concat!(
+            "#let nome = sys.inputs.at(\"nome\", default: \"Mundo\")\n",
+            "#set page(paper: \"a4\")\n",
+            "Olá, #nome!"
+        );
+        let mut string_inputs = HashMap::new();
+        string_inputs.insert("nome", "ASPPIBRA DevOS".to_owned());
 
         let options = TypstCompileOptions {
             template_source: template,
             fonts: &[],
-            string_inputs: inputs,
+            string_inputs,
         };
 
-        let result = compile_typst_document(options);
-        assert!(
-            result.is_ok(),
-            "Falha ao compilar com inputs injetados: {:?}",
-            result.err()
-        );
-        let bytes = result.unwrap();
-        assert!(bytes.starts_with(b"%PDF-"));
+        let bytes = compile_typst_document(options).unwrap_or_else(|error| {
+            panic!("Falha ao compilar documento com entradas injetadas: {error:?}")
+        });
+
+        assert_valid_pdf_header(&bytes);
     }
 
     #[test]
-    fn test_compile_invalid_typst_syntax_returns_error() {
-        let template = "#set page(paper: \"a4\"\n// falta fechar parenteses";
+    fn test_invalid_typst_syntax_returns_compilation_error() {
+        let template = concat!(
+            "#set page(paper: \"a4\"\n",
+            "// falta fechar parenteses"
+        );
         let options = TypstCompileOptions {
             template_source: template,
             fonts: &[],
             string_inputs: HashMap::new(),
         };
 
-        let result = compile_typst_document(options);
+        let error = compile_typst_document(options)
+            .expect_err("Sintaxe Typst inválida deve retornar um erro");
+
         assert!(
-            result.is_err(),
-            "Sintaxe Typst inválida deve retornar TypstEngineError::CompilationFailed"
+            matches!(&error, TypstEngineError::CompilationFailed(_)),
+            "Esperava CompilationFailed, mas recebeu: {error:?}"
         );
-        match result.unwrap_err() {
-            TypstEngineError::CompilationFailed(_) => {}
-            other => panic!("Esperava CompilationFailed, obteve: {:?}", other),
-        }
     }
 }
