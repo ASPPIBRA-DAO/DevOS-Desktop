@@ -1,3 +1,5 @@
+import type { TextFieldProps } from '@mui/material/TextField';
+
 import * as z from 'zod';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -28,44 +30,94 @@ import { getErrorMessage } from '../../utils';
 import { FormDivider, SignUpTerms } from '../../components';
 
 // ----------------------------------------------------------------------
+// Schema de validação
+// ----------------------------------------------------------------------
+
+export const SignUpSchema = z.object({
+  firstName: z
+    .string()
+    .trim()
+    .min(1, {
+      message: 'O nome é obrigatório!',
+    }),
+
+  lastName: z
+    .string()
+    .trim()
+    .min(1, {
+      message: 'O sobrenome é obrigatório!',
+    }),
+
+  email: schemaUtils.email(),
+
+  password: z
+    .string()
+    .min(1, {
+      message: 'A senha mestre é obrigatória!',
+    })
+    .min(12, {
+      message:
+        'A senha mestre deve ter pelo menos 12 caracteres para segurança institucional!',
+    }),
+});
 
 export type SignUpSchemaType = z.infer<typeof SignUpSchema>;
 
-export const SignUpSchema = z.object({
-  firstName: z.string().min(1, { message: 'O nome é obrigatório!' }),
-  lastName: z.string().min(1, { message: 'O sobrenome é obrigatório!' }),
-  email: schemaUtils.email(),
-  password: z
-    .string()
-    .min(1, { message: 'A senha mestre é obrigatória!' })
-    .min(12, { message: 'A senha mestre deve ter pelo menos 12 caracteres para segurança institucional!' }),
-});
+// ----------------------------------------------------------------------
+// Valores padrão
+// ----------------------------------------------------------------------
 
+const DEFAULT_VALUES: SignUpSchemaType = {
+  firstName: '',
+  lastName: '',
+  email: '',
+  password: '',
+};
+
+// ----------------------------------------------------------------------
+// Tipos públicos
 // ----------------------------------------------------------------------
 
 export interface JwtSignUpViewProps {
   isInitVault?: boolean;
 }
 
-export function JwtSignUpView({ isInitVault = false }: JwtSignUpViewProps) {
+// ----------------------------------------------------------------------
+// Tela de cadastro e inicialização do cofre
+// ----------------------------------------------------------------------
+
+export function JwtSignUpView({
+  isInitVault = false,
+}: JwtSignUpViewProps) {
   const theme = useTheme();
   const router = useRouter();
+
   const showPassword = useBoolean();
+
   const { checkUserSession } = useAuthContext();
+
   const { refreshStatus } = useBootstrap();
 
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] =
+    useState<string | null>(null);
 
-  const defaultValues: SignUpSchemaType = {
-    firstName: '',
-    lastName: '',
-    email: '',
-    password: '',
-  };
+  /**
+   * Registra se signUp já foi concluído com sucesso nesta montagem.
+   *
+   * Caso a verificação posterior do cofre falhe, uma nova submissão
+   * tentará verificar a sessão e o cofre novamente sem reenviar
+   * imediatamente a operação de cadastro.
+   */
+  const [registrationCompleted, setRegistrationCompleted] =
+    useState(false);
 
-  const methods = useForm({
+  // ------------------------------------------------------------
+  // Formulário
+  // ------------------------------------------------------------
+
+  const methods = useForm<SignUpSchemaType>({
     resolver: zodResolver(SignUpSchema),
-    defaultValues,
+    defaultValues: DEFAULT_VALUES,
   });
 
   const {
@@ -73,182 +125,247 @@ export function JwtSignUpView({ isInitVault = false }: JwtSignUpViewProps) {
     formState: { isSubmitting },
   } = methods;
 
-  const handleSocialLogin = (provider: 'google' | 'github') => {
-    const providerName = provider === 'google' ? 'Google' : 'GitHub';
+  // ------------------------------------------------------------
+  // Estilos compartilhados dos campos
+  // ------------------------------------------------------------
+
+  const fieldInputSx = {
+    borderRadius: 1,
+    bgcolor: 'rgba(2, 8, 23, 0.65)',
+
+    '& input': {
+      fontFamily: 'var(--font-orbitron), sans-serif',
+      color: theme.palette.info.main,
+
+      '&:-webkit-autofill': {
+        WebkitBoxShadow: '0 0 0 100px #020817 inset',
+        WebkitTextFillColor: theme.palette.info.main,
+        transition: 'background-color 5000s ease-in-out 0s',
+      },
+    },
+
+    '& fieldset': {
+      borderColor: alpha(theme.palette.info.main, 0.25),
+    },
+
+    '&:hover fieldset': {
+      borderColor: `${theme.palette.info.main} !important`,
+    },
+
+    '&.Mui-focused fieldset': {
+      borderColor: `${theme.palette.info.main} !important`,
+    },
+  };
+
+  const commonFieldSlotProps = {
+    inputLabel: {
+      shrink: true,
+      sx: {
+        fontFamily: 'var(--font-orbitron), sans-serif',
+        fontWeight: 600,
+        color: 'info.main',
+      },
+    },
+
+    input: {
+      sx: fieldInputSx,
+    },
+  } satisfies NonNullable<TextFieldProps['slotProps']>;
+
+  // ------------------------------------------------------------
+  // Estilos compartilhados dos botões sociais
+  // ------------------------------------------------------------
+
+  const socialButtonSx = {
+    color: 'white',
+    borderColor: alpha(theme.palette.info.main, 0.2),
+    fontFamily: 'var(--font-orbitron), sans-serif',
+    fontWeight: 700,
+    fontSize: 13,
+
+    '&:hover': {
+      borderColor: 'info.main',
+      bgcolor: alpha(theme.palette.info.main, 0.05),
+      transform: 'translateY(-2px)',
+      boxShadow: `0 5px 15px ${alpha(theme.palette.info.main, 0.2)}`,
+    },
+  };
+
+  // ------------------------------------------------------------
+  // Identificação social
+  // ------------------------------------------------------------
+
+  const handleSocialLogin = (
+    provider: 'google' | 'github'
+  ) => {
+    const providerName =
+      provider === 'google' ? 'Google' : 'GitHub';
+
     setErrorMessage(
-      `Conta do ${providerName} não vinculada a nenhum operador existente. O primeiro acesso institucional requer o preenchimento do formulário abaixo para criação do cofre seguro.`
+      `Conta do ${providerName} não vinculada a nenhum operador existente. ` +
+        'O primeiro acesso institucional requer o preenchimento do formulário abaixo para criação do cofre seguro.'
     );
   };
 
+  // ------------------------------------------------------------
+  // Submissão
+  // ------------------------------------------------------------
+
   const onSubmit = handleSubmit(async (data) => {
+    setErrorMessage(null);
+
     try {
-      setErrorMessage(null);
-      await signUp({
-        email: data.email,
-        password: data.password,
-        firstName: data.firstName,
-        lastName: data.lastName,
-      });
+      // 1. Executa o cadastro apenas quando ainda não foi concluído.
+      if (!registrationCompleted) {
+        await signUp({
+          email: data.email,
+          password: data.password,
+          firstName: data.firstName,
+          lastName: data.lastName,
+        });
 
+        // Marca a operação como concluída para evitar sua repetição
+        // imediata quando a verificação posterior falhar.
+        setRegistrationCompleted(true);
+      }
+
+      // 2. Atualiza a sessão de autenticação, se disponível.
       await checkUserSession?.();
-      await refreshStatus();
 
+      // 3. Consulta o estado atual do cofre.
+      const status = await refreshStatus();
+
+      // 4. Não navegar quando não for possível confirmar o estado.
+      if (!status) {
+        setErrorMessage(
+          'Não foi possível confirmar o estado atual do cofre. ' +
+            'Tente verificar novamente antes de acessar o dashboard.'
+        );
+
+        return;
+      }
+
+      // 5. Não considerar o cadastro operacional se o cofre
+      // continuar sem inicialização.
+      if (!status.is_initialized) {
+        setErrorMessage(
+          'O cadastro foi processado, mas o cofre ainda não está ' +
+            'confirmado como inicializado. Verifique o estado do ambiente.'
+        );
+
+        return;
+      }
+
+      // 6. Não encaminhar para o dashboard com o cofre bloqueado.
+      if (!status.is_unlocked) {
+        setErrorMessage(
+          'O cofre está inicializado, mas permanece bloqueado. ' +
+            'O dashboard não será aberto enquanto o estado de desbloqueio ' +
+            'não for confirmado.'
+        );
+
+        return;
+      }
+
+      // 7. Navegar somente após a confirmação do estado esperado.
       router.push(paths.dashboard.root);
-    } catch (error) {
-      console.error(error);
+    } catch (error: unknown) {
+      // Não registrar o objeto bruto de erro no console.
       const feedbackMessage = getErrorMessage(error);
-      setErrorMessage(feedbackMessage);
+
+      setErrorMessage(
+        typeof feedbackMessage === 'string' &&
+          feedbackMessage.trim().length > 0
+          ? feedbackMessage
+          : 'Não foi possível concluir a operação de cadastro.'
+      );
     }
   });
 
+  // ------------------------------------------------------------
+  // Campos e botão de envio
+  // ------------------------------------------------------------
+
   const renderForm = () => (
-    <Box sx={{ gap: 2, display: 'flex', flexDirection: 'column' }}>
+    <Box
+      sx={{
+        gap: 2,
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      {/* Nome e sobrenome */}
       <Box
-        sx={{ display: 'flex', gap: { xs: 2, sm: 2 }, flexDirection: { xs: 'column', sm: 'row' } }}
+        sx={{
+          display: 'flex',
+          gap: 2,
+          flexDirection: {
+            xs: 'column',
+            sm: 'row',
+          },
+        }}
       >
         <Field.Text
           name="firstName"
           label="Nome"
           placeholder="Ex: Sandro"
-          slotProps={{
-            inputLabel: {
-              shrink: true,
-              sx: {
-                fontFamily: 'var(--font-orbitron), sans-serif',
-                fontWeight: 600,
-                color: 'info.main',
-              },
-            },
-            input: {
-              sx: {
-                borderRadius: 1,
-                bgcolor: 'rgba(2, 8, 23, 0.65)',
-                '& input': {
-                  fontFamily: 'var(--font-orbitron), sans-serif',
-                  color: 'info.main',
-                  '&:-webkit-autofill': {
-                    WebkitBoxShadow: '0 0 0 100px #020817 inset',
-                    WebkitTextFillColor: theme.palette.info.main,
-                    transition: 'background-color 5000s ease-in-out 0s',
-                  },
-                },
-                '& fieldset': { borderColor: alpha(theme.palette.info.main, 0.25) },
-                '&:hover fieldset': { borderColor: `${theme.palette.info.main} !important` },
-                '&.Mui-focused fieldset': { borderColor: `${theme.palette.info.main} !important` },
-              },
-            },
-          }}
+          autoComplete="given-name"
+          slotProps={commonFieldSlotProps}
         />
+
         <Field.Text
           name="lastName"
           label="Sobrenome"
           placeholder="Ex: Operador"
-          slotProps={{
-            inputLabel: {
-              shrink: true,
-              sx: {
-                fontFamily: 'var(--font-orbitron), sans-serif',
-                fontWeight: 600,
-                color: 'info.main',
-              },
-            },
-            input: {
-              sx: {
-                borderRadius: 1,
-                bgcolor: 'rgba(2, 8, 23, 0.65)',
-                '& input': {
-                  fontFamily: 'var(--font-orbitron), sans-serif',
-                  color: 'info.main',
-                  '&:-webkit-autofill': {
-                    WebkitBoxShadow: '0 0 0 100px #020817 inset',
-                    WebkitTextFillColor: theme.palette.info.main,
-                    transition: 'background-color 5000s ease-in-out 0s',
-                  },
-                },
-                '& fieldset': { borderColor: alpha(theme.palette.info.main, 0.25) },
-                '&:hover fieldset': { borderColor: `${theme.palette.info.main} !important` },
-                '&.Mui-focused fieldset': { borderColor: `${theme.palette.info.main} !important` },
-              },
-            },
-          }}
+          autoComplete="family-name"
+          slotProps={commonFieldSlotProps}
         />
       </Box>
 
+      {/* E-mail */}
       <Field.Text
         name="email"
         label="E-mail Institucional"
         placeholder="operador@asppibra.com"
-        slotProps={{
-          inputLabel: {
-            shrink: true,
-            sx: {
-              fontFamily: 'var(--font-orbitron), sans-serif',
-              fontWeight: 600,
-              color: 'info.main',
-            },
-          },
-          input: {
-            sx: {
-              borderRadius: 1,
-              bgcolor: 'rgba(2, 8, 23, 0.65)',
-              '& input': {
-                fontFamily: 'var(--font-orbitron), sans-serif',
-                color: 'info.main',
-                '&:-webkit-autofill': {
-                  WebkitBoxShadow: '0 0 0 100px #020817 inset',
-                  WebkitTextFillColor: theme.palette.info.main,
-                  transition: 'background-color 5000s ease-in-out 0s',
-                },
-              },
-              '& fieldset': { borderColor: alpha(theme.palette.info.main, 0.25) },
-              '&:hover fieldset': { borderColor: `${theme.palette.info.main} !important` },
-              '&.Mui-focused fieldset': { borderColor: `${theme.palette.info.main} !important` },
-            },
-          },
-        }}
+        autoComplete="email"
+        slotProps={commonFieldSlotProps}
       />
 
+      {/* Senha mestre */}
       <Field.Text
         name="password"
         label="Nova Senha Mestre"
         placeholder="Mínimo 12 caracteres seguros"
         type={showPassword.value ? 'text' : 'password'}
+        autoComplete="new-password"
         slotProps={{
-          inputLabel: {
-            shrink: true,
-            sx: {
-              fontFamily: 'var(--font-orbitron), sans-serif',
-              fontWeight: 600,
-              color: 'info.main',
-            },
-          },
+          ...commonFieldSlotProps,
+
           input: {
-            sx: {
-              borderRadius: 1,
-              bgcolor: 'rgba(2, 8, 23, 0.65)',
-              '& input': {
-                fontFamily: 'var(--font-orbitron), sans-serif',
-                color: 'info.main',
-                '&:-webkit-autofill': {
-                  WebkitBoxShadow: '0 0 0 100px #020817 inset',
-                  WebkitTextFillColor: theme.palette.info.main,
-                  transition: 'background-color 5000s ease-in-out 0s',
-                },
-              },
-              '& fieldset': { borderColor: alpha(theme.palette.info.main, 0.25) },
-              '&:hover fieldset': { borderColor: `${theme.palette.info.main} !important` },
-              '&.Mui-focused fieldset': { borderColor: `${theme.palette.info.main} !important` },
-            },
+            sx: fieldInputSx,
+
             endAdornment: (
               <InputAdornment position="end">
                 <IconButton
-                  aria-label={showPassword.value ? 'Ocultar senha' : 'Exibir senha'}
+                  type="button"
+                  aria-label={
+                    showPassword.value
+                      ? 'Ocultar senha'
+                      : 'Exibir senha'
+                  }
+                  aria-pressed={showPassword.value}
                   onClick={showPassword.onToggle}
                   edge="end"
-                  sx={{ color: 'info.main' }}
+                  sx={{
+                    color: 'info.main',
+                  }}
                 >
                   <Iconify
-                    icon={showPassword.value ? 'solar:eye-bold' : 'solar:eye-closed-bold'}
+                    icon={
+                      showPassword.value
+                        ? 'solar:eye-bold'
+                        : 'solar:eye-closed-bold'
+                    }
                   />
                 </IconButton>
               </InputAdornment>
@@ -257,6 +374,7 @@ export function JwtSignUpView({ isInitVault = false }: JwtSignUpViewProps) {
         }}
       />
 
+      {/* Envio do formulário */}
       <Button
         fullWidth
         size="large"
@@ -274,23 +392,35 @@ export function JwtSignUpView({ isInitVault = false }: JwtSignUpViewProps) {
           color: 'common.white',
           position: 'relative',
           border: 'none',
+
           '&::before': {
             content: '""',
             position: 'absolute',
             inset: 0,
             borderRadius: 'inherit',
             padding: '1.5px',
-            background: `linear-gradient(180deg, 
-              ${alpha(theme.palette.info.main, 1)} 0%, 
-              ${alpha(theme.palette.common.white, 0.05)} 50%, 
+
+            background: `linear-gradient(
+              180deg,
+              ${alpha(theme.palette.info.main, 1)} 0%,
+              ${alpha(theme.palette.common.white, 0.05)} 50%,
               ${alpha(theme.palette.warning.main, 1)} 100%
             )`,
-            WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+
+            WebkitMask:
+              'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+
             WebkitMaskComposite: 'xor',
             maskComposite: 'exclude',
             pointerEvents: 'none',
           },
-          transition: theme.transitions.create(['all']),
+
+          transition: theme.transitions.create([
+            'background-color',
+            'transform',
+            'box-shadow',
+          ]),
+
           '&:hover': {
             bgcolor: alpha(theme.palette.info.main, 0.1),
             transform: 'scale(1.02)',
@@ -298,10 +428,18 @@ export function JwtSignUpView({ isInitVault = false }: JwtSignUpViewProps) {
           },
         }}
       >
-        {isInitVault ? 'CRIAR COFRE SEGURO' : 'SOLICITAR ACESSO'}
+        {registrationCompleted
+          ? 'VERIFICAR ESTADO DO COFRE'
+          : isInitVault
+            ? 'CRIAR COFRE SEGURO'
+            : 'SOLICITAR ACESSO'}
       </Button>
     </Box>
   );
+
+  // ------------------------------------------------------------
+  // Renderização da página
+  // ------------------------------------------------------------
 
   return (
     <Box
@@ -312,7 +450,13 @@ export function JwtSignUpView({ isInitVault = false }: JwtSignUpViewProps) {
         gap: 1.5,
       }}
     >
-      <Box sx={{ mb: 1, textAlign: 'center' }}>
+      {/* Cabeçalho */}
+      <Box
+        sx={{
+          mb: 1,
+          textAlign: 'center',
+        }}
+      >
         <Typography
           variant="h5"
           component="h1"
@@ -325,9 +469,18 @@ export function JwtSignUpView({ isInitVault = false }: JwtSignUpViewProps) {
             textShadow: '0 0 20px rgba(0, 184, 217, 0.45)',
           }}
         >
-          {isInitVault ? 'INICIALIZAÇÃO DO COFRE' : 'SOLICITAR ACESSO'}
+          {isInitVault
+            ? 'INICIALIZAÇÃO DO COFRE'
+            : 'SOLICITAR ACESSO'}
         </Typography>
-        <Typography variant="body2" sx={{ color: 'grey.500', fontSize: 13 }}>
+
+        <Typography
+          variant="body2"
+          sx={{
+            color: 'grey.500',
+            fontSize: 13,
+          }}
+        >
           {isInitVault ? (
             'Defina a senha mestre que protegerá todas as chaves no hardware local.'
           ) : (
@@ -350,9 +503,11 @@ export function JwtSignUpView({ isInitVault = false }: JwtSignUpViewProps) {
         </Typography>
       </Box>
 
+      {/* Mensagens de erro e feedback */}
       {!!errorMessage && (
         <Alert
           severity="error"
+          aria-live="polite"
           sx={{
             mb: 3,
             textAlign: 'left',
@@ -365,58 +520,55 @@ export function JwtSignUpView({ isInitVault = false }: JwtSignUpViewProps) {
         </Alert>
       )}
 
-      <Form methods={methods} onSubmit={onSubmit}>
+      {/* Formulário principal */}
+      <Form
+        methods={methods}
+        onSubmit={onSubmit}
+      >
         {renderForm()}
       </Form>
 
+      {/* Separador */}
       <FormDivider label="OU IDENTIFIQUE-SE COM" />
 
-      <Box sx={{ display: 'flex', gap: 2 }}>
+      {/* Opções de identificação social existentes */}
+      <Box
+        sx={{
+          display: 'flex',
+          gap: 2,
+        }}
+      >
         <Button
+          type="button"
           fullWidth
           variant="outlined"
           onClick={() => handleSocialLogin('google')}
           startIcon={<Iconify icon="logos:google-icon" />}
-          sx={{
-            color: 'white',
-            borderColor: alpha(theme.palette.info.main, 0.2),
-            fontFamily: 'var(--font-orbitron), sans-serif',
-            fontWeight: 700,
-            fontSize: 13,
-            '&:hover': {
-              borderColor: 'info.main',
-              bgcolor: alpha(theme.palette.info.main, 0.05),
-              transform: 'translateY(-2px)',
-              boxShadow: `0 5px 15px ${alpha(theme.palette.info.main, 0.2)}`,
-            },
-          }}
+          sx={socialButtonSx}
         >
           Google
         </Button>
+
         <Button
+          type="button"
           fullWidth
           variant="outlined"
           onClick={() => handleSocialLogin('github')}
           startIcon={<Iconify icon="logos:github-icon" />}
-          sx={{
-            color: 'white',
-            borderColor: alpha(theme.palette.info.main, 0.2),
-            fontFamily: 'var(--font-orbitron), sans-serif',
-            fontWeight: 700,
-            fontSize: 13,
-            '&:hover': {
-              borderColor: 'info.main',
-              bgcolor: alpha(theme.palette.info.main, 0.05),
-              transform: 'translateY(-2px)',
-              boxShadow: `0 5px 15px ${alpha(theme.palette.info.main, 0.2)}`,
-            },
-          }}
+          sx={socialButtonSx}
         >
           GitHub
         </Button>
       </Box>
 
-      <SignUpTerms sx={{ color: 'grey.600', mt: 0.5, fontSize: 11 }} />
+      {/* Termos existentes */}
+      <SignUpTerms
+        sx={{
+          color: 'grey.600',
+          mt: 0.5,
+          fontSize: 11,
+        }}
+      />
     </Box>
   );
 }

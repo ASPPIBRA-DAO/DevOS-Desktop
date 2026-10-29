@@ -50,6 +50,32 @@ describe('Onda 5 — IPC Contracts & Bridges Test Suite', () => {
       const unauthorizedErr = TauriErrorMapper.normalize('Permission denied by capability', 'list_audit_findings');
       expect(unauthorizedErr.code).toBe('PERMISSION_DENIED_ERROR');
     });
+
+    it('deve normalizar acentos e termos em portugues no TauriErrorMapper', () => {
+      const accVal = TauriErrorMapper.normalize('Parâmetro com valor inválido');
+      expect(accVal.code).toBe('VALIDATION_ERROR');
+
+      const accNotFound = TauriErrorMapper.normalize('Chave não encontrada');
+      expect(accNotFound.code).toBe('NOT_FOUND_ERROR');
+
+      const accPerm = TauriErrorMapper.normalize('Operação não permitida: permissão negada');
+      expect(accPerm.code).toBe('PERMISSION_DENIED_ERROR');
+
+      const cryptoErr = TauriErrorMapper.normalize('Falha na descriptografia do envelope');
+      expect(cryptoErr.code).toBe('CRYPTO_ERROR');
+
+      const storageErr = TauriErrorMapper.normalize('Falha no banco SQLite devos_vault');
+      expect(storageErr.code).toBe('STORAGE_ERROR');
+    });
+
+    it('deve extrair mensagem com seguranca sem falhar em referencias circulares', () => {
+      const circularObj: Record<string, unknown> = { message: 'Erro circular de validacao' };
+      circularObj.self = circularObj;
+
+      const result = TauriErrorMapper.normalize(circularObj, 'test_cmd');
+      expect(result.code).toBe('VALIDATION_ERROR');
+      expect(result.message).toBe('Erro circular de validacao');
+    });
   });
 
   describe('SystemBridge Contracts', () => {

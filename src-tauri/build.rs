@@ -5,6 +5,7 @@ fn main() {
             "get_vault_status",
             "init_master_password",
             "unlock_vault",
+            "lock_vault",
             "generate_seed_and_preview",
             "reveal_pending_mnemonic",
             "cancel_pending_creation",

@@ -2,6 +2,7 @@ import type { VaultStatus } from 'src/platform/tauri/contracts/vault-contracts';
 
 import React, {
   useRef,
+  useMemo,
   useState,
   useEffect,
   useContext,
@@ -23,17 +24,17 @@ import { WindowBridge } from 'src/platform/tauri/window/window-bridge';
 import { SplashScreen } from 'src/shared/components/loading-screen';
 
 // ----------------------------------------------------------------------
-// Tipos e Estados Estritos da Máquina de Inicialização
+// Estados e contratos públicos
 // ----------------------------------------------------------------------
 
 export type BootstrapState =
-  | 'INITIALIZING' // Handshake e validação SQLite em andamento
-  | 'READY_UNLOCKED' // Desktop: cofre inicializado e desbloqueado (acesso total)
-  | 'READY_LOCKED' // Desktop: cofre inicializado mas trancado (requer senha mestre)
-  | 'UNINITIALIZED' // Desktop: primeiro acesso, requer criação de senha mestre
-  | 'WEB_PREVIEW' // Navegador: ambiente web sem cofre nativo de hardware
-  | 'TIMEOUT_WARNING' // UX: inicialização excedeu o limite de espera (4.5s)
-  | 'FATAL_ERROR'; // Falha física de I/O ou banco SQLite indisponível
+  | 'INITIALIZING'
+  | 'READY_UNLOCKED'
+  | 'READY_LOCKED'
+  | 'UNINITIALIZED'
+  | 'WEB_PREVIEW'
+  | 'TIMEOUT_WARNING'
+  | 'FATAL_ERROR';
 
 export interface BootstrapContextValue {
   state: BootstrapState;
@@ -45,280 +46,791 @@ export interface BootstrapContextValue {
   refreshStatus: () => Promise<VaultStatus | null>;
 }
 
-const BootstrapContext = createContext<BootstrapContextValue | null>(null);
-
-export function useBootstrap(): BootstrapContextValue {
-  const context = useContext(BootstrapContext);
-  if (!context) {
-    throw new Error('useBootstrap deve ser utilizado dentro de um <AppBootstrapProvider />');
-  }
-  return context;
-}
-
-// ----------------------------------------------------------------------
-// Provedor de Bootstrap com Proteção Estrita Contra Race Conditions
-// ----------------------------------------------------------------------
-
 type Props = {
   children: React.ReactNode;
   timeoutMs?: number;
   enableThreeAnimation?: boolean;
 };
 
+const BootstrapContext = createContext<BootstrapContextValue | null>(null);
+
+// ----------------------------------------------------------------------
+// Integração segura com callbacks opcionais do splash
+// ----------------------------------------------------------------------
+
+type DevOSWindow = Window & {
+  __DEVOS_UPDATE_SPLASH_STAGE__?: (
+    text: string,
+    progress?: number
+  ) => void;
+
+  __DEVOS_FINISH_SPLASH__?: () => void;
+};
+
+/**
+ * A atualização visual do splash não pode interromper
+ * a inicialização do subsistema nativo.
+ */
+function notifySplashStage(
+  text: string,
+  progress?: number
+): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    const updater = (window as DevOSWindow)
+      .__DEVOS_UPDATE_SPLASH_STAGE__;
+
+    if (typeof updater === 'function') {
+      updater(text, progress);
+    }
+  } catch {
+    // Uma falha visual não deve interromper o bootstrap.
+  }
+}
+
+/**
+ * Finaliza a tela HTML inicial, quando o callback estiver disponível.
+ */
+function finishSplashIfAvailable(): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    const finishSplash = (window as DevOSWindow)
+      .__DEVOS_FINISH_SPLASH__;
+
+    if (typeof finishSplash === 'function') {
+      finishSplash();
+    }
+  } catch {
+    // O callback é opcional e não controla o estado do cofre.
+  }
+}
+
+// ----------------------------------------------------------------------
+// Operações de janela: tratamento de exceções e rejeições
+// ----------------------------------------------------------------------
+
+/**
+ * Executa uma operação de janela sem permitir que uma falha
+ * de interface produza uma rejeição assíncrona não tratada.
+ *
+ * O erro bruto não é enviado ao log.
+ */
+function runBestEffortWindowAction(
+  action: () => unknown,
+  failureMessage: string
+): void {
+  try {
+    void Promise.resolve(action()).catch(() => {
+      console.warn(failureMessage);
+    });
+  } catch {
+    console.warn(failureMessage);
+  }
+}
+
+// ----------------------------------------------------------------------
+// Validação dos campos essenciais recebidos pelo IPC
+// ----------------------------------------------------------------------
+
+/**
+ * Valida os dois campos utilizados nas decisões de segurança
+ * desta máquina de estados.
+ *
+ * A validação integral de VaultStatus pertence também à fronteira
+ * do contrato IPC, cuja implementação deve ser auditada separadamente.
+ */
+function hasValidVaultFlags(
+  value: unknown
+): value is {
+  is_initialized: boolean;
+  is_unlocked: boolean;
+} {
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    Array.isArray(value)
+  ) {
+    return false;
+  }
+
+  const record = value as Record<string, unknown>;
+
+  return (
+    typeof record.is_initialized === 'boolean' &&
+    typeof record.is_unlocked === 'boolean'
+  );
+}
+
+// ----------------------------------------------------------------------
+// Resolução da máquina de estados a partir do status nativo
+// ----------------------------------------------------------------------
+
+type VaultStateResolution = {
+  state: BootstrapState;
+  errorMessage: string | null;
+};
+
+function resolveVaultState(
+  status: VaultStatus
+): VaultStateResolution {
+  // Uma sessão desbloqueada sem cofre inicializado é inconsistente.
+  if (!status.is_initialized && status.is_unlocked) {
+    return {
+      state: 'FATAL_ERROR',
+      errorMessage:
+        'Inconsistência de integridade na sessão do cofre.',
+    };
+  }
+
+  if (!status.is_initialized) {
+    return {
+      state: 'UNINITIALIZED',
+      errorMessage: null,
+    };
+  }
+
+  if (!status.is_unlocked) {
+    return {
+      state: 'READY_LOCKED',
+      errorMessage: null,
+    };
+  }
+
+  return {
+    state: 'READY_UNLOCKED',
+    errorMessage: null,
+  };
+}
+
+// ----------------------------------------------------------------------
+// Tratamento seguro de erros desconhecidos
+// ----------------------------------------------------------------------
+
+/**
+ * Extrai texto de erro somente quando a mensagem é realmente uma string.
+ * Não pressupõe que todas as rejeições sejam instâncias de Error.
+ */
+function extractErrorText(error: unknown): string {
+  try {
+    if (typeof error === 'string') {
+      return error;
+    }
+
+    if (error instanceof Error) {
+      return typeof error.message === 'string'
+        ? error.message
+        : '';
+    }
+
+    if (typeof error === 'object' && error !== null) {
+      const record = error as Record<string, unknown>;
+
+      return typeof record.message === 'string'
+        ? record.message
+        : '';
+    }
+  } catch {
+    // Um valor de erro malformado não deve interromper o tratamento.
+  }
+
+  return '';
+}
+
+/**
+ * Traduz erros nativos para mensagens permitidas na interface.
+ * A mensagem bruta nunca é exibida ao usuário.
+ */
+function getBootstrapErrorMessage(
+  error: unknown
+): string {
+  const rawMessage = extractErrorText(error);
+
+  if (rawMessage.includes('VAULT_STORAGE_ERR')) {
+    return (
+      'Falha de acesso ao armazenamento seguro local ' +
+      '(devos_vault.sqlite).'
+    );
+  }
+
+  return (
+    'Erro inesperado na inicialização do subsistema nativo ' +
+    'do cofre.'
+  );
+}
+
+// ----------------------------------------------------------------------
+// Contexto público
+// ----------------------------------------------------------------------
+
+export function useBootstrap(): BootstrapContextValue {
+  const context = useContext(BootstrapContext);
+
+  if (!context) {
+    throw new Error(
+      'useBootstrap deve ser utilizado dentro de um ' +
+      '<AppBootstrapProvider />'
+    );
+  }
+
+  return context;
+}
+
+// ----------------------------------------------------------------------
+// Provedor de bootstrap
+// ----------------------------------------------------------------------
+
 export function AppBootstrapProvider({
   children,
   timeoutMs = 4500,
   enableThreeAnimation = false,
 }: Props) {
-  const [state, setState] = useState<BootstrapState>('INITIALIZING');
-  const [vaultStatus, setVaultStatus] = useState<VaultStatus | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [state, setState] =
+    useState<BootstrapState>('INITIALIZING');
 
-  // Controle sequencial estrito de tentativas (elimina Casos A e B de respostas atrasadas)
+  const [vaultStatus, setVaultStatus] =
+    useState<VaultStatus | null>(null);
+
+  const [errorMessage, setErrorMessage] =
+    useState<string | null>(null);
+
+  // ------------------------------------------------------------
+  // Controle das tentativas de bootstrap
+  // ------------------------------------------------------------
+
   const attemptSeqRef = useRef(0);
-  const activeAttemptIdRef = useRef<number | null>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Portão Duplo de Inicialização: IPC Ready + Animation Done
-  const isAnimationDoneRef = useRef<boolean>(!enableThreeAnimation);
-  const pendingTargetStateRef = useRef<BootstrapState | null>(null);
+  const activeAttemptIdRef =
+    useRef<number | null>(null);
 
-  const handleAnimationComplete = useCallback(() => {
-    isAnimationDoneRef.current = true;
-    if (pendingTargetStateRef.current) {
-      const next = pendingTargetStateRef.current;
-      pendingTargetStateRef.current = null;
-      setState(next);
-    }
-  }, []);
+  const timerRef =
+    useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const runBootstrap = useCallback(() => {
-    // 1. Limpa timer ativo da tentativa anterior
-    if (timerRef.current) {
+  // ------------------------------------------------------------
+  // Sequenciamento das operações assíncronas
+  // ------------------------------------------------------------
+
+  /**
+   * A sequência de operações protege as atualizações de estado
+   * de bootstrap, refreshStatus, unlock e lock.
+   *
+   * Não substitui a sincronização ou a exclusão mútua nativa.
+   */
+  const operationSeqRef = useRef(0);
+
+  // ------------------------------------------------------------
+  // Controle da animação e do destino pendente
+  // ------------------------------------------------------------
+
+  const isAnimationDoneRef = useRef<boolean>(
+    !enableThreeAnimation
+  );
+
+  const pendingTargetStateRef =
+    useRef<BootstrapState | null>(null);
+
+  /**
+   * Identifica a instância da animação correspondente
+   * à tentativa atual do bootstrap.
+   */
+  const [splashAttemptId, setSplashAttemptId] =
+    useState(0);
+
+  // ------------------------------------------------------------
+  // Invalidação de operações anteriores
+  // ------------------------------------------------------------
+
+  /**
+   * Invalida resultados assíncronos anteriores e limpa
+   * o timer associado a uma tentativa de bootstrap ativa.
+   */
+  const beginStateOperation = useCallback((): number => {
+    const operationId = ++operationSeqRef.current;
+
+    activeAttemptIdRef.current = null;
+
+    if (timerRef.current !== null) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
 
-    // 2. Incrementa ID de tentativa e define como tentativa ativa
+    pendingTargetStateRef.current = null;
+
+    return operationId;
+  }, []);
+
+  // ------------------------------------------------------------
+  // Gate da animação
+  // ------------------------------------------------------------
+
+  const handleAnimationComplete = useCallback(
+    (attemptId: number) => {
+      // Uma animação antiga não pode concluir uma tentativa nova.
+      if (attemptId !== attemptSeqRef.current) {
+        return;
+      }
+
+      isAnimationDoneRef.current = true;
+
+      const nextState = pendingTargetStateRef.current;
+
+      if (nextState !== null) {
+        pendingTargetStateRef.current = null;
+        setState(nextState);
+      }
+    },
+    []
+  );
+
+  /**
+   * Mantém estável o callback enquanto o identificador da tentativa
+   * não mudar, evitando reinicializações desnecessárias da animação.
+   */
+  const onSplashAnimationComplete = useCallback(() => {
+    handleAnimationComplete(splashAttemptId);
+  }, [
+    handleAnimationComplete,
+    splashAttemptId,
+  ]);
+
+  // ------------------------------------------------------------
+  // Bootstrap: inicialização, handshake IPC e timeout
+  // ------------------------------------------------------------
+
+  const runBootstrap = useCallback(() => {
+    // Invalida imediatamente os resultados da tentativa anterior.
+    if (timerRef.current !== null) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+
     const attemptId = ++attemptSeqRef.current;
+
+    const operationId = ++operationSeqRef.current;
+
     activeAttemptIdRef.current = attemptId;
 
-    // Reseta portão duplo e estado de janela para nova tentativa
-    WindowBridge.reset();
+    setSplashAttemptId(attemptId);
+
+    // Restabelece os invariantes da nova execução.
     isAnimationDoneRef.current = !enableThreeAnimation;
+
     pendingTargetStateRef.current = null;
 
     setState('INITIALIZING');
+    setVaultStatus(null);
     setErrorMessage(null);
 
-    const notifySplashStage = (stageText: string, targetP?: number) => {
-      if (typeof window !== 'undefined') {
-        const updater = (
-          window as unknown as {
-            __DEVOS_UPDATE_SPLASH_STAGE__?: (text: string, p?: number) => void;
-          }
-        ).__DEVOS_UPDATE_SPLASH_STAGE__;
-        if (typeof updater === 'function') {
-          updater(stageText, targetP);
-        }
-      }
-    };
+    // A falha na operação de janela não deve impedir o bootstrap.
+    runBestEffortWindowAction(
+      () => WindowBridge.reset(),
+      'Não foi possível redefinir o estado da janela.'
+    );
 
-    notifySplashStage('VALIDANDO AMBIENTE DE SEGURANÇA...', 20);
+    notifySplashStage(
+      'VALIDANDO AMBIENTE DE SEGURANÇA...',
+      20
+    );
 
-    // 3. Verificação de ambiente: se não for Tauri Desktop, transiciona diretamente para WEB_PREVIEW
+    const isCurrentAttempt = (): boolean =>
+      activeAttemptIdRef.current === attemptId &&
+      operationSeqRef.current === operationId;
+
+    // ----------------------------------------------------------
+    // Execução em navegador: modo de demonstração
+    // ----------------------------------------------------------
+
     if (!isTauriDesktop()) {
       activeAttemptIdRef.current = null;
+
       if (isAnimationDoneRef.current) {
         setState('WEB_PREVIEW');
       } else {
         pendingTargetStateRef.current = 'WEB_PREVIEW';
       }
+
       return;
     }
 
-    // 4. Timer de UX (4.5s): invalida a tentativa ativa IMEDIATAMENTE no timeout e interrompe animação
+    // ----------------------------------------------------------
+    // Timeout de experiência do usuário
+    // ----------------------------------------------------------
+
     timerRef.current = setTimeout(() => {
-      if (activeAttemptIdRef.current === attemptId) {
-        // Regra fiduciária: a tentativa expirada é invalidada aqui (impede Caso A)
-        activeAttemptIdRef.current = null;
-        pendingTargetStateRef.current = null;
-        isAnimationDoneRef.current = true;
-        setState('TIMEOUT_WARNING');
+      if (!isCurrentAttempt()) {
+        return;
       }
+
+      // O timeout invalida imediatamente a tentativa pendente.
+      activeAttemptIdRef.current = null;
+      timerRef.current = null;
+
+      pendingTargetStateRef.current = null;
+
+      // A animação não deve bloquear a apresentação do aviso.
+      isAnimationDoneRef.current = true;
+
+      setState('TIMEOUT_WARNING');
     }, timeoutMs);
 
-    // 5. Execução do handshake IPC seguro com o motor Rust
-    notifySplashStage('VERIFICANDO DISPONIBILIDADE DO COFRE LOCAL...', 45);
+    notifySplashStage(
+      'VERIFICANDO DISPONIBILIDADE DO COFRE LOCAL...',
+      45
+    );
+
+    // ----------------------------------------------------------
+    // Handshake IPC com o backend Rust
+    // ----------------------------------------------------------
 
     VaultBridge.getStatus()
       .then((status) => {
-        // Verificação estrita: se a tentativa ativa não for EXATAMENTE este attemptId, descarta
-        if (activeAttemptIdRef.current !== attemptId) {
-          // Descarte seguro de resposta atrasada (impede Casos A e B)
+        // Descarta respostas atrasadas ou operações invalidadas.
+        if (!isCurrentAttempt()) {
           return;
         }
 
-        // Tentativa válida no prazo
+        // Não interpretar uma resposta malformada como primeiro acesso.
+        if (!hasValidVaultFlags(status)) {
+          activeAttemptIdRef.current = null;
+
+          if (timerRef.current !== null) {
+            clearTimeout(timerRef.current);
+            timerRef.current = null;
+          }
+
+          pendingTargetStateRef.current = null;
+          isAnimationDoneRef.current = true;
+
+          setVaultStatus(null);
+
+          setErrorMessage(
+            'Não foi possível validar a resposta do subsistema nativo.'
+          );
+
+          setState('FATAL_ERROR');
+
+          return;
+        }
+
+        // O handshake foi concluído no prazo e a resposta é válida.
         activeAttemptIdRef.current = null;
-        if (timerRef.current) {
+
+        if (timerRef.current !== null) {
           clearTimeout(timerRef.current);
           timerRef.current = null;
         }
 
         setVaultStatus(status);
-        notifySplashStage('VERIFICANDO CONECTIVIDADE COM A REDE IPFS...', 75);
 
-        // Invariante de Segurança Fiduciária — Tratamento Exaustivo das 4 Combinações:
-        let targetState: BootstrapState;
-        if (!status.is_initialized && status.is_unlocked) {
-          // Combinação Anômala: desbloqueado sem estar inicializado
-          setErrorMessage('Inconsistência de integridade na sessão do cofre.');
-          targetState = 'FATAL_ERROR';
-        } else if (!status.is_initialized) {
-          targetState = 'UNINITIALIZED';
-        } else if (!status.is_unlocked) {
-          targetState = 'READY_LOCKED';
-        } else {
-          targetState = 'READY_UNLOCKED';
-        }
+        notifySplashStage(
+          'VERIFICANDO CONECTIVIDADE COM A REDE IPFS...',
+          75
+        );
 
-        // Falha crítica interrompe imediatamente a animação
-        if (targetState === 'FATAL_ERROR') {
+        const resolution = resolveVaultState(status);
+
+        setErrorMessage(resolution.errorMessage);
+
+        // Falha crítica: não aguardar a animação para exibi-la.
+        if (resolution.state === 'FATAL_ERROR') {
           pendingTargetStateRef.current = null;
           isAnimationDoneRef.current = true;
+
           setState('FATAL_ERROR');
+
           return;
         }
 
-        notifySplashStage('PREPARANDO AMBIENTE DE OPERAÇÃO...', 90);
+        notifySplashStage(
+          'PREPARANDO AMBIENTE DE OPERAÇÃO...',
+          90
+        );
 
-        // Portão Duplo: Se a animação já concluiu, transiciona para o estado alvo
+        // Portão duplo: IPC concluído + animação concluída.
         if (isAnimationDoneRef.current) {
-          setState(targetState);
+          setState(resolution.state);
         } else {
-          // Aguarda conclusão da animação (tempo regular ou Esc/Pular)
-          pendingTargetStateRef.current = targetState;
+          pendingTargetStateRef.current = resolution.state;
         }
       })
-      .catch((err: unknown) => {
-        if (activeAttemptIdRef.current !== attemptId) {
-          // Descarte de erro atrasado de tentativa obsoleta
+      .catch((error: unknown) => {
+        // Não permitir que uma rejeição antiga altere o estado.
+        if (!isCurrentAttempt()) {
           return;
         }
 
         activeAttemptIdRef.current = null;
         pendingTargetStateRef.current = null;
+
         isAnimationDoneRef.current = true;
-        if (timerRef.current) {
+
+        if (timerRef.current !== null) {
           clearTimeout(timerRef.current);
           timerRef.current = null;
         }
 
-        const raw = (err as Error)?.message || String(err);
-        const sanitized = raw.includes('VAULT_STORAGE_ERR')
-          ? 'Falha de acesso ao armazenamento seguro local (devos_vault.sqlite).'
-          : 'Erro inesperado na inicialização do subsistema nativo do cofre.';
+        setVaultStatus(null);
 
-        setErrorMessage(sanitized);
+        setErrorMessage(
+          getBootstrapErrorMessage(error)
+        );
+
         setState('FATAL_ERROR');
       });
-  }, [timeoutMs, enableThreeAnimation]);
+  }, [
+    timeoutMs,
+    enableThreeAnimation,
+  ]);
+
+  // ------------------------------------------------------------
+  // Ciclo de vida do bootstrap
+  // ------------------------------------------------------------
 
   useEffect(() => {
     runBootstrap();
 
     return () => {
-      // Cleanup no desmonte: anula tentativa ativa e limpa timers
+      // Invalida callbacks pendentes durante o cleanup.
       activeAttemptIdRef.current = null;
-      if (timerRef.current) {
+
+      operationSeqRef.current += 1;
+      attemptSeqRef.current += 1;
+
+      pendingTargetStateRef.current = null;
+
+      if (timerRef.current !== null) {
         clearTimeout(timerRef.current);
         timerRef.current = null;
       }
     };
   }, [runBootstrap]);
 
-  // Restauração da Janela: as telas de inicialização e credenciais (UNINITIALIZED / READY_LOCKED)
-  // permanecem em tela cheia fluida total (100vw x 100vh), exatamente como a tela de carregamento (splash).
-  // Apenas após a liberação do cofre (READY_UNLOCKED) é que a janela é restaurada para as dimensões de trabalho.
+  // ------------------------------------------------------------
+  // Restauração e dimensionamento da janela
+  // ------------------------------------------------------------
+
   useEffect(() => {
-    if (state === 'UNINITIALIZED' || state === 'READY_LOCKED') {
-      void WindowBridge.setFullscreen(true);
+    if (
+      state === 'UNINITIALIZED' ||
+      state === 'READY_LOCKED'
+    ) {
+      runBestEffortWindowAction(
+        () => WindowBridge.setFullscreen(true),
+        'Não foi possível ajustar a janela para a autenticação.'
+      );
     } else if (state === 'READY_UNLOCKED') {
-      void WindowBridge.restoreWindowAfterBoot();
+      runBestEffortWindowAction(
+        () => WindowBridge.restoreWindowAfterBoot(),
+        'Não foi possível restaurar as dimensões da janela.'
+      );
     }
   }, [state]);
 
-  // Transição suave e descarte da 1ª página de carregamento nativa (index.html)
+  // ------------------------------------------------------------
+  // Finalização da splash nativa
+  // ------------------------------------------------------------
+
   useEffect(() => {
     if (state !== 'INITIALIZING') {
-      const finishSplash = (window as unknown as { __DEVOS_FINISH_SPLASH__?: () => void })
-        .__DEVOS_FINISH_SPLASH__;
-      if (typeof finishSplash === 'function') {
-        finishSplash();
-      }
+      finishSplashIfAvailable();
     }
   }, [state]);
 
-  const unlock = useCallback(async (password: string): Promise<boolean> => {
-    const ok = await VaultBridge.unlock(password);
-    if (ok) {
-      setState('READY_UNLOCKED');
-      return true;
-    }
-    return false;
-  }, []);
+  // ------------------------------------------------------------
+  // Atualização do status nativo
+  // ------------------------------------------------------------
 
-  const lock = useCallback(async (): Promise<void> => {
-    try {
-      await VaultBridge.lock();
-    } finally {
-      setState('READY_LOCKED');
-    }
-  }, []);
+  const refreshStatus =
+    useCallback(async (): Promise<VaultStatus | null> => {
+      const operationId = beginStateOperation();
 
-  const refreshStatus = useCallback(async (): Promise<VaultStatus | null> => {
-    try {
-      const status = await VaultBridge.getStatus();
-      setVaultStatus(status);
-      if (!status.is_initialized && status.is_unlocked) {
-        setErrorMessage('Inconsistência de integridade na sessão do cofre.');
-        setState('FATAL_ERROR');
-      } else if (!status.is_initialized) {
-        setState('UNINITIALIZED');
-      } else if (!status.is_unlocked) {
-        setState('READY_LOCKED');
-      } else {
-        setState('READY_UNLOCKED');
+      try {
+        const status = await VaultBridge.getStatus();
+
+        // Descarta resultados substituídos por outra operação.
+        if (operationSeqRef.current !== operationId) {
+          return null;
+        }
+
+        if (!hasValidVaultFlags(status)) {
+          throw new Error('INVALID_VAULT_STATUS');
+        }
+
+        setVaultStatus(status);
+
+        const resolution = resolveVaultState(status);
+
+        setErrorMessage(resolution.errorMessage);
+        setState(resolution.state);
+
+        return status;
+      } catch {
+        // Só a operação vigente pode alterar o estado.
+        if (operationSeqRef.current === operationId) {
+          // O status anterior não representa mais uma confirmação atual.
+          setVaultStatus(null);
+
+          setErrorMessage(
+            'Não foi possível confirmar o estado atual do cofre.'
+          );
+
+          // Não afirmar READY_LOCKED sem confirmação do backend.
+          setState('FATAL_ERROR');
+        }
+
+        return null;
       }
-      return status;
-    } catch {
-      setState('READY_LOCKED');
-      return null;
-    }
-  }, []);
+    }, [
+      beginStateOperation,
+    ]);
 
-  const value: BootstrapContextValue = {
-    state,
-    vaultStatus,
-    errorMessage,
-    retry: runBootstrap,
-    unlock,
-    lock,
-    refreshStatus,
-  };
+  // ------------------------------------------------------------
+  // Desbloqueio
+  // ------------------------------------------------------------
+
+  const unlock = useCallback(
+    async (password: string): Promise<boolean> => {
+      const operationId = beginStateOperation();
+
+      setErrorMessage(null);
+
+      try {
+        const ok = await VaultBridge.unlock(password);
+
+        // Uma operação posterior invalida esta atualização.
+        if (operationSeqRef.current !== operationId) {
+          return false;
+        }
+
+        if (!ok) {
+          return false;
+        }
+
+        // Mantém o status em sincronia com o comando confirmado.
+        setVaultStatus((currentStatus) =>
+          currentStatus
+            ? {
+                ...currentStatus,
+                is_unlocked: true,
+              }
+            : currentStatus
+        );
+
+        setErrorMessage(null);
+        setState('READY_UNLOCKED');
+
+        return true;
+      } catch {
+        if (operationSeqRef.current === operationId) {
+          setErrorMessage(
+            'Não foi possível concluir o desbloqueio do cofre.'
+          );
+        }
+
+        // Preserva o contrato Promise<boolean>.
+        return false;
+      }
+    },
+    [
+      beginStateOperation,
+    ]
+  );
+
+  // ------------------------------------------------------------
+  // Bloqueio
+  // ------------------------------------------------------------
+
+  const lock = useCallback(
+    async (): Promise<void> => {
+      const operationId = beginStateOperation();
+
+      setErrorMessage(null);
+
+      try {
+        await VaultBridge.lock();
+
+        if (operationSeqRef.current !== operationId) {
+          return;
+        }
+
+        // Mantém o status em sincronia com o comando confirmado.
+        setVaultStatus((currentStatus) =>
+          currentStatus
+            ? {
+                ...currentStatus,
+                is_unlocked: false,
+              }
+            : currentStatus
+        );
+
+        setErrorMessage(null);
+        setState('READY_LOCKED');
+      } catch {
+        // Não registrar o objeto de erro nativo bruto.
+        if (operationSeqRef.current !== operationId) {
+          return;
+        }
+
+        console.warn(
+          'Falha ao bloquear o cofre; verificando o estado atual.'
+        );
+
+        // O estado será determinado por uma nova consulta nativa.
+        await refreshStatus();
+      }
+    },
+    [
+      beginStateOperation,
+      refreshStatus,
+    ]
+  );
+
+  // ------------------------------------------------------------
+  // Contexto memoizado
+  // ------------------------------------------------------------
+
+  const value = useMemo<BootstrapContextValue>(
+    () => ({
+      state,
+      vaultStatus,
+      errorMessage,
+      retry: runBootstrap,
+      unlock,
+      lock,
+      refreshStatus,
+    }),
+    [
+      state,
+      vaultStatus,
+      errorMessage,
+      runBootstrap,
+      unlock,
+      lock,
+      refreshStatus,
+    ]
+  );
+
+  // ------------------------------------------------------------
+  // Interface
+  // ------------------------------------------------------------
 
   return (
     <BootstrapContext.Provider value={value}>
-      {/* 1. Tela com a Animação do Globo (Three.js Web3 Globe) */}
+      {/* 1. Tela com a animação do globo */}
       {state === 'INITIALIZING' && (
         <SplashScreen
+          key={splashAttemptId}
           enableThree={enableThreeAnimation}
-          onAnimationComplete={handleAnimationComplete}
+          onAnimationComplete={onSplashAnimationComplete}
         />
       )}
 
-      {/* 2. Tela de Aviso de Timeout da Interface (> 4.5s) */}
+      {/* 2. Aviso de timeout da inicialização */}
       {state === 'TIMEOUT_WARNING' && (
         <Box
           sx={{
@@ -339,20 +851,44 @@ export function AppBootstrapProvider({
               textAlign: 'center',
             }}
           >
-            <CircularProgress sx={{ color: 'warning.main', mb: 2 }} size={44} />
-            <Typography variant="h6" sx={{ color: 'common.white', mb: 1 }}>
+            <CircularProgress
+              sx={{
+                color: 'warning.main',
+                mb: 2,
+              }}
+              size={44}
+            />
+
+            <Typography
+              variant="h6"
+              sx={{
+                color: 'common.white',
+                mb: 1,
+              }}
+            >
               Inicialização Demorada
             </Typography>
-            <Typography variant="body2" sx={{ color: 'text.secondary', mb: 3 }}>
-              A verificação do ambiente e banco seguro SQLite está demorando mais do que o esperado.
+
+            <Typography
+              variant="body2"
+              sx={{
+                color: 'text.secondary',
+                mb: 3,
+              }}
+            >
+              A verificação do ambiente e do banco seguro
+              SQLite está demorando mais do que o esperado.
               Deseja tentar novamente?
             </Typography>
+
             <Button
               variant="contained"
               color="primary"
               fullWidth
               onClick={runBootstrap}
-              sx={{ fontWeight: 600 }}
+              sx={{
+                fontWeight: 600,
+              }}
             >
               Tentar Novamente
             </Button>
@@ -360,7 +896,7 @@ export function AppBootstrapProvider({
         </Box>
       )}
 
-      {/* 3. Tela de Erro Fatal de Armazenamento Sanitizado */}
+      {/* 3. Erro fatal de inicialização */}
       {state === 'FATAL_ERROR' && (
         <Box
           sx={{
@@ -381,18 +917,35 @@ export function AppBootstrapProvider({
               textAlign: 'center',
             }}
           >
-            <Typography variant="h6" sx={{ color: '#ff5630', mb: 1 }}>
+            <Typography
+              variant="h6"
+              sx={{
+                color: '#ff5630',
+                mb: 1,
+              }}
+            >
               Falha de Inicialização do Cofre
             </Typography>
-            <Alert severity="error" sx={{ mb: 3, textAlign: 'left' }}>
-              {errorMessage || 'Falha de acesso ao armazenamento seguro local.'}
+
+            <Alert
+              severity="error"
+              sx={{
+                mb: 3,
+                textAlign: 'left',
+              }}
+            >
+              {errorMessage ||
+                'Falha ao confirmar o estado do armazenamento seguro local.'}
             </Alert>
+
             <Button
               variant="outlined"
               color="error"
               fullWidth
               onClick={runBootstrap}
-              sx={{ fontWeight: 600 }}
+              sx={{
+                fontWeight: 600,
+              }}
             >
               Tentar Novamente
             </Button>
@@ -400,7 +953,7 @@ export function AppBootstrapProvider({
         </Box>
       )}
 
-      {/* 4. Banner Fiduciário Institucional de Modo Web */}
+      {/* 4. Aviso do modo de demonstração web */}
       {state === 'WEB_PREVIEW' && (
         <Alert
           severity="info"
@@ -413,17 +966,21 @@ export function AppBootstrapProvider({
             justifyContent: 'center',
           }}
         >
-          <strong>Ambiente Web (Modo Demonstração)</strong> — Chaves criptográficas e cofre nativo de
-          hardware operam exclusivamente no aplicativo Desktop nativo.
+          <strong>
+            Ambiente Web (Modo Demonstração)
+          </strong>{' '}
+          — Chaves criptográficas e cofre nativo de hardware
+          operam exclusivamente no aplicativo Desktop nativo.
         </Alert>
       )}
 
-      {/* 5. Renderização da Aplicação quando Pronta ou em Modo Web/Locked */}
-      {(state === 'READY_UNLOCKED' ||
+      {/* 5. Aplicação pronta, bloqueada ou em modo web */}
+      {(
+        state === 'READY_UNLOCKED' ||
         state === 'READY_LOCKED' ||
         state === 'UNINITIALIZED' ||
-        state === 'WEB_PREVIEW') &&
-        children}
+        state === 'WEB_PREVIEW'
+      ) && children}
     </BootstrapContext.Provider>
   );
 }

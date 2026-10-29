@@ -16,11 +16,18 @@ export function AuthCenteredContent({
   className,
   ...other
 }: AuthCenteredContentProps) {
+  // Normaliza os estilos personalizados sem incluir valores ausentes.
+  const customSx = Array.isArray(sx)
+    ? sx
+    : sx == null
+      ? []
+      : [sx];
+
   return (
     <Box
       className={mergeClasses([layoutClasses.content, className])}
       sx={[
-        () => ({
+        {
           py: { xs: 2, sm: 3 },
           px: { xs: 2, sm: 3 },
           my: 'auto',
@@ -31,15 +38,11 @@ export function AuthCenteredContent({
           maxWidth: { xs: '100%', sm: 480, md: 520 },
           position: 'relative',
 
-          /**
-           * ✅ HUD ABERTO FLUIDO (100vw × 100vh)
-           * Sem borda de caixa fechada - fundo radial suave para legibilidade cristalina
-           * mantendo o Globo 3D visível e integrado em tela cheia.
-           */
+          // Fundo radial translúcido integrado ao globo 3D.
           background:
             'radial-gradient(ellipse at center, rgba(2, 8, 23, 0.7) 0%, rgba(2, 8, 23, 0.35) 75%, transparent 100%)',
-        }),
-        ...(Array.isArray(sx) ? sx : [sx]),
+        },
+        ...customSx,
       ]}
       {...other}
     >

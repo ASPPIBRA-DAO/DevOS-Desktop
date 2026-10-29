@@ -1,13 +1,15 @@
 import type { Breakpoint } from '@mui/material/styles';
 import type { AuthCenteredContentProps } from './content';
-import type { MainSectionProps, HeaderSectionProps, LayoutSectionProps } from '../core';
+import type {
+  MainSectionProps,
+  HeaderSectionProps,
+  LayoutSectionProps,
+} from '../core';
 
 import { useEffect } from 'react';
-import { merge } from 'es-toolkit';
 
 import Box from '@mui/material/Box';
 import Link from '@mui/material/Link';
-import Alert from '@mui/material/Alert';
 import Typography from '@mui/material/Typography';
 
 import { WindowBridge } from 'src/platform/tauri/window/window-bridge';
@@ -19,12 +21,24 @@ import { RouterLink } from 'src/routes/components';
 
 import { AuthCenteredContent } from './content';
 import { SettingsButton } from '../components/settings-button';
-import { MainSection, LayoutSection, HeaderSection } from '../core';
-import { AuthGlobeBackground, type AuthGlobeBackgroundProps } from './globe-background';
+import {
+  MainSection,
+  LayoutSection,
+  HeaderSection,
+} from '../core';
+import {
+  AuthGlobeBackground,
+  type AuthGlobeBackgroundProps,
+} from './globe-background';
 
 // ----------------------------------------------------------------------
+// Tipos
+// ----------------------------------------------------------------------
 
-type LayoutBaseProps = Pick<LayoutSectionProps, 'sx' | 'children' | 'cssVars'>;
+type LayoutBaseProps = Pick<
+  LayoutSectionProps,
+  'sx' | 'children' | 'cssVars'
+>;
 
 export type AuthCenteredLayoutProps = LayoutBaseProps & {
   layoutQuery?: Breakpoint;
@@ -37,6 +51,10 @@ export type AuthCenteredLayoutProps = LayoutBaseProps & {
   };
 };
 
+// ----------------------------------------------------------------------
+// Layout centralizado de autenticação
+// ----------------------------------------------------------------------
+
 export function AuthCenteredLayout({
   sx,
   cssVars,
@@ -46,23 +64,78 @@ export function AuthCenteredLayout({
   disableBackgroundGlobe = false,
   globeProps,
 }: AuthCenteredLayoutProps) {
+  // ------------------------------------------------------------
+  // Janela nativa
+  // ------------------------------------------------------------
+
   useEffect(() => {
-    void WindowBridge.setFullscreen(true);
+    let isMounted = true;
+
+    try {
+      const request = WindowBridge.setFullscreen(true);
+
+      // Captura rejeições sem expor detalhes internos da ponte.
+      void Promise.resolve(request).catch(() => {
+        if (isMounted) {
+          console.warn(
+            'Não foi possível ajustar a janela para a tela de autenticação.'
+          );
+        }
+      });
+    } catch {
+      // Também trata uma eventual exceção síncrona da ponte.
+      console.warn(
+        'Não foi possível solicitar o modo de tela cheia.'
+      );
+    }
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
+
+  // ------------------------------------------------------------
+  // Cabeçalho
+  // ------------------------------------------------------------
+
   const renderHeader = () => {
-    const headerSlotProps: HeaderSectionProps['slotProps'] = { container: { maxWidth: false } };
+    const headerSlotProps: HeaderSectionProps['slotProps'] = {
+      container: {
+        maxWidth: false,
+      },
+    };
+
+    // Mantém a composição profunda dos slots de forma estritamente tipada
+    const mergedHeaderSlotProps: HeaderSectionProps['slotProps'] = {
+      ...headerSlotProps,
+      ...slotProps?.header?.slotProps,
+      container: {
+        ...headerSlotProps.container,
+        ...slotProps?.header?.slotProps?.container,
+      },
+    };
 
     const headerSlots: HeaderSectionProps['slots'] = {
-      topArea: (
-        <Alert severity="info" sx={{ display: 'none', borderRadius: 0 }}>
-          This is an info Alert.
-        </Alert>
-      ),
       leftArea: (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.5,
+          }}
+        >
           {/** @slot Logo */}
           <Logo />
-          <Box sx={{ display: { xs: 'none', sm: 'flex' }, flexDirection: 'column' }}>
+
+          <Box
+            sx={{
+              display: {
+                xs: 'none',
+                sm: 'flex',
+              },
+              flexDirection: 'column',
+            }}
+          >
             <Typography
               variant="overline"
               sx={{
@@ -76,6 +149,7 @@ export function AuthCenteredLayout({
             >
               DevOS // Secure Enterprise
             </Typography>
+
             <Typography
               variant="caption"
               sx={{
@@ -89,11 +163,24 @@ export function AuthCenteredLayout({
           </Box>
         </Box>
       ),
+
       rightArea: (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 2 } }}>
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: {
+              xs: 1,
+              sm: 2,
+            },
+          }}
+        >
           <Box
             sx={{
-              display: { xs: 'none', md: 'flex' },
+              display: {
+                xs: 'none',
+                md: 'flex',
+              },
               alignItems: 'center',
               gap: 0.8,
               px: 1.2,
@@ -112,6 +199,7 @@ export function AuthCenteredLayout({
                 boxShadow: '0 0 8px #22c55e',
               }}
             />
+
             <Typography
               variant="caption"
               sx={{
@@ -128,7 +216,7 @@ export function AuthCenteredLayout({
 
           {/** @slot Help link */}
           <Link
-            href={paths.faqs || '#'}
+            href={paths.faqs}
             component={RouterLink}
             sx={{
               typography: 'subtitle2',
@@ -136,7 +224,9 @@ export function AuthCenteredLayout({
               fontFamily: 'var(--font-orbitron), sans-serif',
               textDecoration: 'none',
               fontSize: '0.8rem',
-              '&:hover': { textShadow: '0 0 8px rgba(0, 184, 217, 0.8)' },
+              '&:hover': {
+                textShadow: '0 0 8px rgba(0, 184, 217, 0.8)',
+              },
             }}
           >
             Precisa de ajuda?
@@ -148,27 +238,47 @@ export function AuthCenteredLayout({
       ),
     };
 
+    const headerSx = slotProps?.header?.sx;
+
     return (
       <HeaderSection
         disableElevation
         layoutQuery={layoutQuery}
         {...slotProps?.header}
-        slots={{ ...headerSlots, ...slotProps?.header?.slots }}
-        slotProps={merge(headerSlotProps, slotProps?.header?.slotProps ?? {}) as any}
+        slots={{
+          ...headerSlots,
+          ...slotProps?.header?.slots,
+        }}
+        slotProps={mergedHeaderSlotProps}
         sx={[
-          { position: { [layoutQuery]: 'fixed' } },
-          ...(Array.isArray(slotProps?.header?.sx) ? slotProps.header.sx : [slotProps?.header?.sx]),
+          {
+            position: {
+              [layoutQuery]: 'fixed',
+            },
+          },
+          ...(Array.isArray(headerSx)
+            ? headerSx
+            : headerSx == null
+              ? []
+              : [headerSx]),
         ]}
       />
     );
   };
+
+  // ------------------------------------------------------------
+  // Rodapé
+  // ------------------------------------------------------------
 
   const renderFooter = () => (
     <Box
       component="footer"
       sx={{
         py: 1.5,
-        px: { xs: 2, md: 4 },
+        px: {
+          xs: 2,
+          md: 4,
+        },
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -187,6 +297,7 @@ export function AuthCenteredLayout({
       >
         DEVOS COCKPIT // HARDWARE SECURITY MODULE
       </Typography>
+
       <Typography
         variant="caption"
         sx={{
@@ -202,41 +313,59 @@ export function AuthCenteredLayout({
     </Box>
   );
 
-  const renderMain = () => (
-    <MainSection
-      {...slotProps?.main}
-      sx={[
-        (theme) => ({
-          alignItems: 'center',
-          justifyContent: 'center',
-          flex: '1 1 auto',
-          display: 'flex',
-          flexDirection: 'column',
-          pt: { xs: 7, md: 8 },
-          pb: { xs: 2.5, md: 3 },
-          px: 2,
-        }),
-        ...(Array.isArray(slotProps?.main?.sx) ? slotProps.main.sx : [slotProps?.main?.sx]),
-      ]}
-    >
-      <AuthCenteredContent {...slotProps?.content}>{children}</AuthCenteredContent>
-    </MainSection>
-  );
+  // ------------------------------------------------------------
+  // Conteúdo principal
+  // ------------------------------------------------------------
+
+  const renderMain = () => {
+    const mainSx = slotProps?.main?.sx;
+
+    return (
+      <MainSection
+        {...slotProps?.main}
+        sx={[
+          (theme) => ({
+            alignItems: 'center',
+            justifyContent: 'center',
+            flex: '1 1 auto',
+            display: 'flex',
+            flexDirection: 'column',
+            pt: {
+              xs: 7,
+              md: 8,
+            },
+            pb: {
+              xs: 2.5,
+              md: 3,
+            },
+            px: 2,
+          }),
+          ...(Array.isArray(mainSx)
+            ? mainSx
+            : mainSx == null
+              ? []
+              : [mainSx]),
+        ]}
+      >
+        <AuthCenteredContent {...slotProps?.content}>
+          {children}
+        </AuthCenteredContent>
+      </MainSection>
+    );
+  };
+
+  // ------------------------------------------------------------
+  // Composição final
+  // ------------------------------------------------------------
 
   return (
     <LayoutSection
-      /** **************************************
-       * @Header
-       *************************************** */
       headerSection={renderHeader()}
-      /** **************************************
-       * @Footer
-       *************************************** */
       footerSection={renderFooter()}
-      /** **************************************
-       * @Styles
-       *************************************** */
-      cssVars={{ '--layout-auth-content-width': '520px', ...cssVars }}
+      cssVars={{
+        '--layout-auth-content-width': '520px',
+        ...cssVars,
+      }}
       sx={[
         {
           position: 'relative',
@@ -246,18 +375,31 @@ export function AuthCenteredLayout({
           minHeight: '100vh',
           display: 'flex',
           flexDirection: 'column',
-          '&::-webkit-scrollbar': { width: 6 },
+
+          '&::-webkit-scrollbar': {
+            width: 6,
+          },
+
           '&::-webkit-scrollbar-thumb': {
             bgcolor: 'rgba(0, 184, 217, 0.25)',
             borderRadius: 3,
-            '&:hover': { bgcolor: 'rgba(0, 184, 217, 0.5)' },
+
+            '&:hover': {
+              bgcolor: 'rgba(0, 184, 217, 0.5)',
+            },
           },
         },
-        ...(Array.isArray(sx) ? sx : [sx]),
+        ...(Array.isArray(sx)
+          ? sx
+          : sx == null
+            ? []
+            : [sx]),
       ]}
     >
       {/** @slot 3D Web3 Rotating Globe Background */}
-      {!disableBackgroundGlobe && <AuthGlobeBackground {...globeProps} />}
+      {!disableBackgroundGlobe && (
+        <AuthGlobeBackground {...globeProps} />
+      )}
 
       {renderMain()}
     </LayoutSection>

@@ -10,6 +10,7 @@
     "allow-get-vault-status",
     "allow-init-master-password",
     "allow-unlock-vault",
+    "allow-lock-vault",
     "allow-generate-seed-and-preview",
     "allow-reveal-pending-mnemonic",
     "allow-cancel-pending-creation",

@@ -29,41 +29,171 @@ import { FormDivider } from '../../components';
 import { signInWithWeb3, signInWithPassword } from '../../context/jwt';
 
 // ----------------------------------------------------------------------
-
-export type SignInSchemaType = z.infer<typeof SignInSchema>;
+// Schema
+// ----------------------------------------------------------------------
 
 export const SignInSchema = z.object({
   email: schemaUtils.email(),
+
   password: z
     .string()
-    .min(1, { message: 'A senha é obrigatória!' })
-    .min(6, { message: 'A senha deve ter pelo menos 6 caracteres!' }),
+    .min(1, {
+      message: 'A senha é obrigatória!',
+    })
+    .min(6, {
+      message: 'A senha deve ter pelo menos 6 caracteres!',
+    }),
 });
 
+export type SignInSchemaType = z.infer<typeof SignInSchema>;
+
+// ----------------------------------------------------------------------
+// Valores padrão
+// ----------------------------------------------------------------------
+
+const DEFAULT_VALUES: SignInSchemaType = {
+  email: 'operador@asppibra.com',
+  password: '',
+};
+
+// ----------------------------------------------------------------------
+// Tipagem mínima do provedor Web3 utilizado
+// ----------------------------------------------------------------------
+
+type EthereumProvider = {
+  request: (args: {
+    method: 'eth_requestAccounts';
+  }) => Promise<unknown>;
+};
+
+type WindowWithEthereum = Window & {
+  ethereum?: EthereumProvider;
+};
+
+// ----------------------------------------------------------------------
+// Validação de navegação
+// ----------------------------------------------------------------------
+
+/**
+ * Aceita apenas caminhos internos.
+ *
+ * URLs absolutas, caminhos relativos e URLs protocol-relative
+ * são rejeitados. O destino padrão é a rota principal do dashboard.
+ */
+function getSafeRedirectTarget(
+  returnTo: string | null
+): string {
+  if (
+    !returnTo ||
+    !returnTo.startsWith('/') ||
+    returnTo.startsWith('//') ||
+    returnTo.includes('\\')
+  ) {
+    return paths.dashboard.root;
+  }
+
+  try {
+    const baseOrigin = 'https://devos.invalid';
+    const candidate = new URL(returnTo, baseOrigin);
+
+    if (candidate.origin !== baseOrigin) {
+      return paths.dashboard.root;
+    }
+
+    return (
+      candidate.pathname +
+      candidate.search +
+      candidate.hash
+    );
+  } catch {
+    return paths.dashboard.root;
+  }
+}
+
+// ----------------------------------------------------------------------
+// Tratamento seguro dos parâmetros OAuth
+// ----------------------------------------------------------------------
+
+function getOAuthProviderLabel(
+  provider: string | null
+): string {
+  if (!provider) {
+    return 'Google';
+  }
+
+  switch (provider.toLowerCase()) {
+    case 'google':
+      return 'Google';
+
+    case 'github':
+      return 'GitHub';
+
+    default:
+      return 'provedor de identidade';
+  }
+}
+
+// ----------------------------------------------------------------------
+// Validação da resposta da carteira
+// ----------------------------------------------------------------------
+
+function isValidEvmAddress(
+  value: unknown
+): value is string {
+  return (
+    typeof value === 'string' &&
+    /^0x[a-fA-F0-9]{40}$/.test(value)
+  );
+}
+
+// ----------------------------------------------------------------------
+// Componente
 // ----------------------------------------------------------------------
 
 export function JwtSignInView() {
   const theme = useTheme();
   const router = useRouter();
   const showPassword = useBoolean();
-  const { checkUserSession } = useAuthContext();
-  const { unlock, refreshStatus } = useBootstrap();
 
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const { checkUserSession } = useAuthContext();
+
+  const {
+    state: bootstrapState,
+    unlock,
+    refreshStatus,
+  } = useBootstrap();
+
+  const [errorMessage, setErrorMessage] =
+    useState<string | null>(null);
+
+  const [isWeb3Submitting, setIsWeb3Submitting] =
+    useState(false);
+
   const [authNotice, setAuthNotice] = useState<{
     type: 'warning' | 'info' | 'error';
     title: string;
     description: string;
   } | null>(null);
 
-  const defaultValues: SignInSchemaType = {
-    email: 'operador@asppibra.com',
-    password: '',
-  };
+  const searchParams = useSearchParams();
 
-  const methods = useForm({
+  const oauthError = searchParams.get('error');
+
+  const providerLabel = getOAuthProviderLabel(
+    searchParams.get('provider')
+  );
+
+  const redirectTarget = getSafeRedirectTarget(
+    searchParams.get('returnTo')
+  );
+
+  // ------------------------------------------------------------
+  // Formulário
+  // ------------------------------------------------------------
+
+  const methods = useForm<SignInSchemaType>({
     resolver: zodResolver(SignInSchema),
-    defaultValues,
+    defaultValues: DEFAULT_VALUES,
   });
 
   const {
@@ -71,168 +201,395 @@ export function JwtSignInView() {
     formState: { isSubmitting },
   } = methods;
 
-  const searchParams = useSearchParams();
-  const returnTo = searchParams.get('returnTo');
+  // ------------------------------------------------------------
+  // Estilos compartilhados
+  // ------------------------------------------------------------
+
+  const fieldInputSx = {
+    borderRadius: 1,
+    bgcolor: 'rgba(2, 8, 23, 0.65)',
+
+    '& input': {
+      fontFamily: 'var(--font-orbitron), sans-serif',
+      color: theme.palette.info.main,
+
+      '&:-webkit-autofill': {
+        WebkitBoxShadow: '0 0 0 100px #020817 inset',
+        WebkitTextFillColor: theme.palette.info.main,
+        transition: 'background-color 5000s ease-in-out 0s',
+      },
+    },
+
+    '& fieldset': {
+      borderColor: alpha(theme.palette.info.main, 0.25),
+    },
+
+    '&:hover fieldset': {
+      borderColor: `${theme.palette.info.main} !important`,
+    },
+
+    '&.Mui-focused fieldset': {
+      borderColor: `${theme.palette.info.main} !important`,
+    },
+  };
+
+  const commonFieldSlotProps = {
+    inputLabel: {
+      shrink: true,
+      sx: {
+        fontFamily: 'var(--font-orbitron), sans-serif',
+        fontWeight: 600,
+        color: 'info.main',
+      },
+    },
+
+    input: {
+      sx: fieldInputSx,
+    },
+  };
+
+  const socialButtonSx = {
+    color: 'white',
+    borderColor: alpha(theme.palette.info.main, 0.2),
+    fontFamily: 'var(--font-orbitron), sans-serif',
+    fontWeight: 700,
+    fontSize: 13,
+
+    '&:hover': {
+      borderColor: 'info.main',
+      bgcolor: alpha(theme.palette.info.main, 0.05),
+      transform: 'translateY(-2px)',
+      boxShadow: `0 5px 15px ${alpha(theme.palette.info.main, 0.2)}`,
+    },
+  };
+
+  // ------------------------------------------------------------
+  // Confirmação do estado do cofre e navegação
+  // ------------------------------------------------------------
+
+  /**
+   * No modo nativo, só navega após confirmar que o cofre
+   * está inicializado e desbloqueado.
+   *
+   * No modo WEB_PREVIEW, não exige a existência de um cofre
+   * nativo para concluir o fluxo de autenticação web.
+   */
+  const completeSignIn = async (): Promise<boolean> => {
+    await checkUserSession?.();
+
+    if (bootstrapState === 'WEB_PREVIEW') {
+      router.push(redirectTarget);
+      return true;
+    }
+
+    const status = await refreshStatus();
+
+    if (
+      !status ||
+      !status.is_initialized ||
+      !status.is_unlocked
+    ) {
+      setErrorMessage(
+        'Não foi possível confirmar que o cofre está inicializado ' +
+          'e desbloqueado. Verifique a senha mestre e tente novamente.'
+      );
+
+      return false;
+    }
+
+    router.push(redirectTarget);
+
+    return true;
+  };
+
+  // ------------------------------------------------------------
+  // Login com senha mestre
+  // ------------------------------------------------------------
 
   const onSubmit = handleSubmit(async (data) => {
+    setErrorMessage(null);
+    setAuthNotice(null);
+
     try {
-      setErrorMessage(null);
-      // Tenta desbloquear o cofre seguro local
-      const unlocked = await unlock(data.password);
-      if (!unlocked) {
-        // Fallback para autenticação de sessão
-        await signInWithPassword({ email: data.email, password: data.password });
+      if (bootstrapState === 'WEB_PREVIEW') {
+        // A autenticação web não deve depender da ponte nativa.
+        await signInWithPassword({
+          email: data.email,
+          password: data.password,
+        });
+      } else {
+        // Primeiro tenta desbloquear o cofre local.
+        const unlocked = await unlock(data.password);
+
+        if (!unlocked) {
+          // Mantém o fallback de autenticação existente.
+          await signInWithPassword({
+            email: data.email,
+            password: data.password,
+          });
+        }
       }
 
-      await checkUserSession?.();
-      await refreshStatus();
+      await completeSignIn();
+    } catch (error: unknown) {
+      // Não registrar o objeto bruto de erro.
+      const message = getErrorMessage(error);
 
-      const redirectUrl = returnTo || paths.dashboard.root;
-      router.push(redirectUrl);
-    } catch (error) {
-      console.error(error);
-      const feedbackMessage = getErrorMessage(error);
-      setErrorMessage(feedbackMessage);
+      setErrorMessage(
+        message ||
+          'Não foi possível concluir a autenticação.'
+      );
     }
   });
 
-  const handleWeb3Login = async () => {
-    try {
-      if (typeof window === 'undefined' || !(window as any).ethereum) {
-        throw new Error('Instale a MetaMask ou wallet EVM para continuar.');
-      }
-      const accounts = await (window as any).ethereum.request({ method: 'eth_requestAccounts' });
-      const address = accounts[0];
-      await signInWithWeb3(address);
-      await checkUserSession?.();
-      await refreshStatus();
+  // ------------------------------------------------------------
+  // Login Web3
+  // ------------------------------------------------------------
 
-      const redirectUrl = returnTo || paths.dashboard.root;
-      router.push(redirectUrl);
-    } catch (error) {
-      console.error(error);
-      const msg = getErrorMessage(error);
-      if (msg.includes('não vinculada') || msg.includes('Carteira Web3') || msg.includes('IDENTITY_NOT_LINKED')) {
+  const handleWeb3Login = async () => {
+    if (isWeb3Submitting) {
+      return;
+    }
+
+    setIsWeb3Submitting(true);
+    setErrorMessage(null);
+    setAuthNotice(null);
+
+    try {
+      if (typeof window === 'undefined') {
+        throw new Error(
+          'A carteira Web3 não está disponível neste ambiente.'
+        );
+      }
+
+      const ethereum = (
+        window as WindowWithEthereum
+      ).ethereum;
+
+      if (!ethereum) {
+        throw new Error(
+          'Instale a MetaMask ou uma carteira EVM para continuar.'
+        );
+      }
+
+      const accounts = await ethereum.request({
+        method: 'eth_requestAccounts',
+      });
+
+      if (
+        !Array.isArray(accounts) ||
+        !isValidEvmAddress(accounts[0])
+      ) {
+        throw new Error(
+          'A carteira não retornou um endereço EVM válido.'
+        );
+      }
+
+      const address = accounts[0];
+
+      await signInWithWeb3(address);
+
+      await checkUserSession?.();
+
+      // Em modo desktop, a autenticação Web3 não substitui
+      // a confirmação do estado de desbloqueio do cofre local.
+      if (bootstrapState !== 'WEB_PREVIEW') {
+        const status = await refreshStatus();
+
+        if (
+          !status ||
+          !status.is_initialized ||
+          !status.is_unlocked
+        ) {
+          setAuthNotice({
+            type: 'warning',
+            title: status?.is_initialized
+              ? 'Cofre local bloqueado'
+              : 'Estado do cofre não confirmado',
+            description: status?.is_initialized
+              ? 'Sua identidade Web3 foi autenticada, mas o cofre local continua bloqueado. Entre com a senha mestre para liberar o acesso.'
+              : 'A identidade Web3 foi autenticada, mas não foi possível confirmar o estado do cofre. Verifique a inicialização e tente novamente.',
+          });
+
+          return;
+        }
+      }
+
+      router.push(redirectTarget);
+    } catch (error: unknown) {
+      const message = getErrorMessage(error);
+
+      const normalizedMessage = message.toLowerCase();
+
+      const isIdentityNotLinked =
+        normalizedMessage.includes('não vinculada') ||
+        normalizedMessage.includes('carteira web3') ||
+        normalizedMessage.includes('identity_not_linked');
+
+      if (isIdentityNotLinked) {
         setAuthNotice({
           type: 'warning',
           title: 'Vínculo com Carteira Web3 Pendente',
-          description: 'Sua assinatura MetaMask foi validada com sucesso, porém esta carteira ainda não está vinculada a nenhuma conta autorizada no ecossistema ASPPIBRA. Para acessar por este método, entre primeiro com sua senha mestre para vincular sua carteira no seu perfil.'
+          description:
+            'Sua carteira ainda não está vinculada a uma conta autorizada no ecossistema ASPPIBRA. Entre primeiro com sua senha mestre para realizar o procedimento de vinculação.',
         });
+
         setErrorMessage(null);
       } else {
-        setErrorMessage(msg);
+        setErrorMessage(
+          message ||
+            'Não foi possível concluir a autenticação Web3. Verifique a carteira e tente novamente.'
+        );
+
         setAuthNotice(null);
       }
+    } finally {
+      setIsWeb3Submitting(false);
     }
   };
+
+  // ------------------------------------------------------------
+  // Login OAuth
+  // ------------------------------------------------------------
 
   useEffect(() => {
-    const errorParam = searchParams.get('error');
-    const providerParam = searchParams.get('provider') || 'Google';
-    if (errorParam === 'IDENTITY_NOT_LINKED') {
-      setAuthNotice({
-        type: 'warning',
-        title: `Vínculo com ${providerParam} Pendente`,
-        description: `Sua conta do ${providerParam} foi autenticada com sucesso, porém ela ainda não está vinculada a nenhuma conta autorizada no ecossistema ASPPIBRA. Para acessar por este método, entre primeiro com sua credencial cadastrada.`
-      });
-    } else if (errorParam === 'OAUTH_NOT_CONFIGURED') {
-      setAuthNotice({
-        type: 'info',
-        title: `Serviço ${providerParam}`,
-        description: `O serviço de login com ${providerParam} está em sincronização. Por favor, utilize sua senha mestre cadastrada para acessar o portal.`
-      });
-    } else if (errorParam) {
-      setAuthNotice({
-        type: 'error',
-        title: 'Falha na Autenticação',
-        description: `Não foi possível concluir o acesso com ${providerParam}: ${errorParam}`
-      });
+    if (!oauthError) {
+      setAuthNotice(null);
+      return;
     }
-  }, [searchParams]);
 
-  const handleSocialLogin = (provider: 'google' | 'github') => {
-    const serverUrl = CONFIG.serverUrl || 'https://api.asppibra.com';
-    window.location.href = `${serverUrl}/api/v1/identity/oauth/${provider}/login`;
+    switch (oauthError) {
+      case 'IDENTITY_NOT_LINKED':
+        setAuthNotice({
+          type: 'warning',
+          title: `Vínculo com ${providerLabel} Pendente`,
+          description:
+            `Sua conta do ${providerLabel} foi autenticada, ` +
+            'mas ainda não está vinculada a uma conta autorizada ' +
+            'no ecossistema ASPPIBRA. Entre com sua credencial cadastrada para continuar.',
+        });
+        break;
+
+      case 'OAUTH_NOT_CONFIGURED':
+        setAuthNotice({
+          type: 'info',
+          title: `Serviço ${providerLabel}`,
+          description:
+            `O serviço de login com ${providerLabel} está em sincronização. ` +
+            'Utilize sua senha mestre cadastrada para acessar o portal.',
+        });
+        break;
+
+      default:
+        // Não exibe diretamente o conteúdo arbitrário do parâmetro error.
+        setAuthNotice({
+          type: 'error',
+          title: 'Falha na Autenticação',
+          description:
+            `Não foi possível concluir o acesso com ${providerLabel}. ` +
+            'Tente novamente ou utilize sua senha mestre.',
+        });
+        break;
+    }
+  }, [
+    oauthError,
+    providerLabel,
+  ]);
+
+  const handleSocialLogin = (
+    provider: 'google' | 'github'
+  ) => {
+    if (typeof window === 'undefined') {
+      setErrorMessage(
+        'O login social não está disponível neste ambiente.'
+      );
+      return;
+    }
+
+    try {
+      const serverUrl =
+        CONFIG.serverUrl || 'https://api.asppibra.com';
+
+      const oauthUrl = new URL(
+        `${serverUrl.replace(/\/+$/, '')}/api/v1/identity/oauth/${provider}/login`
+      );
+
+      if (
+        oauthUrl.protocol !== 'https:' &&
+        oauthUrl.protocol !== 'http:'
+      ) {
+        throw new Error('Protocolo OAuth inválido.');
+      }
+
+      window.location.assign(oauthUrl.toString());
+    } catch {
+      setErrorMessage(
+        'Não foi possível iniciar a autenticação pelo provedor selecionado.'
+      );
+    }
   };
 
+  // ------------------------------------------------------------
+  // Formulário
+  // ------------------------------------------------------------
+
   const renderForm = () => (
-    <Box sx={{ gap: 2, display: 'flex', flexDirection: 'column' }}>
+    <Box
+      sx={{
+        gap: 2,
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
       <Field.Text
         name="email"
         label="Identificador / E-mail"
         placeholder="operador@asppibra.com"
-        slotProps={{
-          inputLabel: {
-            shrink: true,
-            sx: {
-              fontFamily: 'var(--font-orbitron), sans-serif',
-              fontWeight: 600,
-              color: 'info.main',
-            },
-          },
-          input: {
-            sx: {
-              borderRadius: 1,
-              bgcolor: 'rgba(2, 8, 23, 0.65)',
-              '& input': {
-                fontFamily: 'var(--font-orbitron), sans-serif',
-                color: 'info.main',
-                '&:-webkit-autofill': {
-                  WebkitBoxShadow: '0 0 0 100px #020817 inset',
-                  WebkitTextFillColor: theme.palette.info.main,
-                  transition: 'background-color 5000s ease-in-out 0s',
-                },
-              },
-              '& fieldset': { borderColor: alpha(theme.palette.info.main, 0.25) },
-              '&:hover fieldset': { borderColor: `${theme.palette.info.main} !important` },
-              '&.Mui-focused fieldset': { borderColor: `${theme.palette.info.main} !important` },
-            },
-          },
-        }}
+        autoComplete="username"
+        slotProps={commonFieldSlotProps}
       />
 
-      <Box sx={{ gap: 1.5, display: 'flex', flexDirection: 'column' }}>
+      <Box
+        sx={{
+          gap: 1.5,
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
         <Field.Text
           name="password"
           label="Senha Mestre do Cofre"
           type={showPassword.value ? 'text' : 'password'}
+          autoComplete="current-password"
           autoFocus
           slotProps={{
-            inputLabel: {
-              shrink: true,
-              sx: {
-                fontFamily: 'var(--font-orbitron), sans-serif',
-                fontWeight: 600,
-                color: 'info.main',
-              },
-            },
+            ...commonFieldSlotProps,
+
             input: {
-              sx: {
-                borderRadius: 1,
-                bgcolor: 'rgba(2, 8, 23, 0.65)',
-                '& input': {
-                  fontFamily: 'var(--font-orbitron), sans-serif',
-                  color: 'info.main',
-                  '&:-webkit-autofill': {
-                    WebkitBoxShadow: '0 0 0 100px #020817 inset',
-                    WebkitTextFillColor: theme.palette.info.main,
-                    transition: 'background-color 5000s ease-in-out 0s',
-                  },
-                },
-                '& fieldset': { borderColor: alpha(theme.palette.info.main, 0.25) },
-                '&:hover fieldset': { borderColor: `${theme.palette.info.main} !important` },
-                '&.Mui-focused fieldset': { borderColor: `${theme.palette.info.main} !important` },
-              },
+              ...commonFieldSlotProps.input,
+
               endAdornment: (
                 <InputAdornment position="end">
                   <IconButton
-                    aria-label={showPassword.value ? 'Ocultar senha' : 'Exibir senha'}
+                    type="button"
+                    aria-label={
+                      showPassword.value
+                        ? 'Ocultar senha'
+                        : 'Exibir senha'
+                    }
+                    aria-pressed={showPassword.value}
                     onClick={showPassword.onToggle}
                     edge="end"
-                    sx={{ color: 'info.main' }}
+                    sx={{
+                      color: 'info.main',
+                    }}
                   >
                     <Iconify
-                      icon={showPassword.value ? 'solar:eye-bold' : 'solar:eye-closed-bold'}
+                      icon={
+                        showPassword.value
+                          ? 'solar:eye-bold'
+                          : 'solar:eye-closed-bold'
+                      }
                     />
                   </IconButton>
                 </InputAdornment>
@@ -242,8 +599,20 @@ export function JwtSignInView() {
         />
       </Box>
 
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography variant="caption" sx={{ color: 'grey.500', fontSize: 11 }}>
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
+        <Typography
+          variant="caption"
+          sx={{
+            color: 'grey.500',
+            fontSize: 11,
+          }}
+        >
           Primeiro acesso?{' '}
           <Link
             component={RouterLink}
@@ -258,6 +627,7 @@ export function JwtSignInView() {
             CRIAR COFRE
           </Link>
         </Typography>
+
         <Link
           component={RouterLink}
           href={paths.auth.jwt.resetPassword}
@@ -291,7 +661,14 @@ export function JwtSignInView() {
           color: 'info.main',
           borderColor: alpha(theme.palette.info.main, 0.5),
           boxShadow: `0 0 15px ${alpha(theme.palette.info.main, 0.2)}`,
-          transition: theme.transitions.create(['all']),
+
+          transition: theme.transitions.create([
+            'background-color',
+            'border-color',
+            'transform',
+            'box-shadow',
+          ]),
+
           '&:hover': {
             bgcolor: alpha(theme.palette.info.main, 0.15),
             borderColor: 'info.main',
@@ -304,6 +681,24 @@ export function JwtSignInView() {
       </Button>
     </Box>
   );
+
+  // ------------------------------------------------------------
+  // Renderização
+  // ------------------------------------------------------------
+
+  const noticeIcon =
+    authNotice?.type === 'warning'
+      ? 'solar:shield-warning-bold-duotone'
+      : authNotice?.type === 'error'
+        ? 'solar:danger-triangle-bold-duotone'
+        : 'solar:info-circle-bold-duotone';
+
+  const noticeColor =
+    authNotice?.type === 'warning'
+      ? theme.palette.warning.main
+      : authNotice?.type === 'error'
+        ? theme.palette.error.main
+        : theme.palette.info.main;
 
   return (
     <Box
@@ -332,68 +727,44 @@ export function JwtSignInView() {
 
       {authNotice && (
         <Box
+          role="status"
+          aria-live="polite"
           sx={{
             p: 2,
             borderRadius: 1.5,
             display: 'flex',
             alignItems: 'flex-start',
             gap: 1.5,
-            bgcolor:
-              authNotice.type === 'warning'
-                ? alpha(theme.palette.warning.main, 0.08)
-                : authNotice.type === 'error'
-                  ? alpha(theme.palette.error.main, 0.08)
-                  : alpha(theme.palette.info.main, 0.08),
+
+            bgcolor: alpha(noticeColor, 0.08),
+
             border: '1px solid',
-            borderColor:
-              authNotice.type === 'warning'
-                ? alpha(theme.palette.warning.main, 0.3)
-                : authNotice.type === 'error'
-                  ? alpha(theme.palette.error.main, 0.3)
-                  : alpha(theme.palette.info.main, 0.3),
-            boxShadow: `0 4px 20px ${alpha(
-              authNotice.type === 'warning'
-                ? theme.palette.warning.main
-                : authNotice.type === 'error'
-                  ? theme.palette.error.main
-                  : theme.palette.info.main,
-              0.08
-            )}`,
+            borderColor: alpha(noticeColor, 0.3),
+
+            boxShadow: `0 4px 20px ${alpha(noticeColor, 0.08)}`,
           }}
         >
           <Iconify
-            icon={
-              (authNotice.type === 'warning'
-                ? 'solar:shield-warning-bold-duotone'
-                : authNotice.type === 'error'
-                  ? 'solar:danger-triangle-bold-duotone'
-                  : 'solar:info-circle-bold-duotone') as any
-            }
+            icon={noticeIcon}
             width={24}
             sx={{
               flexShrink: 0,
               mt: 0.25,
-              color:
-                authNotice.type === 'warning'
-                  ? 'warning.main'
-                  : authNotice.type === 'error'
-                    ? 'error.main'
-                    : 'info.main',
+              color: noticeColor,
             }}
           />
 
-          <Box sx={{ flex: 1 }}>
+          <Box
+            sx={{
+              flex: 1,
+            }}
+          >
             <Typography
               variant="subtitle2"
               sx={{
                 mb: 0.5,
                 fontWeight: 600,
-                color:
-                  authNotice.type === 'warning'
-                    ? 'warning.light'
-                    : authNotice.type === 'error'
-                      ? 'error.light'
-                      : 'info.light',
+                color: noticeColor,
               }}
             >
               {authNotice.title}
@@ -414,68 +785,66 @@ export function JwtSignInView() {
       )}
 
       {!!errorMessage && !authNotice && (
-        <Alert severity="error" sx={{ mb: 1 }}>
+        <Alert
+          severity="error"
+          aria-live="polite"
+          sx={{
+            mb: 1,
+          }}
+        >
           {errorMessage}
         </Alert>
       )}
 
-      <Form methods={methods} onSubmit={onSubmit}>
+      <Form
+        methods={methods}
+        onSubmit={onSubmit}
+      >
         {renderForm()}
       </Form>
 
       <FormDivider label="OU ENTRE COM" />
 
-      <Box sx={{ display: 'flex', gap: 2 }}>
+      <Box
+        sx={{
+          display: 'flex',
+          gap: 2,
+        }}
+      >
         <Button
+          type="button"
           fullWidth
           variant="outlined"
           onClick={() => handleSocialLogin('google')}
           startIcon={<Iconify icon="logos:google-icon" />}
-          sx={{
-            color: 'white',
-            borderColor: alpha(theme.palette.info.main, 0.2),
-            fontFamily: 'var(--font-orbitron), sans-serif',
-            fontWeight: 700,
-            fontSize: 13,
-            '&:hover': {
-              borderColor: 'info.main',
-              bgcolor: alpha(theme.palette.info.main, 0.05),
-              transform: 'translateY(-2px)',
-              boxShadow: `0 5px 15px ${alpha(theme.palette.info.main, 0.2)}`,
-            },
-          }}
+          sx={socialButtonSx}
         >
           Google
         </Button>
+
         <Button
+          type="button"
           fullWidth
           variant="outlined"
           onClick={() => handleSocialLogin('github')}
           startIcon={<Iconify icon="logos:github-icon" />}
-          sx={{
-            color: 'white',
-            borderColor: alpha(theme.palette.info.main, 0.2),
-            fontFamily: 'var(--font-orbitron), sans-serif',
-            fontWeight: 700,
-            fontSize: 13,
-            '&:hover': {
-              borderColor: 'info.main',
-              bgcolor: alpha(theme.palette.info.main, 0.05),
-              transform: 'translateY(-2px)',
-              boxShadow: `0 5px 15px ${alpha(theme.palette.info.main, 0.2)}`,
-            },
-          }}
+          sx={socialButtonSx}
         >
           GitHub
         </Button>
       </Box>
 
       <Button
+        type="button"
         fullWidth
         variant="contained"
+        loading={isWeb3Submitting}
         onClick={handleWeb3Login}
         startIcon={
-          <Iconify icon="logos:metamask-icon" width={24} />
+          <Iconify
+            icon="logos:metamask-icon"
+            width={24}
+          />
         }
         sx={{
           height: 48,
@@ -488,6 +857,14 @@ export function JwtSignInView() {
           border: `1px solid ${alpha(theme.palette.info.main, 0.4)}`,
           position: 'relative',
           overflow: 'hidden',
+
+          transition: theme.transitions.create([
+            'background-color',
+            'border-color',
+            'transform',
+            'box-shadow',
+          ]),
+
           '&:hover': {
             borderColor: 'info.main',
             backgroundColor: alpha('#020817', 0.95),
