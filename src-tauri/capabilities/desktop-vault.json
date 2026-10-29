@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "desktop-vault",
-  "description": "DevOS desktop vault and wallet management capabilities",
+  "description": "Capability da janela principal do DevOS para operações do cofre, carteiras, diagnóstico do dispositivo, geração de documentos e controles específicos da janela. A exposição dos comandos personalizados deve permanecer alinhada ao ACL gerado no build e à autorização validada pelos handlers Rust.",
   "windows": [
     "main"
   ],
