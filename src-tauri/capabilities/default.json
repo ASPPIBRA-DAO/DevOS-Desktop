@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "minimal unprivileged DevOS window capability",
+  "description": "Capability mínima da janela principal do DevOS, sem permissões explícitas de APIs ou plugins Tauri. A restrição de comandos personalizados Rust deve ser configurada e verificada separadamente.",
   "windows": [
     "main"
   ],
