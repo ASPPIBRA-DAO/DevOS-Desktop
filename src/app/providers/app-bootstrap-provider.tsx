@@ -145,7 +145,7 @@ function runBestEffortWindowAction(
  * A validação integral de VaultStatus pertence também à fronteira
  * do contrato IPC, cuja implementação deve ser auditada separadamente.
  */
-function hasValidVaultFlags(
+export function hasValidVaultFlags(
   value: unknown
 ): value is {
   is_initialized: boolean;
@@ -171,12 +171,12 @@ function hasValidVaultFlags(
 // Resolução da máquina de estados a partir do status nativo
 // ----------------------------------------------------------------------
 
-type VaultStateResolution = {
+export type VaultStateResolution = {
   state: BootstrapState;
   errorMessage: string | null;
 };
 
-function resolveVaultState(
+export function resolveVaultState(
   status: VaultStatus
 ): VaultStateResolution {
   // Uma sessão desbloqueada sem cofre inicializado é inconsistente.
@@ -216,7 +216,7 @@ function resolveVaultState(
  * Extrai texto de erro somente quando a mensagem é realmente uma string.
  * Não pressupõe que todas as rejeições sejam instâncias de Error.
  */
-function extractErrorText(error: unknown): string {
+export function extractErrorText(error: unknown): string {
   try {
     if (typeof error === 'string') {
       return error;
@@ -246,7 +246,7 @@ function extractErrorText(error: unknown): string {
  * Traduz erros nativos para mensagens permitidas na interface.
  * A mensagem bruta nunca é exibida ao usuário.
  */
-function getBootstrapErrorMessage(
+export function getBootstrapErrorMessage(
   error: unknown
 ): string {
   const rawMessage = extractErrorText(error);
