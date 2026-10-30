@@ -70,6 +70,11 @@ export function createDevosNavData(): NavSectionProps['data'] {
           icon: <Iconify icon={'solar:city-bold' as any} />,
         },
         {
+          title: 'Cessão de Posse',
+          path: paths.devos.cessaoPosse,
+          icon: <Iconify icon={'solar:document-text-bold' as any} />,
+        },
+        {
           title: 'Hub Analítico',
           path: paths.devos.analytics,
           icon: <Iconify icon={'solar:chart-square-bold' as any} />,
@@ -145,6 +150,9 @@ export function getSectionTitle(pathname: string): string {
     pathname.startsWith('/real-estate')
   ) {
     return 'Banco de Dados Imobiliário';
+  }
+  if (pathname.startsWith(paths.devos.cessaoPosse)) {
+    return 'Instrumento de Cessão de Posse';
   }
   if (pathname.startsWith(paths.devos.database)) {
     return 'Banco de Dados Imobiliário (Explorer)';

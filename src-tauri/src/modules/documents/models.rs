@@ -62,6 +62,9 @@ pub enum DocumentKind {
 
     /// Fatura / Recibo Associativo (Invoice Bill).
     InvoiceBill,
+
+    /// Contrato de Cessão de Posse de Imóvel.
+    CessaoPosse,
 }
 
 impl DocumentKind {
@@ -74,6 +77,7 @@ impl DocumentKind {
         match self {
             DocumentKind::CitizenLedger => DocumentScope::Universal,
             DocumentKind::InvoiceBill => DocumentScope::Universal,
+            DocumentKind::CessaoPosse => DocumentScope::Universal,
         }
     }
 
@@ -82,6 +86,7 @@ impl DocumentKind {
         match self {
             DocumentKind::CitizenLedger => "extrato_citizen_ledger.typ",
             DocumentKind::InvoiceBill => "invoice_bill.typ",
+            DocumentKind::CessaoPosse => "contrato_cessao_posse.typ",
         }
     }
 }
@@ -132,6 +137,7 @@ pub struct DocumentOutput {
 pub enum DocumentRequest {
     CitizenLedger(crate::reports::models::CitizenLedgerPayload),
     InvoiceBill(crate::reports::models::InvoiceReportPayload),
+    CessaoPosse(crate::reports::models::CessaoPossePayload),
 }
 
 impl DocumentRequest {
@@ -140,6 +146,7 @@ impl DocumentRequest {
         match self {
             DocumentRequest::CitizenLedger(_) => DocumentKind::CitizenLedger,
             DocumentRequest::InvoiceBill(_) => DocumentKind::InvoiceBill,
+            DocumentRequest::CessaoPosse(_) => DocumentKind::CessaoPosse,
         }
     }
 }

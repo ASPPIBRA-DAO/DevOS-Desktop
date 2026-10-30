@@ -134,6 +134,9 @@ fn default_file_name(kind: DocumentKind) -> String {
         DocumentKind::InvoiceBill => {
             format!("fatura_associativa_{timestamp}.pdf")
         }
+        DocumentKind::CessaoPosse => {
+            format!("contrato_cessao_posse_{timestamp}.pdf")
+        }
     }
 }
 

@@ -3,6 +3,7 @@ import type { EditionConfig } from './types';
 import { paths } from '../../routes/paths';
 import { LedgerView } from '../../modules/ledger';
 import { RealEstateView } from '../../modules/real-estate';
+import { CessaoPosseView } from '../../sections/cessao-de-posse';
 import { CockpitDashboardPage } from './cockpit/cockpit-dashboard-page';
 
 export const currentEdition: EditionConfig = {
@@ -22,6 +23,12 @@ export const currentEdition: EditionConfig = {
       label: 'Banco Imobiliário',
       icon: 'solar:city-bold',
       component: RealEstateView,
+    },
+    {
+      path: paths.devos.cessaoPosse,
+      label: 'Cessão de Posse (Contrato)',
+      icon: 'solar:document-text-bold-duotone',
+      component: CessaoPosseView,
     },
     {
       path: paths.devos.database,

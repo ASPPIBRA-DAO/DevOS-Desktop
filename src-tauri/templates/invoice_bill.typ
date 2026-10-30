@@ -57,10 +57,12 @@
         weight: "bold",
         fill: if data.invoice.status == "paid" { rgb("#15803D") } else if data.invoice.status == "overdue" { rgb("#B91C1C") } else { rgb("#B45309") }
       )[
-        #if data.invoice.status == "paid" [LIQUIDADA / PAGA]
-        else if data.invoice.status == "overdue" [EM ATRASO / VENCIDA]
-        else if data.invoice.status == "draft" [RASCUNHO / NÃO EMITIDA]
-        else [PENDENTE DE LIQUIDAÇÃO]
+        #{
+          if data.invoice.status == "paid" [LIQUIDADA / PAGA]
+          else if data.invoice.status == "overdue" [EM ATRASO / VENCIDA]
+          else if data.invoice.status == "draft" [RASCUNHO / NÃO EMITIDA]
+          else [PENDENTE DE LIQUIDAÇÃO]
+        }
       ]
     ] \
     #v(4pt)

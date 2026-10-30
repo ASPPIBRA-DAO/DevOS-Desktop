@@ -14,6 +14,9 @@ static CITIZEN_TEMPLATE: &str =
 static INVOICE_TEMPLATE: &str =
     include_str!("../../../templates/invoice_bill.typ");
 
+static CONTRATO_CESSAO_TEMPLATE: &str =
+    include_str!("../../../templates/contrato_cessao_posse.typ");
+
 static ROBOTO_REGULAR: &[u8] =
     include_bytes!("../../../assets/fonts/Roboto-Regular.ttf");
 
@@ -41,7 +44,7 @@ impl DocumentRenderer for DocumentsService {
     fn supports(&self, kind: DocumentKind) -> bool {
         matches!(
             kind,
-            DocumentKind::CitizenLedger | DocumentKind::InvoiceBill
+            DocumentKind::CitizenLedger | DocumentKind::InvoiceBill | DocumentKind::CessaoPosse
         )
     }
 
@@ -72,6 +75,15 @@ impl DocumentRenderer for DocumentsService {
                     })?;
 
                 (INVOICE_TEMPLATE, json_str)
+            }
+
+            DocumentRequest::CessaoPosse(payload) => {
+                let json_str = serde_json::to_string(&payload)
+                    .map_err(|error| {
+                        DocumentError::SerializationError(error.to_string())
+                    })?;
+
+                (CONTRATO_CESSAO_TEMPLATE, json_str)
             }
         };
 
@@ -264,6 +276,35 @@ mod tests {
         assert_valid_document_output(
             &output,
             DocumentKind::InvoiceBill,
+        );
+    }
+
+    #[test]
+    fn test_generate_cessao_posse_document() {
+        let service = DocumentsService::new();
+
+        let payload = crate::reports::models::CessaoPossePayload {
+            document_number: "2026-0001/CP".to_string(),
+            auth_code: "2026-X7Y9".to_string(),
+            data: serde_json::json!({
+                "cedenteNome": "JOÃO SILVA TESTE",
+                "cessionarioNome": "MARIA SOUZA TESTE",
+                "imovelLote": "12",
+                "imovelQuadra": "B"
+            }),
+        };
+
+        let request = DocumentRequest::CessaoPosse(payload);
+
+        let output = service
+            .generate_document(request)
+            .unwrap_or_else(|error| {
+                panic!("Falha ao gerar contrato de cessão: {error:?}")
+            });
+
+        assert_valid_document_output(
+            &output,
+            DocumentKind::CessaoPosse,
         );
     }
 }

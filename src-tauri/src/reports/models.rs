@@ -96,6 +96,30 @@ pub struct InvoiceReportPayload {
     pub d1_protocol: Option<String>,
 }
 
+/// Dados de entrada para a geração do Contrato de Cessão de Posse.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CessaoPossePayload {
+    /// Número de controle ou registro do documento.
+    #[serde(default = "default_contract_doc_number")]
+    pub document_number: String,
+
+    /// Código de autenticação / rastreio institucional.
+    #[serde(default = "default_contract_auth_code")]
+    pub auth_code: String,
+
+    /// Dados estruturados ou dinâmicos do contrato (partes, imóvel, valores, etc.).
+    #[serde(default)]
+    pub data: serde_json::Value,
+}
+
+fn default_contract_doc_number() -> String {
+    "2026-0001/CP".to_string()
+}
+
+fn default_contract_auth_code() -> String {
+    "2026-X7Y9".to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
