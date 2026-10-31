@@ -5,7 +5,11 @@
  * e autenticação de documentos oficiais e relatórios em PDF.
  */
 
-export type DocumentKind = 'citizen_ledger' | 'invoice_bill' | 'cessao_posse';
+export type DocumentKind =
+  | 'citizen_ledger'
+  | 'invoice_bill'
+  | 'cessao_posse'
+  | 'real_estate_reconciliation';
 
 export interface DocumentMetadata {
   document_kind: DocumentKind;
@@ -84,10 +88,15 @@ export interface CessaoPossePayload {
   data?: Record<string, unknown>;
 }
 
+export interface RealEstateReconciliationPayload {
+  data: Record<string, unknown>;
+}
+
 export type DocumentRequest =
   | { kind: 'citizen_ledger'; payload: CitizenLedgerPayload }
   | { kind: 'invoice_bill'; payload: InvoiceReportPayload }
-  | { kind: 'cessao_posse'; payload: CessaoPossePayload };
+  | { kind: 'cessao_posse'; payload: CessaoPossePayload }
+  | { kind: 'real_estate_reconciliation'; payload: RealEstateReconciliationPayload };
 
 export interface GenerateDocumentPayload {
   request: DocumentRequest;

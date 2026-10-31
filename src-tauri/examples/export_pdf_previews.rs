@@ -119,5 +119,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     fs::write(&invoice_pdf_path, &invoice_pdf_bytes)?;
     println!("Fatura salva em: {}", invoice_pdf_path.display());
 
+    // 3. Compilar Contrato de Cessão de Posse
+    println!("Compilando Contrato de Cessão via Typst...");
+    let cessao_payload = app_lib::reports::models::CessaoPossePayload {
+        document_number: "2026-0001/CP".to_string(),
+        auth_code: "2026-X7Y9".to_string(),
+        data: serde_json::json!({
+            "cedenteNome": "JOÃO SILVA TESTE",
+            "cessionarioNome": "MARIA SOUZA TESTE",
+            "imovelLote": "12",
+            "imovelQuadra": "B"
+        }),
+    };
+    let service = app_lib::modules::documents::DocumentsService::new();
+    let res = service.generate_document(app_lib::modules::documents::DocumentRequest::CessaoPosse(cessao_payload));
+    match res {
+        Ok(out) => {
+            let path = output_dir.join("contrato_cessao_preview.pdf");
+            fs::write(&path, &out.pdf_bytes)?;
+            println!("Contrato salvo em: {}", path.display());
+        }
+        Err(err) => {
+            return Err(format!("Erro ao compilar contrato: {err:?}").into());
+        }
+    }
+
     Ok(())
 }

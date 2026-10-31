@@ -1,0 +1,779 @@
+.
+├── AGENTS.md
+├── architecture
+│   ├── adr
+│   │   ├── ADR-009-Identity-Domain.md
+│   │   ├── ADR-010-ViewModel-Isolation.md
+│   │   └── ADR-011-Facades-Anti-Corruption.md
+│   ├── arvore_completa_dashboard.md
+│   └── mapa_arquitetura_roadmap_desktop.md
+├── audit
+│   └── git-change-log.csv
+├── AUDITORIA_CODIGO_FONTE_CREDENCIAIS.md
+├── docs
+│   ├── adr
+│   │   ├── 0001-modular-monolith-editions.md
+│   │   └── 0002-ipc-security-and-capabilities.md
+│   ├── architecture
+│   │   ├── catalog-and-boundaries.md
+│   │   ├── ipc-contracts.md
+│   │   └── theme-and-layout-specification.md
+│   ├── migration
+│   │   └── react-pdf-removal-audit.md
+│   └── security
+│       └── AUTH-CREDENTIALS-AUDIT.md
+├── eslint.config.mjs
+├── index.html
+├── package.json
+├── pnpm-lock.yaml
+├── pnpm-workspace.yaml
+├── public
+│   ├── assets
+│   │   ├── 3d
+│   │   │   └── README.md
+│   │   ├── icons
+│   │   │   └── files
+│   │   │       ├── ic-ai.svg
+│   │   │       ├── ic-audio.svg
+│   │   │       ├── ic-document.svg
+│   │   │       ├── ic-excel.svg
+│   │   │       ├── ic-file.svg
+│   │   │       ├── ic-folder.svg
+│   │   │       ├── ic-img.svg
+│   │   │       ├── ic-js.svg
+│   │   │       ├── ic-pdf.svg
+│   │   │       ├── ic-power-point.svg
+│   │   │       ├── ic-pts.svg
+│   │   │       ├── ic-txt.svg
+│   │   │       ├── ic-video.svg
+│   │   │       ├── ic-word.svg
+│   │   │       └── ic-zip.svg
+│   │   └── illustrations
+│   │       ├── characters
+│   │       │   ├── character-fly.webp
+│   │       │   ├── character-happy-jump.webp
+│   │       │   ├── character-maintenance.webp
+│   │       │   ├── character-notification.webp
+│   │       │   ├── character-present.webp
+│   │       │   ├── character-question.webp
+│   │       │   ├── character-reject.webp
+│   │       │   └── character-study.webp
+│   │       ├── illustration-dashboard.webp
+│   │       ├── illustration-integration.webp
+│   │       ├── illustration-receipt.webp
+│   │       ├── illustration-rocket-large.webp
+│   │       ├── illustration-rocket-small.webp
+│   │       └── illustration-upgrade.webp
+│   ├── favicon.ico
+│   └── logo
+│       ├── GisGlobeO.svg
+│       └── logo-single.svg
+├── README.md
+├── src
+│   ├── actions
+│   │   ├── identity.ts
+│   │   └── treasury.ts
+│   ├── app
+│   │   ├── app.tsx
+│   │   ├── editions
+│   │   │   ├── cockpit
+│   │   │   │   └── cockpit-dashboard-page.tsx
+│   │   │   ├── edition.cockpit.ts
+│   │   │   ├── edition.node.ts
+│   │   │   ├── node
+│   │   │   │   └── node-dashboard-page.tsx
+│   │   │   └── types.ts
+│   │   ├── layouts
+│   │   │   ├── components
+│   │   │   │   ├── account-drawer.tsx
+│   │   │   │   ├── contacts-popover.tsx
+│   │   │   │   ├── language-popover.tsx
+│   │   │   │   ├── menu-button.tsx
+│   │   │   │   ├── nav-toggle-button.tsx
+│   │   │   │   ├── nav-upgrade.tsx
+│   │   │   │   ├── notifications-drawer.tsx
+│   │   │   │   ├── searchbar.tsx
+│   │   │   │   ├── settings-button.tsx
+│   │   │   │   └── workspaces-popover.tsx
+│   │   │   ├── core
+│   │   │   │   ├── classes.ts
+│   │   │   │   ├── css-vars.ts
+│   │   │   │   ├── header-section.tsx
+│   │   │   │   ├── index.ts
+│   │   │   │   ├── layout-section.tsx
+│   │   │   │   └── main-section.tsx
+│   │   │   ├── dashboard
+│   │   │   │   ├── content.tsx
+│   │   │   │   ├── css-vars.ts
+│   │   │   │   ├── layout.tsx
+│   │   │   │   ├── nav-horizontal.tsx
+│   │   │   │   ├── nav-mobile.tsx
+│   │   │   │   └── nav-vertical.tsx
+│   │   │   ├── devos
+│   │   │   │   └── layout.tsx
+│   │   │   ├── main
+│   │   │   │   └── footer.tsx
+│   │   │   ├── nav-config-account.ts
+│   │   │   ├── nav-config-dashboard.tsx
+│   │   │   └── nav-config-workspace.ts
+│   │   ├── pages
+│   │   │   ├── error-view.tsx
+│   │   │   ├── index.ts
+│   │   │   └── not-found-view.tsx
+│   │   ├── providers
+│   │   │   ├── app-bootstrap-provider.tsx
+│   │   │   ├── error-boundary.tsx
+│   │   │   ├── index.ts
+│   │   │   └── theme-provider.tsx
+│   │   └── router
+│   │       └── index.tsx
+│   ├── assets
+│   │   └── icons
+│   │       └── index.tsx
+│   ├── auth
+│   │   ├── application
+│   │   │   └── identity-session.service.ts
+│   │   ├── components
+│   │   │   ├── form-divider.tsx
+│   │   │   ├── form-head.tsx
+│   │   │   ├── form-resend-code.tsx
+│   │   │   ├── form-return-link.tsx
+│   │   │   ├── form-socials.tsx
+│   │   │   ├── identity-avatar.tsx
+│   │   │   ├── index.ts
+│   │   │   └── sign-up-terms.tsx
+│   │   ├── context
+│   │   │   └── jwt.ts
+│   │   ├── facades.ts
+│   │   ├── hooks.ts
+│   │   ├── index.ts
+│   │   ├── utils
+│   │   │   ├── error-message.ts
+│   │   │   └── index.ts
+│   │   └── view
+│   │       └── jwt
+│   │           ├── index.ts
+│   │           ├── jwt-reset-password-view.tsx
+│   │           ├── jwt-sign-in-view.tsx
+│   │           ├── jwt-sign-up-view.tsx
+│   │           ├── jwt-update-password-view.tsx
+│   │           └── jwt-verify-view.tsx
+│   ├── global-config.ts
+│   ├── global.css
+│   ├── layouts
+│   │   ├── auth-centered
+│   │   │   ├── content.tsx
+│   │   │   ├── globe-background.tsx
+│   │   │   ├── index.ts
+│   │   │   └── layout.tsx
+│   │   ├── components
+│   │   │   └── settings-button.tsx
+│   │   └── core
+│   │       └── index.ts
+│   ├── lib
+│   │   └── axios.ts
+│   ├── locales
+│   │   └── index.ts
+│   ├── main.tsx
+│   ├── _mock
+│   │   └── index.ts
+│   ├── modules
+│   │   ├── documents
+│   │   │   ├── index.ts
+│   │   │   ├── presentation
+│   │   │   │   └── components
+│   │   │   │       └── pdf-preview-dialog.tsx
+│   │   │   ├── services
+│   │   │   │   └── pdf-export-service.ts
+│   │   │   └── templates
+│   │   │       └── shared
+│   │   │           ├── document-footer.tsx
+│   │   │           ├── document-header.tsx
+│   │   │           └── document-layout.tsx
+│   │   ├── identity
+│   │   │   ├── application
+│   │   │   ├── domain
+│   │   │   ├── index.ts
+│   │   │   └── presentation
+│   │   │       └── components
+│   │   │           └── host-integrity-card.tsx
+│   │   ├── ipfs
+│   │   │   ├── application
+│   │   │   ├── domain
+│   │   │   ├── index.ts
+│   │   │   ├── infrastructure
+│   │   │   └── presentation
+│   │   │       └── components
+│   │   │           ├── ipfs-daemon-metric.tsx
+│   │   │           └── storage-proof-card.tsx
+│   │   ├── ledger
+│   │   │   ├── domain
+│   │   │   │   ├── index.ts
+│   │   │   │   ├── ledger-canonical-data.ts
+│   │   │   │   └── ledger-models.ts
+│   │   │   ├── index.ts
+│   │   │   ├── presentation
+│   │   │   │   ├── citizen-ledger
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── associate-search-card.tsx
+│   │   │   │   │   │   ├── financial-history-print.tsx
+│   │   │   │   │   │   ├── financial-summary-header.tsx
+│   │   │   │   │   │   └── financial-transactions-table.tsx
+│   │   │   │   │   ├── index.ts
+│   │   │   │   │   └── view
+│   │   │   │   │       ├── citizen-ledger-view.tsx
+│   │   │   │   │       └── index.ts
+│   │   │   │   ├── components
+│   │   │   │   │   └── double-entry-chart-card.tsx
+│   │   │   │   ├── hooks
+│   │   │   │   │   └── treasury-hooks.ts
+│   │   │   │   ├── index.ts
+│   │   │   │   └── ledger-view.tsx
+│   │   │   ├── services
+│   │   │   │   └── ledger-export-service.ts
+│   │   │   └── templates
+│   │   │       └── citizen-ledger-pdf-document.tsx
+│   │   ├── real-estate
+│   │   │   ├── index.ts
+│   │   │   └── presentation
+│   │   │       ├── components
+│   │   │       │   ├── real-estate-importer-card.tsx
+│   │   │       │   ├── real-estate-metrics-bar.tsx
+│   │   │       │   ├── real-estate-spreadsheet-table.tsx
+│   │   │       │   └── territorial-hub-selector.tsx
+│   │   │       └── real-estate-view.tsx
+│   │   ├── reports
+│   │   │   ├── index.ts
+│   │   │   ├── presentation
+│   │   │   │   └── components
+│   │   │   │       └── reconciliation-report-button.tsx
+│   │   │   ├── services
+│   │   │   │   └── report-compiler-service.ts
+│   │   │   └── templates
+│   │   │       └── real-estate-reconciliation-report.tsx
+│   │   └── wallets
+│   │       ├── application
+│   │       ├── domain
+│   │       ├── index.ts
+│   │       ├── infrastructure
+│   │       └── presentation
+│   │           └── components
+│   │               └── vault-status-metric.tsx
+│   ├── pages
+│   │   └── auth
+│   │       └── jwt
+│   │           ├── reset-password.tsx
+│   │           ├── sign-in.tsx
+│   │           ├── sign-up.tsx
+│   │           ├── update-password.tsx
+│   │           └── verify.tsx
+│   ├── platform
+│   │   └── tauri
+│   │       ├── contracts
+│   │       │   ├── document-contracts.ts
+│   │       │   ├── index.ts
+│   │       │   ├── ipc-errors.ts
+│   │       │   ├── monitoring-contracts.ts
+│   │       │   ├── real-estate-contracts.ts
+│   │       │   ├── system-contracts.ts
+│   │       │   ├── vault-contracts.ts
+│   │       │   └── wallet-contracts.ts
+│   │       ├── core
+│   │       │   ├── invoke.ts
+│   │       │   └── tauri-errors.ts
+│   │       ├── documents
+│   │       │   └── document-bridge.ts
+│   │       ├── index.ts
+│   │       ├── ipfs
+│   │       │   └── ipfs-bridge.ts
+│   │       ├── monitoring
+│   │       │   └── monitoring-bridge.ts
+│   │       ├── real-estate
+│   │       │   └── real-estate-bridge.ts
+│   │       ├── system
+│   │       │   └── system-bridge.ts
+│   │       ├── vault
+│   │       │   └── vault-bridge.ts
+│   │       ├── wallets
+│   │       │   └── wallet-bridge.ts
+│   │       └── window
+│   │           └── window-bridge.ts
+│   ├── routes
+│   │   ├── components
+│   │   │   ├── index.ts
+│   │   │   └── router-link.tsx
+│   │   ├── hooks.ts
+│   │   └── paths.ts
+│   ├── sections
+│   │   ├── cessao-de-posse
+│   │   │   ├── CessaoPosseContent.tsx
+│   │   │   ├── CessaoPosseView.tsx
+│   │   │   └── index.ts
+│   │   └── devos
+│   │       └── ledger
+│   │           └── index.ts
+│   ├── shared
+│   │   ├── components
+│   │   │   ├── abnt-document
+│   │   │   │   ├── a4-page.tsx
+│   │   │   │   ├── abnt-text.tsx
+│   │   │   │   ├── data-tag.tsx
+│   │   │   │   ├── default-footer.tsx
+│   │   │   │   ├── default-header.tsx
+│   │   │   │   ├── digital-signature.tsx
+│   │   │   │   ├── document-context.tsx
+│   │   │   │   ├── document-title.tsx
+│   │   │   │   ├── document-viewer.tsx
+│   │   │   │   ├── index.ts
+│   │   │   │   ├── pdf-viewer-layout.tsx
+│   │   │   │   └── section-title.tsx
+│   │   │   ├── animate
+│   │   │   │   ├── animate-border.tsx
+│   │   │   │   ├── animate-count-up.tsx
+│   │   │   │   ├── animate-logo.tsx
+│   │   │   │   ├── animate-text.tsx
+│   │   │   │   ├── back-to-top-button.tsx
+│   │   │   │   ├── index.ts
+│   │   │   │   ├── motion-container.tsx
+│   │   │   │   ├── motion-lazy.tsx
+│   │   │   │   ├── motion-viewport.tsx
+│   │   │   │   ├── scroll-progress
+│   │   │   │   │   ├── index.ts
+│   │   │   │   │   ├── scroll-progress.tsx
+│   │   │   │   │   └── use-scroll-progress.ts
+│   │   │   │   └── variants
+│   │   │   │       ├── actions.ts
+│   │   │   │       ├── background.ts
+│   │   │   │       ├── bounce.ts
+│   │   │   │       ├── container.ts
+│   │   │   │       ├── fade.ts
+│   │   │   │       ├── flip.ts
+│   │   │   │       ├── index.ts
+│   │   │   │       ├── path.ts
+│   │   │   │       ├── rotate.ts
+│   │   │   │       ├── scale.ts
+│   │   │   │       ├── slide.ts
+│   │   │   │       ├── transition.ts
+│   │   │   │       └── zoom.ts
+│   │   │   ├── Card.tsx
+│   │   │   ├── chart
+│   │   │   │   ├── chart.tsx
+│   │   │   │   ├── classes.ts
+│   │   │   │   ├── components
+│   │   │   │   │   ├── chart-legends.tsx
+│   │   │   │   │   ├── chart-loading.tsx
+│   │   │   │   │   ├── chart-select.tsx
+│   │   │   │   │   └── index.ts
+│   │   │   │   ├── index.ts
+│   │   │   │   ├── styles.css
+│   │   │   │   ├── types.ts
+│   │   │   │   └── use-chart.ts
+│   │   │   ├── custom-breadcrumbs
+│   │   │   │   ├── back-link.tsx
+│   │   │   │   ├── breadcrumb-link.tsx
+│   │   │   │   ├── custom-breadcrumbs.tsx
+│   │   │   │   ├── index.ts
+│   │   │   │   ├── more-links.tsx
+│   │   │   │   └── styles.tsx
+│   │   │   ├── custom-dialog
+│   │   │   │   ├── confirm-dialog.tsx
+│   │   │   │   ├── index.ts
+│   │   │   │   └── types.ts
+│   │   │   ├── custom-popover
+│   │   │   │   ├── custom-popover.tsx
+│   │   │   │   ├── hooks.ts
+│   │   │   │   ├── index.ts
+│   │   │   │   ├── styles.tsx
+│   │   │   │   ├── types.ts
+│   │   │   │   └── utils.ts
+│   │   │   ├── cyber-button
+│   │   │   │   ├── cyber-button.tsx
+│   │   │   │   └── index.ts
+│   │   │   ├── cyber-card
+│   │   │   │   ├── cyber-card.tsx
+│   │   │   │   └── index.ts
+│   │   │   ├── data-display
+│   │   │   │   ├── card.tsx
+│   │   │   │   ├── index.ts
+│   │   │   │   ├── metric-box.tsx
+│   │   │   │   └── status-badge.tsx
+│   │   │   ├── edger-lights
+│   │   │   │   ├── edger-badge.tsx
+│   │   │   │   ├── edger-button.tsx
+│   │   │   │   ├── edger-card.tsx
+│   │   │   │   ├── edger-inline-notification.tsx
+│   │   │   │   ├── edger-lights.spec.ts
+│   │   │   │   ├── edger-tokens.ts
+│   │   │   │   ├── index.ts
+│   │   │   │   ├── types.ts
+│   │   │   │   └── UIVERSE_SNIPPET.md
+│   │   │   ├── empty-content
+│   │   │   │   ├── empty-content.tsx
+│   │   │   │   └── index.ts
+│   │   │   ├── file-thumbnail
+│   │   │   │   ├── classes.ts
+│   │   │   │   ├── file-thumbnail.tsx
+│   │   │   │   ├── index.ts
+│   │   │   │   ├── styles.tsx
+│   │   │   │   ├── types.ts
+│   │   │   │   ├── use-file-preview.ts
+│   │   │   │   └── utils.ts
+│   │   │   ├── filters-result
+│   │   │   │   ├── filters-block.tsx
+│   │   │   │   ├── filters-result.tsx
+│   │   │   │   └── index.ts
+│   │   │   ├── globe-wire
+│   │   │   │   ├── globe-wire-icon.tsx
+│   │   │   │   └── index.ts
+│   │   │   ├── hook-form
+│   │   │   │   ├── fields.tsx
+│   │   │   │   ├── form-provider.tsx
+│   │   │   │   ├── help-text.tsx
+│   │   │   │   ├── index.ts
+│   │   │   │   ├── rhf-autocomplete.tsx
+│   │   │   │   ├── rhf-checkbox.tsx
+│   │   │   │   ├── rhf-code.tsx
+│   │   │   │   ├── rhf-date-picker.tsx
+│   │   │   │   ├── rhf-number-input.tsx
+│   │   │   │   ├── rhf-radio-group.tsx
+│   │   │   │   ├── rhf-rating.tsx
+│   │   │   │   ├── rhf-select.tsx
+│   │   │   │   ├── rhf-slider.tsx
+│   │   │   │   ├── rhf-switch.tsx
+│   │   │   │   ├── rhf-text-field.tsx
+│   │   │   │   └── schema-utils.ts
+│   │   │   ├── iconify
+│   │   │   │   ├── classes.ts
+│   │   │   │   ├── iconify.tsx
+│   │   │   │   ├── icon-sets.ts
+│   │   │   │   ├── index.ts
+│   │   │   │   └── register-icons.ts
+│   │   │   ├── illustrations
+│   │   │   │   ├── background-shape.tsx
+│   │   │   │   ├── forbidden-illustration.tsx
+│   │   │   │   ├── index.ts
+│   │   │   │   ├── page-not-found-illustration.tsx
+│   │   │   │   ├── server-error-illustration.tsx
+│   │   │   │   └── upload-illustration.tsx
+│   │   │   ├── image
+│   │   │   │   ├── classes.ts
+│   │   │   │   ├── image.tsx
+│   │   │   │   ├── index.ts
+│   │   │   │   └── styles.tsx
+│   │   │   ├── index.ts
+│   │   │   ├── ipfs-cube
+│   │   │   │   ├── index.ts
+│   │   │   │   ├── ipfs-cube.tsx
+│   │   │   │   └── styles.css
+│   │   │   ├── label
+│   │   │   │   ├── classes.ts
+│   │   │   │   ├── index.ts
+│   │   │   │   ├── label.tsx
+│   │   │   │   ├── styles.tsx
+│   │   │   │   └── types.ts
+│   │   │   ├── loading-screen
+│   │   │   │   ├── index.ts
+│   │   │   │   ├── loading-screen.tsx
+│   │   │   │   └── splash-screen.tsx
+│   │   │   ├── logo
+│   │   │   │   ├── classes.ts
+│   │   │   │   ├── index.ts
+│   │   │   │   └── logo.tsx
+│   │   │   ├── MetricBox.tsx
+│   │   │   ├── nav-section
+│   │   │   │   ├── components
+│   │   │   │   │   ├── index.ts
+│   │   │   │   │   ├── nav-collapse.tsx
+│   │   │   │   │   ├── nav-dropdown.tsx
+│   │   │   │   │   ├── nav-elements.tsx
+│   │   │   │   │   └── nav-subheader.tsx
+│   │   │   │   ├── horizontal
+│   │   │   │   │   ├── index.ts
+│   │   │   │   │   ├── nav-item.tsx
+│   │   │   │   │   ├── nav-list.tsx
+│   │   │   │   │   └── nav-section-horizontal.tsx
+│   │   │   │   ├── index.ts
+│   │   │   │   ├── mini
+│   │   │   │   │   ├── index.ts
+│   │   │   │   │   ├── nav-item.tsx
+│   │   │   │   │   ├── nav-list.tsx
+│   │   │   │   │   └── nav-section-mini.tsx
+│   │   │   │   ├── styles
+│   │   │   │   │   ├── classes.ts
+│   │   │   │   │   ├── css-vars.ts
+│   │   │   │   │   ├── index.ts
+│   │   │   │   │   └── nav-item-styles.tsx
+│   │   │   │   ├── types.ts
+│   │   │   │   ├── utils
+│   │   │   │   │   ├── create-nav-item.ts
+│   │   │   │   │   └── index.ts
+│   │   │   │   └── vertical
+│   │   │   │       ├── index.ts
+│   │   │   │       ├── nav-item.tsx
+│   │   │   │       ├── nav-list.tsx
+│   │   │   │       └── nav-section-vertical.tsx
+│   │   │   ├── number-input
+│   │   │   │   ├── index.ts
+│   │   │   │   ├── number-input.tsx
+│   │   │   │   └── styles.tsx
+│   │   │   ├── progress-bar
+│   │   │   │   ├── index.ts
+│   │   │   │   ├── progress-bar.tsx
+│   │   │   │   └── styles.css
+│   │   │   ├── scrollbar
+│   │   │   │   ├── classes.ts
+│   │   │   │   ├── index.ts
+│   │   │   │   ├── scrollbar.tsx
+│   │   │   │   ├── styles.css
+│   │   │   │   └── types.ts
+│   │   │   ├── search-not-found
+│   │   │   │   ├── index.ts
+│   │   │   │   └── search-not-found.tsx
+│   │   │   ├── settings
+│   │   │   │   └── index.ts
+│   │   │   ├── snackbar
+│   │   │   │   ├── classes.ts
+│   │   │   │   ├── index.ts
+│   │   │   │   ├── snackbar.tsx
+│   │   │   │   └── styles.tsx
+│   │   │   ├── StatusBadge.tsx
+│   │   │   ├── svg-color
+│   │   │   │   ├── classes.ts
+│   │   │   │   ├── index.ts
+│   │   │   │   ├── svg-color.tsx
+│   │   │   │   └── types.ts
+│   │   │   ├── table
+│   │   │   │   ├── index.ts
+│   │   │   │   ├── table-empty-rows.tsx
+│   │   │   │   ├── table-head-custom.tsx
+│   │   │   │   ├── table-no-data.tsx
+│   │   │   │   ├── table-pagination-custom.tsx
+│   │   │   │   ├── table-selected-action.tsx
+│   │   │   │   ├── table-skeleton.tsx
+│   │   │   │   ├── use-table.ts
+│   │   │   │   └── utils.ts
+│   │   │   ├── three-splash
+│   │   │   │   ├── data
+│   │   │   │   │   └── world.json
+│   │   │   │   ├── gamer-intro-scene.ts
+│   │   │   │   ├── index.ts
+│   │   │   │   ├── three-splash-view.tsx
+│   │   │   │   ├── types.ts
+│   │   │   │   ├── web3-globe-scene.tsx
+│   │   │   │   └── webgl-detector.ts
+│   │   │   ├── upload
+│   │   │   │   ├── avatar
+│   │   │   │   │   ├── styles.tsx
+│   │   │   │   │   └── upload-avatar.tsx
+│   │   │   │   ├── box
+│   │   │   │   │   ├── styles.tsx
+│   │   │   │   │   └── upload-box.tsx
+│   │   │   │   ├── classes.ts
+│   │   │   │   ├── components
+│   │   │   │   │   ├── multi-file-preview.tsx
+│   │   │   │   │   ├── rejected-files.tsx
+│   │   │   │   │   └── single-file-preview.tsx
+│   │   │   │   ├── default
+│   │   │   │   │   ├── styles.tsx
+│   │   │   │   │   └── upload-default.tsx
+│   │   │   │   ├── index.ts
+│   │   │   │   └── types.ts
+│   │   │   └── window-mode-toggle
+│   │   │       ├── index.ts
+│   │   │       └── window-mode-toggle.tsx
+│   │   ├── lib
+│   │   ├── theme
+│   │   │   ├── create-classes.ts
+│   │   │   ├── index.ts
+│   │   │   ├── palette.ts
+│   │   │   ├── theme-provider.tsx
+│   │   │   └── typography.ts
+│   │   ├── types
+│   │   └── utils
+│   │       ├── format-hash.ts
+│   │       ├── format-number.ts
+│   │       ├── format-time.ts
+│   │       └── index.ts
+│   ├── test
+│   │   ├── app-bootstrap.spec.tsx
+│   │   ├── document-bridge.spec.ts
+│   │   ├── documents-and-reports.spec.tsx
+│   │   ├── globe-wire-icon.spec.tsx
+│   │   ├── ipc-contracts.spec.ts
+│   │   ├── ledger-module.spec.tsx
+│   │   ├── setup.ts
+│   │   ├── tauri-ipc.spec.ts
+│   │   ├── test-utils.tsx
+│   │   └── three-splash-dual-gate.spec.tsx
+│   ├── theme
+│   │   ├── core
+│   │   │   ├── components
+│   │   │   │   └── index.ts
+│   │   │   ├── custom-shadows.ts
+│   │   │   ├── index.ts
+│   │   │   ├── mixins
+│   │   │   │   ├── background.ts
+│   │   │   │   ├── border.ts
+│   │   │   │   ├── global-styles-components.ts
+│   │   │   │   ├── index.ts
+│   │   │   │   ├── mixins.ts
+│   │   │   │   └── text.ts
+│   │   │   ├── opacity.ts
+│   │   │   ├── palette.ts
+│   │   │   ├── shadows.ts
+│   │   │   └── typography.ts
+│   │   ├── create-theme.ts
+│   │   ├── extend-theme-types.d.ts
+│   │   ├── index.ts
+│   │   ├── theme-config.ts
+│   │   ├── theme-provider.tsx
+│   │   ├── types.ts
+│   │   └── with-settings
+│   │       ├── color-presets.ts
+│   │       ├── index.ts
+│   │       ├── right-to-left.tsx
+│   │       ├── update-components.ts
+│   │       └── update-core.ts
+│   ├── utils
+│   │   ├── format-number.ts
+│   │   └── format-time.ts
+│   └── vite-env.d.ts
+├── src-tauri
+│   ├── assets
+│   │   └── fonts
+│   │       ├── Roboto-Bold.ttf
+│   │       └── Roboto-Regular.ttf
+│   ├── build.rs
+│   ├── capabilities
+│   │   ├── cockpit-real-estate.json
+│   │   ├── default.json
+│   │   └── desktop-vault.json
+│   ├── Cargo.lock
+│   ├── Cargo.toml
+│   ├── examples
+│   │   └── export_pdf_previews.rs
+│   ├── fixtures
+│   │   ├── generate_fixtures.py
+│   │   ├── test_batch_reconciliation.xlsx
+│   │   ├── test_incomplete_v1.xlsx
+│   │   ├── test_incomplete_v2.xlsx
+│   │   └── test_synthetic.xlsx
+│   ├── gen
+│   │   └── schemas
+│   │       ├── acl-manifests.json
+│   │       ├── capabilities.json
+│   │       ├── desktop-schema.json
+│   │       └── linux-schema.json
+│   ├── icons
+│   │   ├── 128x128@2x.png
+│   │   ├── 128x128.png
+│   │   ├── 32x32.png
+│   │   ├── devos-globe.svg
+│   │   ├── GisGlobeO.svg
+│   │   ├── icon.icns
+│   │   ├── icon.ico
+│   │   ├── icon.png
+│   │   ├── Square107x107Logo.png
+│   │   ├── Square142x142Logo.png
+│   │   ├── Square150x150Logo.png
+│   │   ├── Square284x284Logo.png
+│   │   ├── Square30x30Logo.png
+│   │   ├── Square310x310Logo.png
+│   │   ├── Square44x44Logo.png
+│   │   ├── Square71x71Logo.png
+│   │   ├── Square89x89Logo.png
+│   │   └── StoreLogo.png
+│   ├── permissions
+│   │   └── autogenerated
+│   │       ├── batch_fetch_wallet_balances.toml
+│   │       ├── cancel_pending_creation.toml
+│   │       ├── confirm_and_save_wallets.toml
+│   │       ├── execute_real_estate_import.toml
+│   │       ├── export_authorized_secret.toml
+│   │       ├── export_citizen_ledger_pdf.toml
+│   │       ├── export_invoice_pdf.toml
+│   │       ├── export_vault_backup.toml
+│   │       ├── fetch_wallet_balance.toml
+│   │       ├── generate_document.toml
+│   │       ├── generate_seed_and_preview.toml
+│   │       ├── get_device_status.toml
+│   │       ├── get_real_estate_stats.toml
+│   │       ├── get_vault_status.toml
+│   │       ├── init_master_password.toml
+│   │       ├── list_audit_findings.toml
+│   │       ├── list_import_batches.toml
+│   │       ├── list_properties.toml
+│   │       ├── list_stored_wallets.toml
+│   │       ├── lock_vault.toml
+│   │       ├── preview_real_estate_import.toml
+│   │       ├── restore_vault_backup.toml
+│   │       ├── reveal_pending_mnemonic.toml
+│   │       ├── select_spreadsheet_file.toml
+│   │       └── unlock_vault.toml
+│   ├── src
+│   │   ├── commands
+│   │   │   ├── document_commands.rs
+│   │   │   ├── mod.rs
+│   │   │   ├── monitoring_commands.rs
+│   │   │   ├── real_estate_commands.rs
+│   │   │   ├── system_commands.rs
+│   │   │   ├── vault_commands.rs
+│   │   │   └── wallet_commands.rs
+│   │   ├── lib.rs
+│   │   ├── main.rs
+│   │   ├── modules
+│   │   │   ├── documents
+│   │   │   │   ├── models.rs
+│   │   │   │   ├── mod.rs
+│   │   │   │   ├── ports.rs
+│   │   │   │   └── service.rs
+│   │   │   └── mod.rs
+│   │   ├── monitoring
+│   │   │   ├── mod.rs
+│   │   │   └── rpc_client.rs
+│   │   ├── platform
+│   │   │   ├── mod.rs
+│   │   │   └── typst_engine.rs
+│   │   ├── real_estate
+│   │   │   ├── importer.rs
+│   │   │   ├── mod.rs
+│   │   │   └── normalization.rs
+│   │   ├── reports
+│   │   │   ├── engine.rs
+│   │   │   ├── models.rs
+│   │   │   └── mod.rs
+│   │   ├── storage
+│   │   │   ├── local_database.rs
+│   │   │   ├── migrations.rs
+│   │   │   ├── mod.rs
+│   │   │   ├── real_estate_database.rs
+│   │   │   └── real_estate_migrations.rs
+│   │   ├── tests
+│   │   │   ├── document_integration_test.rs
+│   │   │   ├── mod.rs
+│   │   │   ├── real_estate_integration_tests.rs
+│   │   │   └── security_tests.rs
+│   │   ├── vault
+│   │   │   ├── access_control.rs
+│   │   │   ├── encryption.rs
+│   │   │   └── mod.rs
+│   │   └── wallets
+│   │       ├── address.rs
+│   │       ├── creation_session.rs
+│   │       ├── derivation.rs
+│   │       ├── mnemonic.rs
+│   │       └── mod.rs
+│   ├── tauri.cockpit.conf.json
+│   ├── tauri.conf.json
+│   ├── tauri.node.conf.json
+│   └── templates
+│       ├── contrato_cessao_posse.typ
+│       ├── extrato_citizen_ledger.typ
+│       └── invoice_bill.typ
+├── tsconfig.json
+├── tsconfig.node.json
+├── vite.config.ts
+├── vite-ledger-plugin.ts
+└── vite-real-estate-plugin.ts
+
+196 directories, 581 files

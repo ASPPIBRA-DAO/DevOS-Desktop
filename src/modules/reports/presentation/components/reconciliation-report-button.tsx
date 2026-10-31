@@ -1,4 +1,3 @@
-import type { ReconciliationReportModel } from '../../services/report-compiler-service';
 import type {
   RealEstateStats,
   PropertySummary,
@@ -23,12 +22,12 @@ import DialogContent from '@mui/material/DialogContent';
 import CircularProgress from '@mui/material/CircularProgress';
 import FormControlLabel from '@mui/material/FormControlLabel';
 
-import { PdfPreviewDialog } from '../../../documents';
 import { colors } from '../../../../shared/theme/palette';
+import { generateDocument } from '../../../../platform/tauri';
+import { toast } from '../../../../shared/components/snackbar';
 import { Iconify } from '../../../../shared/components/iconify';
 import { ReportCompilerService } from '../../services/report-compiler-service';
 import { RealEstateBridge } from '../../../../platform/tauri/real-estate/real-estate-bridge';
-import { RealEstateReconciliationReport } from '../../templates/real-estate-reconciliation-report';
 
 export interface ReconciliationReportButtonProps {
   stats: RealEstateStats | null;
@@ -50,10 +49,8 @@ export const ReconciliationReportButton: React.FC<ReconciliationReportButtonProp
   disabled = false,
 }) => {
   const [modalOpen, setModalOpen] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
   const [isCompiling, setIsCompiling] = useState(false);
   const [reportLimit, setReportLimit] = useState<number>(2500);
-  const [reportModel, setReportModel] = useState<ReconciliationReportModel | null>(null);
 
   if (!stats) return null;
 
@@ -83,11 +80,30 @@ export const ReconciliationReportButton: React.FC<ReconciliationReportButtonProp
         findings,
         propsToUse
       );
-      setReportModel(compiled);
+
+      const targetFileName = `relatorio-cadastral-marica-${Date.now()}.pdf`;
+      const result = await generateDocument({
+        request: {
+          kind: 'real_estate_reconciliation',
+          payload: {
+            data: compiled as unknown as Record<string, unknown>,
+          },
+        },
+        open_after_export: true,
+        target_file_name: targetFileName,
+      });
+
       setModalOpen(false);
-      setPreviewOpen(true);
-    } catch (err) {
+      toast.success(
+        `Relatório PDF gerado com sucesso (${result.file_name})! Aberto no visualizador do sistema.`
+      );
+    } catch (err: any) {
       console.error('Erro ao compilar relatório cadastral:', err);
+      toast.error(
+        typeof err === 'string'
+          ? err
+          : err?.message || 'Erro ao gerar o relatório em PDF nativo.'
+      );
     } finally {
       setIsCompiling(false);
     }
@@ -306,15 +322,6 @@ export const ReconciliationReportButton: React.FC<ReconciliationReportButtonProp
           </Button>
         </DialogActions>
       </Dialog>
-
-      {/* Visualizador de Alta Fidelidade do PDF para Impressão */}
-      <PdfPreviewDialog
-        open={previewOpen}
-        onClose={() => setPreviewOpen(false)}
-        title={`Relatório Cadastral de Maricá (${reportLimit.toLocaleString('pt-BR')} Imóveis)`}
-        filename={`relatorio-cadastral-marica-${Date.now()}.pdf`}
-        documentElement={reportModel ? <RealEstateReconciliationReport data={reportModel} /> : null}
-      />
     </>
   );
 };

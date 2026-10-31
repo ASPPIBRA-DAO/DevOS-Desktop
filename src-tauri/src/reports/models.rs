@@ -120,6 +120,12 @@ fn default_contract_auth_code() -> String {
     "2026-X7Y9".to_string()
 }
 
+/// Dados de entrada para a geração do Relatório Analítico de Reconciliação Imobiliária.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct RealEstateReconciliationPayload {
+    pub data: serde_json::Value,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

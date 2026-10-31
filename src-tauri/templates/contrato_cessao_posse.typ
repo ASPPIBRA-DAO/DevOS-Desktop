@@ -161,10 +161,10 @@
 
 #v(4pt)
 
-3.1. Pela cessão dos direitos possessórios descritos neste instrumento, o CESSIONÁRIO pagará a quantia total e certa de *R$ #get_val("valorTotal", "65.000,00")* (#get_val("valorTotalExtenso", "sessenta e cinco mil reais")), a ser liquidada da seguinte forma:
+3.1. Pela cessão dos direitos possessórios descritos neste instrumento, o CESSIONÁRIO pagará a quantia total e certa de *R\$ #get_val("valorTotal", "65.000,00")* (#get_val("valorTotalExtenso", "sessenta e cinco mil reais")), a ser liquidada da seguinte forma:
 
-- *a) Entrada / Sinal:* R$ #get_val("valorSinal", "15.000,00") (#get_val("valorSinalExtenso", "quinze mil reais")), pagos na data de assinatura deste contrato;
-- *b) Saldo Remanescente:* R$ #get_val("valorSaldo", "50.000,00"), dividido em #get_val("qtdParcelas", "36") parcelas mensais e sucessivas no valor de R$ #get_val("valorParcela", "1.388,89") cada.
+- *a) Entrada / Sinal:* R\$ #get_val("valorSinal", "15.000,00") (#get_val("valorSinalExtenso", "quinze mil reais")), pagos na data de assinatura deste contrato;
+- *b) Saldo Remanescente:* R\$ #get_val("valorSaldo", "50.000,00"), dividido em #get_val("qtdParcelas", "36") parcelas mensais e sucessivas no valor de R\$ #get_val("valorParcela", "1.388,89") cada.
 
 3.2. As partes convencionam expressamente que todos os pagamentos serão canalizados por meio da conta operacional da ASPPIBRA discriminada no Capítulo I, a qual atua como mandatária para arrecadação, conciliação e repasse aos titulares de direito.
 
@@ -267,7 +267,7 @@
         [
           #text(weight: "bold", size: 7.5pt, fill: rgb("#0A3B18"))[CHANCELA DIGITAL DE AUDITORIA E INTEGRIDADE (DEVOS CORE)] \
           #text(size: 6.5pt, fill: rgb("#4B5563"))[Assinatura eletrônica realizada via Chave Privada do Associado e Protocolo Edge Cloudflare D1.] \
-          #text(size: 6.5pt, font: "monospace", fill: rgb("#111827"))[Protocolo: ASPPIBRA-DOC-#auth_code-SECURE]
+          #text(size: 6.5pt, font: "monospace", fill: rgb("#111827"))[Protocolo: ASPPIBRA-DOC-#{auth_code}-SECURE]
         ],
         [
           #rect(

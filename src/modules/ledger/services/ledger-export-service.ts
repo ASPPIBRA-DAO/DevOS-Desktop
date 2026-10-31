@@ -1,11 +1,8 @@
-import type { GenerateDocumentResult } from '../../documents';
+import type { GenerateDocumentResult } from '../../../platform/tauri';
 import type { IFinancialProfile, ITreasuryTransaction } from '../domain/ledger-models';
 
-import React from 'react';
-
-import { generateDocument, PdfExportService } from '../../documents';
+import { generateDocument } from '../../../platform/tauri';
 import { isTauriDesktop } from '../../../platform/tauri/core/invoke';
-import { CitizenLedgerPdfDocument } from '../templates/citizen-ledger-pdf-document';
 
 export interface ExportCitizenLedgerPdfPayload {
   associate_id?: string;
@@ -45,8 +42,8 @@ export interface ExportCitizenLedgerPdfPayload {
 
 export async function exportCitizenLedgerPdf(
   payload: ExportCitizenLedgerPdfPayload,
-  profile?: IFinancialProfile | null,
-  transactions?: ITreasuryTransaction[]
+  _profile?: IFinancialProfile | null,
+  _transactions?: ITreasuryTransaction[]
 ): Promise<GenerateDocumentResult> {
   const fileName = `extrato_associado_${payload.associate_id || 'documento'}.pdf`;
 
@@ -63,39 +60,16 @@ export async function exportCitizenLedgerPdf(
     });
   }
 
-  // Modo Web: Gera arquivo PDF fiduciario real em A4 e dispara download automatico
-  if (profile && transactions) {
-    const docElement = React.createElement(CitizenLedgerPdfDocument, {
-      profile,
-      transactions,
-    });
-    const blob = await PdfExportService.renderToBlob(docElement as any);
-    PdfExportService.downloadPdf(blob, fileName);
-
-    return {
-      success: true,
-      file_path: `download://${fileName}`,
-      file_name: fileName,
-      message: 'Download do PDF oficial em folha A4 fiduciária concluído com sucesso.',
-      metadata: {
-        document_kind: 'citizen_ledger',
-        generated_at_utc: new Date().toISOString(),
-        sha256_checksum: payload.data.meta.audit_hash,
-        byte_size: blob.size,
-        template_id: 'citizen_ledger_react_pdf',
-      },
-    };
-  }
-
-  // Fallback caso nao haja profile direto
+  // Fallback para ambiente Web / Testes (dispara impressão ABNT no navegador)
   if (typeof window !== 'undefined' && typeof window.print === 'function') {
-    window.print();
+    printCitizenLedgerHtml();
   }
+
   return {
     success: true,
     file_path: 'browser://print',
     file_name: fileName,
-    message: 'Janela de impressão ABNT acionada com sucesso no navegador.',
+    message: 'Janela de impressão ABNT acionada com sucesso.',
     metadata: {
       document_kind: 'citizen_ledger',
       generated_at_utc: new Date().toISOString(),
@@ -108,9 +82,11 @@ export async function exportCitizenLedgerPdf(
 
 export function printCitizenLedgerHtml(): void {
   if (typeof window === 'undefined') return;
-  const sheetEl = document.querySelector('.a4-sheet');
+  const sheetEl = typeof document !== 'undefined' ? document.querySelector('.a4-sheet') : null;
   if (!sheetEl) {
-    window.print();
+    if (typeof window.print === 'function') {
+      window.print();
+    }
     return;
   }
 

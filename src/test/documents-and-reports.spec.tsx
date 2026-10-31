@@ -1,13 +1,10 @@
-import React from 'react';
 import { it, expect, describe } from 'vitest';
-import { Text, View, Document } from '@react-pdf/renderer';
 
-import { PdfExportService } from '../modules/documents/services/pdf-export-service';
-import { DocumentLayout } from '../modules/documents/templates/shared/document-layout';
+import { mockIpcResponse } from './test-utils';
+import { generateDocument } from '../modules/documents';
 import { ReportCompilerService } from '../modules/reports/services/report-compiler-service';
-import { RealEstateReconciliationReport } from '../modules/reports/templates/real-estate-reconciliation-report';
 
-describe('Módulos Documents & Reports — Geração e Compilação', () => {
+describe('Módulos Documents & Reports — Geração e Compilação Nativa', () => {
   const mockStats = {
     total_properties: 42,
     total_identifiers: 84,
@@ -99,46 +96,44 @@ describe('Módulos Documents & Reports — Geração e Compilação', () => {
     expect(compiled.properties).toEqual([]);
   });
 
-  it('deve gerar um Blob PDF real e válido com cabeçalho mágico %PDF-', async () => {
-    const testDoc = (
-      <Document>
-        <DocumentLayout title="Documento de Teste DevOS" systemTag="Test Environment">
-          <View>
-            <Text>Conteúdo de validação do motor React-PDF v4</Text>
-          </View>
-        </DocumentLayout>
-      </Document>
-    );
-
-    const blob = await PdfExportService.renderToBlob(testDoc);
-
-    expect(blob).toBeInstanceOf(Blob);
-    expect(blob.size).toBeGreaterThan(500);
-    expect(blob.type).toBe('application/pdf');
-
-    // Validação da assinatura mágica do cabeçalho binário do PDF (%PDF-)
-    const arrayBuffer = await blob.arrayBuffer();
-    const headerBytes = new Uint8Array(arrayBuffer.slice(0, 5));
-    const headerString = String.fromCharCode(...headerBytes);
-    expect(headerString).toBe('%PDF-');
-  });
-
-  it('deve renderizar o relatório analítico completo de reconciliação em formato PDF real', async () => {
+  it('deve orquestrar a geração do relatório analítico via motor nativo Typst (IPC generate_document)', async () => {
     const compiled = ReportCompilerService.compileReconciliationReport(
       mockStats,
       mockBatches,
-      mockFindings
+      mockFindings,
+      mockProperties
     );
-    const reportElement = <RealEstateReconciliationReport data={compiled} />;
 
-    const blob = await PdfExportService.renderToBlob(reportElement);
+    const mockOutput = {
+      success: true,
+      file_path: '/tmp/relatorio-cadastral-marica.pdf',
+      file_name: 'relatorio-cadastral-marica.pdf',
+      message: 'Documento gerado com sucesso.',
+      metadata: {
+        document_kind: 'real_estate_reconciliation' as const,
+        generated_at_utc: '2026-10-31T13:00:00Z',
+        sha256_checksum: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+        byte_size: 15420,
+        template_id: 'real_estate_reconciliation.typ',
+      },
+    };
+    mockIpcResponse('generate_document', mockOutput);
 
-    expect(blob).toBeInstanceOf(Blob);
-    expect(blob.size).toBeGreaterThan(1000);
-    expect(blob.type).toBe('application/pdf');
+    const result = await generateDocument({
+      request: {
+        kind: 'real_estate_reconciliation',
+        payload: {
+          data: compiled as unknown as Record<string, unknown>,
+        },
+      },
+      open_after_export: true,
+      target_file_name: 'relatorio-cadastral-marica.pdf',
+    });
 
-    const arrayBuffer = await blob.arrayBuffer();
-    const headerString = String.fromCharCode(...new Uint8Array(arrayBuffer.slice(0, 5)));
-    expect(headerString).toBe('%PDF-');
+    expect(result.success).toBe(true);
+    expect(result.file_name).toBe('relatorio-cadastral-marica.pdf');
+    expect(result.metadata.document_kind).toBe('real_estate_reconciliation');
+    expect(result.metadata.template_id).toBe('real_estate_reconciliation.typ');
+    expect(result.metadata.sha256_checksum).toHaveLength(64);
   });
 });

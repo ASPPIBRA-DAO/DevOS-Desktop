@@ -137,6 +137,9 @@ fn default_file_name(kind: DocumentKind) -> String {
         DocumentKind::CessaoPosse => {
             format!("contrato_cessao_posse_{timestamp}.pdf")
         }
+        DocumentKind::RealEstateReconciliation => {
+            format!("reconciliacao_imobiliaria_{timestamp}.pdf")
+        }
     }
 }
 

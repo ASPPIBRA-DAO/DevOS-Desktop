@@ -17,6 +17,9 @@ static INVOICE_TEMPLATE: &str =
 static CONTRATO_CESSAO_TEMPLATE: &str =
     include_str!("../../../templates/contrato_cessao_posse.typ");
 
+static RECONCILIATION_TEMPLATE: &str =
+    include_str!("../../../templates/real_estate_reconciliation.typ");
+
 static ROBOTO_REGULAR: &[u8] =
     include_bytes!("../../../assets/fonts/Roboto-Regular.ttf");
 
@@ -44,7 +47,10 @@ impl DocumentRenderer for DocumentsService {
     fn supports(&self, kind: DocumentKind) -> bool {
         matches!(
             kind,
-            DocumentKind::CitizenLedger | DocumentKind::InvoiceBill | DocumentKind::CessaoPosse
+            DocumentKind::CitizenLedger
+                | DocumentKind::InvoiceBill
+                | DocumentKind::CessaoPosse
+                | DocumentKind::RealEstateReconciliation
         )
     }
 
@@ -84,6 +90,15 @@ impl DocumentRenderer for DocumentsService {
                     })?;
 
                 (CONTRATO_CESSAO_TEMPLATE, json_str)
+            }
+
+            DocumentRequest::RealEstateReconciliation(payload) => {
+                let json_str = serde_json::to_string(&payload.data)
+                    .map_err(|error| {
+                        DocumentError::SerializationError(error.to_string())
+                    })?;
+
+                (RECONCILIATION_TEMPLATE, json_str)
             }
         };
 
@@ -305,6 +320,70 @@ mod tests {
         assert_valid_document_output(
             &output,
             DocumentKind::CessaoPosse,
+        );
+    }
+
+    #[test]
+    fn test_generate_real_estate_reconciliation_document() {
+        let service = DocumentsService::new();
+
+        let payload = crate::reports::models::RealEstateReconciliationPayload {
+            data: serde_json::json!({
+                "generatedAt": "31/10/2026 13:00:00",
+                "stats": {
+                    "totalProperties": 145756,
+                    "totalIdentifiers": 145756,
+                    "totalAddresses": 142100,
+                    "totalBatches": 12,
+                    "openFindingsCount": 3,
+                    "pendingProposalsCount": 1
+                },
+                "batches": [
+                    {
+                        "id": 1,
+                        "filename": "lote_marica_2026_01.csv",
+                        "status": "CONCLUIDO",
+                        "mode": "INCREMENTAL",
+                        "importedRecords": 12500,
+                        "inconsistencies": 2
+                    }
+                ],
+                "findings": [
+                    {
+                        "id": 101,
+                        "category": "CADASTRO",
+                        "severity": "high",
+                        "description": "Inconsistência de numeração na Rua 15",
+                        "status": "OPEN"
+                    }
+                ],
+                "properties": [
+                    {
+                        "id": 1,
+                        "matricula": "MATR-00123",
+                        "contribuinte": "MARIA DA SILVA SANTOS",
+                        "bairro": "CENTRO",
+                        "rua": "RUA ALVARES DE CASTRO",
+                        "numero": "350",
+                        "quadra": "12",
+                        "lote": "04",
+                        "complemento": "SALA 101"
+                    }
+                ]
+            }),
+        };
+
+        let request = DocumentRequest::RealEstateReconciliation(payload);
+
+        let output = service
+            .generate_document(request)
+            .unwrap_or_else(|error| {
+                panic!("Falha ao gerar relatório de reconciliação: {error:?}")
+            });
+
+        assert_valid_document_output(
+            &output,
+            DocumentKind::RealEstateReconciliation,
         );
     }
 }

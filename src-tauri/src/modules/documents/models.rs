@@ -65,6 +65,9 @@ pub enum DocumentKind {
 
     /// Contrato de Cessão de Posse de Imóvel.
     CessaoPosse,
+
+    /// Relatório Analítico de Reconciliação Imobiliária.
+    RealEstateReconciliation,
 }
 
 impl DocumentKind {
@@ -78,6 +81,7 @@ impl DocumentKind {
             DocumentKind::CitizenLedger => DocumentScope::Universal,
             DocumentKind::InvoiceBill => DocumentScope::Universal,
             DocumentKind::CessaoPosse => DocumentScope::Universal,
+            DocumentKind::RealEstateReconciliation => DocumentScope::Universal,
         }
     }
 
@@ -87,6 +91,7 @@ impl DocumentKind {
             DocumentKind::CitizenLedger => "extrato_citizen_ledger.typ",
             DocumentKind::InvoiceBill => "invoice_bill.typ",
             DocumentKind::CessaoPosse => "contrato_cessao_posse.typ",
+            DocumentKind::RealEstateReconciliation => "real_estate_reconciliation.typ",
         }
     }
 }
@@ -138,6 +143,7 @@ pub enum DocumentRequest {
     CitizenLedger(crate::reports::models::CitizenLedgerPayload),
     InvoiceBill(crate::reports::models::InvoiceReportPayload),
     CessaoPosse(crate::reports::models::CessaoPossePayload),
+    RealEstateReconciliation(crate::reports::models::RealEstateReconciliationPayload),
 }
 
 impl DocumentRequest {
@@ -147,6 +153,9 @@ impl DocumentRequest {
             DocumentRequest::CitizenLedger(_) => DocumentKind::CitizenLedger,
             DocumentRequest::InvoiceBill(_) => DocumentKind::InvoiceBill,
             DocumentRequest::CessaoPosse(_) => DocumentKind::CessaoPosse,
+            DocumentRequest::RealEstateReconciliation(_) => {
+                DocumentKind::RealEstateReconciliation
+            }
         }
     }
 }
