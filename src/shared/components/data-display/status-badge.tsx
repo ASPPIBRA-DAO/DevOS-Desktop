@@ -3,7 +3,7 @@ import React from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 
-import { colors } from '../../theme/palette';
+import { colors } from 'src/theme';
 
 export type NodeStatusType =
   | 'ONLINE'
