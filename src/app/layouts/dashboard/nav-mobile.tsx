@@ -7,7 +7,7 @@ import Box from '@mui/material/Box';
 import Drawer from '@mui/material/Drawer';
 
 import { Logo } from 'src/components/logo';
-import { usePathname } from 'src/routes/hooks';
+import { usePathname } from 'src/app/router/hooks';
 import { Scrollbar } from 'src/components/scrollbar';
 import { NavSectionVertical } from 'src/components/nav-section';
 
