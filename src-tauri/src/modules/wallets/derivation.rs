@@ -82,7 +82,7 @@ impl DerivationService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::wallets::mnemonic::MnemonicService;
+    use crate::modules::wallets::mnemonic::MnemonicService;
 
     #[test]
     fn test_derivation_standard_test_vector() {
