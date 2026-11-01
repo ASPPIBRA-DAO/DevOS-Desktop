@@ -1,5 +1,3 @@
-// Componentes Atômicos Base (Compatibilidade Retroativa)
-export * from './Card';
 // Grupo 1: Identidade Visual e Estilo Cibernético
 export * from './logo';
 // Grupo 2: Feedback, Diálogos e Estados
@@ -14,7 +12,6 @@ export * from './iconify';
 // Animações e Transições
 export * from './animate';
 export * from './snackbar';
-export * from './MetricBox';
 export * from './svg-color';
 
 export * from './ipfs-cube';
@@ -24,7 +21,6 @@ export * from './scrollbar';
 export * from './hook-form';
 export * from './cyber-card';
 export * from './globe-wire';
-export * from './StatusBadge';
 
 export * from './nav-section';
 // Categorias Oficiais
