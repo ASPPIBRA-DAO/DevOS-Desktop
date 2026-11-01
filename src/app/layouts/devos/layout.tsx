@@ -14,17 +14,18 @@ import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 import { styled, useTheme } from '@mui/material/styles';
 
+import { paths } from 'src/app/router/paths';
+import { useBootstrap } from 'src/app/bootstrap';
+import { usePathname } from 'src/app/router/hooks';
+
 import { WindowModeToggle } from 'src/shared/components/window-mode-toggle';
 
-import { paths } from 'src/app/router/paths';
 import { Logo } from 'src/components/logo';
-import { usePathname } from 'src/app/router/hooks';
 import { Iconify } from 'src/components/iconify';
 import { NavSectionMini, NavSectionVertical } from 'src/components/nav-section';
 
 import { MenuButton } from '../components/menu-button';
 import { NavToggleButton } from '../components/nav-toggle-button';
-import { useBootstrap } from 'src/app/bootstrap';
 import { MainSection, layoutClasses, HeaderSection, LayoutSection } from '../core';
 
 // ----------------------------------------------------------------------
