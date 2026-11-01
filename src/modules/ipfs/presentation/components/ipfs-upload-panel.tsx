@@ -41,8 +41,8 @@ export function IpfsUploadPanel({ uploading, onUpload, lastResult }: IpfsUploadP
   };
 
   return (
-    <Card variant="glass" sx={{ height: '100%' }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+    <Card variant="glass" sx={{ height: '100%', minWidth: 0 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5, mb: 2 }}>
         <Typography variant="h5" sx={{ fontWeight: 700 }}>
           Upload & Custódia de Arquivos
         </Typography>
@@ -71,7 +71,7 @@ export function IpfsUploadPanel({ uploading, onUpload, lastResult }: IpfsUploadP
           }}
         />
 
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
           <FormControlLabel
             control={
               <Switch
