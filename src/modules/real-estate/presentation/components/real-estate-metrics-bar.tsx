@@ -6,7 +6,7 @@ import Box from '@mui/material/Box';
 
 import { colors } from 'src/theme';
 import { Iconify } from '../../../../shared/components/iconify';
-import { MetricBox } from '../../../../shared/components/MetricBox';
+import { MetricBox } from 'src/shared/components/data-display';
 
 export interface RealEstateMetricsBarProps {
   stats: RealEstateStats | null;
