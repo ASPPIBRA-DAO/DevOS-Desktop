@@ -118,6 +118,23 @@ impl KuboClient {
             .map_err(|e| format!("Falha ao decodificar lista de peers: {e}"))
     }
 
+    /// Conecta o nó local a um peer específico via multiaddr (/api/v0/swarm/connect?arg=<multiaddr>).
+    pub async fn swarm_connect(&self, multiaddr: &str) -> Result<(), String> {
+        let url = format!("{}/swarm/connect?arg={}", self.base_url, multiaddr);
+        let res = self
+            .client
+            .post(&url)
+            .send()
+            .await
+            .map_err(|e| format!("Falha de conexão com Kubo RPC (/swarm/connect): {e}"))?;
+
+        if !res.status().is_success() {
+            let err_text = res.text().await.unwrap_or_default();
+            return Err(format!("Kubo RPC (/swarm/connect) retornou erro: {err_text}"));
+        }
+        Ok(())
+    }
+
     /// Consolida o status operacional completo do nó local.
     /// Se o daemon estiver inativo, retorna imediatamente `running: false` sem travar a interface.
     pub async fn query_daemon_status(&self) -> IpfsDaemonStatus {
@@ -534,14 +551,14 @@ impl KuboClient {
         num_providers: u32,
     ) -> Result<Vec<IpfsProviderPeer>, String> {
         let url = format!(
-            "{}/routing/findprovs?arg={}&num-providers={}",
+            "{}/routing/findprovs?arg={}&num-providers={}&timeout=3s",
             self.base_url, cid, num_providers
         );
 
         let res = self
             .client
             .post(&url)
-            .timeout(Duration::from_secs(ROUTING_TIMEOUT_SECS))
+            .timeout(Duration::from_secs(5))
             .send()
             .await
             .map_err(|e| format!("Falha de conexão com Kubo RPC (/routing/findprovs): {e}"))?;
@@ -555,7 +572,7 @@ impl KuboClient {
         let text = res
             .text()
             .await
-            .map_err(|e| format!("Falha ao ler stream de routing/findprovs: {e}"))?;
+            .unwrap_or_default();
 
         let mut providers = Vec::new();
 
