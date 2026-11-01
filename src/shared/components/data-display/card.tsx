@@ -4,7 +4,7 @@ import React from 'react';
 
 import Box from '@mui/material/Box';
 
-import { colors } from '../../theme/palette';
+import { colors } from 'src/theme';
 
 export interface CardProps extends BoxProps {
   variant?: 'glass' | 'solid' | 'interactive';
