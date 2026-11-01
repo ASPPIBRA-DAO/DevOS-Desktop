@@ -226,7 +226,7 @@ fn write_pdf_without_overwrite(
 mod tests {
     use super::*;
 
-    use crate::reports::models::{
+    use crate::modules::reports::models::{
         CitizenLedgerPayload,
         InvoiceReportItem,
         InvoiceReportPayload,
