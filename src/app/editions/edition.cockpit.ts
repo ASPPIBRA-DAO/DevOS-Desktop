@@ -1,6 +1,6 @@
 import type { EditionConfig } from './types';
 
-import { paths } from '../../routes/paths';
+import { paths } from '../router/paths';
 import { LedgerView } from '../../modules/ledger';
 import { RealEstateView } from '../../modules/real-estate';
 import { CessaoPosseView } from '../../sections/cessao-de-posse';
