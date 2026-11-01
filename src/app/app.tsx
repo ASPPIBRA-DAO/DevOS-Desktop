@@ -2,19 +2,18 @@ import React from 'react';
 import { HashRouter } from 'react-router';
 
 import { AppRouter } from './router';
-import { ThemeProvider, ErrorBoundary, AppBootstrapProvider } from './providers';
+import { AppProviders } from './providers';
+import { AppBootstrapProvider } from './bootstrap';
 
 export function App() {
   return (
-    <ThemeProvider>
-      <HashRouter>
-        <ErrorBoundary>
-          <AppBootstrapProvider>
-            <AppRouter />
-          </AppBootstrapProvider>
-        </ErrorBoundary>
-      </HashRouter>
-    </ThemeProvider>
+    <AppProviders>
+      <AppBootstrapProvider>
+        <HashRouter>
+          <AppRouter />
+        </HashRouter>
+      </AppBootstrapProvider>
+    </AppProviders>
   );
 }
 
