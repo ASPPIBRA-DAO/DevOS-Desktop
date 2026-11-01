@@ -8,6 +8,7 @@
 use crate::commands::ipfs_commands::*;
 use crate::modules::ipfs::client::KuboClient;
 use crate::modules::ipfs::models::*;
+use sha2::Digest;
 
 #[test]
 fn test_ipfs_daemon_status_default_offline() {
@@ -151,6 +152,7 @@ async fn test_managed_pins_catalog_lifecycle() {
         pinned_at_utc: "2026-11-01T15:00:00Z".to_string(),
         pin_type: "recursive".to_string(),
         origin: "unit_test".to_string(),
+        repo_context: "shared_or_external".to_string(),
     };
 
     register_managed_pin(record).expect("Registro de pin no catalogo");
@@ -169,18 +171,52 @@ async fn test_managed_pins_catalog_lifecycle() {
 }
 
 #[tokio::test]
-async fn test_safe_unpin_rejects_unmanaged_pin_without_force() {
+async fn test_safe_unpin_shared_repo_requires_confirmation_for_managed_pin() {
+    use crate::modules::ipfs::pinning::{register_managed_pin, safe_unpin, set_custom_catalog_dir};
+
+    let temp_dir = std::env::temp_dir().join(format!("devos_unpin_test_{}", uuid::Uuid::new_v4()));
+    let _ = std::fs::create_dir_all(&temp_dir);
+    set_custom_catalog_dir(Some(temp_dir.clone()));
+
+    let client = KuboClient::with_base_url("http://127.0.0.1:59999/api/v0");
+    let managed_cid = "bafybeihdwdcefghrandomcidtest123456";
+
+    register_managed_pin(ManagedPinRecord {
+        cid: managed_cid.to_string(),
+        name: "test.pdf".to_string(),
+        original_sha256: "0xabcdef".to_string(),
+        size_bytes: 1024,
+        pinned_at_utc: "2026-11-01T15:00:00Z".to_string(),
+        pin_type: "recursive".to_string(),
+        origin: "unit_test".to_string(),
+        repo_context: "shared_or_external".to_string(),
+    }).expect("Registrar pin gerenciado");
+
+    // Correção 02: Mesmo sendo gerenciado pelo DevOS, em repositório compartilhado
+    // exige confirm_shared_repo_unpin = true explicitamente
+    let res = safe_unpin(&client, managed_cid, true, false, false).await;
+    assert!(res.is_err());
+    let err_msg = res.unwrap_err();
+    assert!(err_msg.contains("confirm_shared_repo_unpin = true"));
+    assert!(err_msg.contains("repositório compartilhado"));
+
+    set_custom_catalog_dir(None);
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+#[tokio::test]
+async fn test_safe_unpin_rejects_unmanaged_pin_without_confirmation() {
     use crate::modules::ipfs::pinning::safe_unpin;
 
     let client = KuboClient::with_base_url("http://127.0.0.1:59999/api/v0");
-    let unmanaged_cid = "bafybeihdwdcefghrandomcidtest123456";
+    let unmanaged_cid = "bafybeihdwdcefghrandomcidtest999999";
 
-    // Sem force_external = true, a remocao de um CID nao catalogado DEVE ser rejeitada
-    let res = safe_unpin(&client, unmanaged_cid, true, false).await;
+    // Sem confirmação explícita, a remoção de um CID não catalogado DEVE ser rejeitada
+    let res = safe_unpin(&client, unmanaged_cid, true, false, false).await;
     assert!(res.is_err());
     let err_msg = res.unwrap_err();
     assert!(err_msg.contains("não é gerenciado pelo DevOS"));
-    assert!(err_msg.contains("force_external_unpin = true"));
+    assert!(err_msg.contains("confirm_shared_repo_unpin = true"));
 }
 
 #[tokio::test]
@@ -200,6 +236,39 @@ async fn test_ipfs_upload_rejects_missing_file() {
 }
 
 #[tokio::test]
+async fn test_upload_failure_does_not_register_in_catalog() {
+    use crate::modules::ipfs::content::upload_file;
+    use crate::modules::ipfs::pinning::{is_managed_pin, set_custom_catalog_dir};
+    use std::io::Write;
+
+    let temp_dir = std::env::temp_dir().join(format!("devos_up_fail_{}", uuid::Uuid::new_v4()));
+    let _ = std::fs::create_dir_all(&temp_dir);
+    set_custom_catalog_dir(Some(temp_dir.clone()));
+
+    let sample_file = temp_dir.join("payload.txt");
+    let mut f = std::fs::File::create(&sample_file).unwrap();
+    f.write_all(b"dados para upload").unwrap();
+    drop(f);
+
+    // Nó inativo deve causar falha de rede
+    let client = KuboClient::with_base_url("http://127.0.0.1:59999/api/v0");
+    let options = IpfsUploadOptions {
+        file_path: sample_file.to_string_lossy().to_string(),
+        pin: true,
+        expected_sha256: None,
+    };
+
+    let res = upload_file(&client, options).await;
+    assert!(res.is_err());
+
+    // O catálogo não pode ter registrado nenhum CID falso em falha
+    assert!(!is_managed_pin("qualquer_cid"));
+
+    set_custom_catalog_dir(None);
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+#[tokio::test]
 async fn test_ipfs_download_rejects_empty_cid_or_invalid_dir() {
     use crate::modules::ipfs::content::download_file;
 
@@ -209,6 +278,7 @@ async fn test_ipfs_download_rejects_empty_cid_or_invalid_dir() {
         cid: "   ".to_string(),
         target_path: "/tmp/dest.pdf".to_string(),
         expected_sha256: None,
+        overwrite: false,
     };
     assert!(download_file(&client, empty_cid_options).await.is_err());
 
@@ -216,8 +286,188 @@ async fn test_ipfs_download_rejects_empty_cid_or_invalid_dir() {
         cid: "bafybeihdwdcefghrandomcidtest123456".to_string(),
         target_path: "/non_existent_folder_abc_123/dest.pdf".to_string(),
         expected_sha256: None,
+        overwrite: false,
     };
     assert!(download_file(&client, invalid_dir_options).await.is_err());
+}
+
+#[tokio::test]
+async fn test_offline_recovery_does_not_confirm_decentralized_availability() {
+    use crate::modules::ipfs::integrity::verify_cid_custody;
+
+    let client = KuboClient::with_base_url("http://127.0.0.1:59999/api/v0");
+    let cid = "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi";
+
+    // Correção 01: Verificação hermética. Quando o daemon está offline ou quando DHT não responde,
+    // a disponibilidade é LookupFailed (ou Unavailable se responder 0 provedores), NUNCA RecoveryConfirmed.
+    let report = verify_cid_custody(&client, cid, None).await.expect("Auditoria de custódia");
+
+    assert_ne!(
+        report.availability,
+        AvailabilityState::RecoveryConfirmed,
+        "Recuperação offline ou presença de blocos locais jamais deve atestar disponibilidade descentralizada"
+    );
+    assert_eq!(report.availability, AvailabilityState::LookupFailed);
+    assert_eq!(report.integrity, IntegrityState::Pending);
+}
+
+#[test]
+fn test_providers_found_differentiated_from_recovery_confirmed() {
+    // Correção 01: ProvidersFound indica anúncios na DHT, RecoveryConfirmed exige recuperação remota independente
+    assert_ne!(AvailabilityState::ProvidersFound, AvailabilityState::RecoveryConfirmed);
+    assert_ne!(AvailabilityState::ProvidersFound, AvailabilityState::Unavailable);
+    assert_ne!(AvailabilityState::LookupFailed, AvailabilityState::Unavailable);
+}
+
+#[tokio::test]
+async fn test_concurrent_downloads_do_not_share_temp_files() {
+    let parent_dir = std::env::temp_dir();
+    let file_stem = "relatorio_auditado.pdf";
+
+    // Gera 100 nomes de arquivos temporários concorrentes
+    let mut paths = std::collections::HashSet::new();
+    for _ in 0..100 {
+        let tmp = parent_dir.join(format!(".{file_stem}.{}.devos.tmp", uuid::Uuid::new_v4()));
+        assert!(paths.insert(tmp), "Cada arquivo temporário deve ter identificador UUID exclusivo");
+    }
+    assert_eq!(paths.len(), 100);
+}
+
+#[tokio::test]
+async fn test_download_overwrite_false_preserves_existing_destination() {
+    use crate::modules::ipfs::content::download_file;
+    use std::io::Write;
+
+    let temp_dir = std::env::temp_dir().join(format!("devos_down_ow_{}", uuid::Uuid::new_v4()));
+    let _ = std::fs::create_dir_all(&temp_dir);
+
+    let target_file = temp_dir.join("arquivo_existente.txt");
+    let original_bytes = b"CONTEUDO ORIGINAL PREEXISTENTE - NAO PODE SER SOBRESCRITO";
+    let mut f = std::fs::File::create(&target_file).unwrap();
+    f.write_all(original_bytes).unwrap();
+    drop(f);
+
+    let client = KuboClient::with_base_url("http://127.0.0.1:59999/api/v0");
+    let options = IpfsDownloadOptions {
+        cid: "bafybeihdwdcefghrandomcidtest123456".to_string(),
+        target_path: target_file.to_string_lossy().to_string(),
+        expected_sha256: None,
+        overwrite: false, // Padrão: NÃO sobrescrever
+    };
+
+    let res = download_file(&client, options).await;
+    assert!(res.is_err());
+    let err_msg = res.unwrap_err();
+    assert!(err_msg.contains("já existe"));
+    assert!(err_msg.contains("overwrite"));
+
+    // Valida que o arquivo original foi 100% preservado
+    let read_back = std::fs::read(&target_file).unwrap();
+    assert_eq!(read_back, original_bytes);
+
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+#[tokio::test]
+async fn test_download_failures_clean_up_temp_files() {
+    use crate::modules::ipfs::content::download_file;
+
+    let temp_dir = std::env::temp_dir().join(format!("devos_clean_test_{}", uuid::Uuid::new_v4()));
+    let _ = std::fs::create_dir_all(&temp_dir);
+    let target_file = temp_dir.join("destino.bin");
+
+    let client = KuboClient::with_base_url("http://127.0.0.1:59999/api/v0");
+    let options = IpfsDownloadOptions {
+        cid: "bafybeihdwdcefghrandomcidtest123456".to_string(),
+        target_path: target_file.to_string_lossy().to_string(),
+        expected_sha256: None,
+        overwrite: false,
+    };
+
+    let res = download_file(&client, options).await;
+    assert!(res.is_err());
+
+    // NENHUM arquivo temporário deve restar no diretório
+    let entries: Vec<_> = std::fs::read_dir(&temp_dir).unwrap().filter_map(|e| e.ok()).collect();
+    assert_eq!(entries.len(), 0, "Arquivos temporários devem ser removidos em caso de falha");
+
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+#[test]
+fn test_kubo_add_response_terminal_error_parsing() {
+    // Correção 03: Parser de resposta do Kubo em /api/v0/add
+    let normal_json = r#"{"Name":"teste.txt","Hash":"QmXoypizjW3WknFiJnKLwHCnL72vedxjQkDDP1mXWo6uco","Size":"123"}"#;
+    let normal_parsed: Result<KuboAddResponse, _> = serde_json::from_str(normal_json);
+    assert!(normal_parsed.is_ok());
+    let ok_obj = normal_parsed.unwrap();
+    assert_eq!(ok_obj.hash.as_deref(), Some("QmXoypizjW3WknFiJnKLwHCnL72vedxjQkDDP1mXWo6uco"));
+
+    // Erro terminal com Type error
+    let error_json = r#"{"Message":"no space left on device","Code":1,"Type":"error"}"#;
+    let error_parsed: Result<KuboAddResponse, _> = serde_json::from_str(error_json);
+    assert!(error_parsed.is_ok());
+    let err_obj = error_parsed.unwrap();
+    assert_eq!(err_obj.r#type.as_deref(), Some("error"));
+    assert_eq!(err_obj.message.as_deref(), Some("no space left on device"));
+}
+
+#[tokio::test]
+async fn test_decode_chunked_response_success() {
+    use crate::modules::ipfs::client::decode_chunked_response;
+    use sha2::{Digest, Sha256};
+    use std::io::Cursor;
+
+    // Stream chunked simulando resposta legítima do Kubo
+    let chunked_data = b"5\r\nHello\r\n6\r\n World\r\n0\r\n\r\n";
+    let reader = Cursor::new(chunked_data);
+    let mut writer = Vec::new();
+    let mut hasher = Sha256::new();
+
+    let bytes = decode_chunked_response(reader, &mut writer, &mut hasher)
+        .await
+        .expect("Decodificação chunked bem-sucedida");
+
+    assert_eq!(bytes, 11);
+    assert_eq!(&writer, b"Hello World");
+
+    let digest = hasher.finalize();
+    assert!(!digest.is_empty());
+}
+
+#[tokio::test]
+async fn test_decode_chunked_response_detects_trailer_error() {
+    use crate::modules::ipfs::client::decode_chunked_response;
+    use sha2::Sha256;
+    use std::io::Cursor;
+
+    // Correção 03: Kubo inicia transmissão normal (HTTP 200) e emite X-Stream-Error no trailer final
+    let chunked_with_trailer = b"5\r\nHello\r\n0\r\nX-Stream-Error: context deadline exceeded\r\n\r\n";
+    let reader = Cursor::new(chunked_with_trailer);
+    let mut writer = Vec::new();
+    let mut hasher = Sha256::new();
+
+    let res = decode_chunked_response(reader, &mut writer, &mut hasher).await;
+    assert!(res.is_err(), "Stream com trailer X-Stream-Error DEVE falhar");
+    let err_msg = res.unwrap_err();
+    assert!(err_msg.contains("X-Stream-Error"));
+    assert!(err_msg.contains("context deadline exceeded"));
+}
+
+#[tokio::test]
+async fn test_decode_chunked_response_detects_premature_eof() {
+    use crate::modules::ipfs::client::decode_chunked_response;
+    use sha2::Sha256;
+    use std::io::Cursor;
+
+    // Conexão encerrada antes do chunk final (0\r\n)
+    let truncated_chunk = b"5\r\nHel";
+    let reader = Cursor::new(truncated_chunk);
+    let mut writer = Vec::new();
+    let mut hasher = Sha256::new();
+
+    let res = decode_chunked_response(reader, &mut writer, &mut hasher).await;
+    assert!(res.is_err(), "Conexão prematuramente encerrada DEVE ser rejeitada");
 }
 
 #[tokio::test]
