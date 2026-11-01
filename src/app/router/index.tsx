@@ -14,6 +14,10 @@ import {
   JwtUpdatePasswordView,
 } from 'src/modules/authentication';
 
+export * from './paths';
+export * from './hooks';
+export * from './components';
+
 export function AppRouter() {
   const { state } = useBootstrap();
 
