@@ -25,6 +25,9 @@ const TAURI_APP_COMMANDS: &[&str] = &[
     "batch_fetch_wallet_balances",
     // Geração de documentos e relatórios nativos (Typst)
     "generate_document",
+    // Armazenamento descentralizado e DePIN (IPFS / Kubo)
+    "get_ipfs_daemon_status",
+    "execute_storage_proof",
     // Módulo imobiliário e importação de dados (Cockpit)
     "get_real_estate_stats",
     "preview_real_estate_import",
