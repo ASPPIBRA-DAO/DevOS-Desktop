@@ -161,6 +161,7 @@ impl KuboClient {
             repo_size_bytes: repo_size,
             peers_count,
             version,
+            origin: None,
         }
     }
 
