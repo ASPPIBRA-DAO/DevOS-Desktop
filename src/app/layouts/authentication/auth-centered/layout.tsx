@@ -12,12 +12,12 @@ import Box from '@mui/material/Box';
 import Link from '@mui/material/Link';
 import Typography from '@mui/material/Typography';
 
+import { paths } from 'src/app/router/paths';
+import { RouterLink } from 'src/app/router/components';
+
 import { WindowBridge } from 'src/platform/tauri/window/window-bridge';
 
 import { Logo } from 'src/shared/components/logo';
-
-import { paths } from 'src/app/router/paths';
-import { RouterLink } from 'src/app/router/components';
 
 import { AuthCenteredContent } from './content';
 import { SettingsButton } from '../../components/settings-button';
