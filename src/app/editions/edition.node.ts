@@ -1,6 +1,6 @@
 import type { EditionConfig } from './types';
 
-import { paths } from '../../routes/paths';
+import { paths } from '../router/paths';
 import { RealEstateView } from '../../modules/real-estate';
 import { NodeDashboardPage } from './node/node-dashboard-page';
 
