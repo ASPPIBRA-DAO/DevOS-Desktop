@@ -12,7 +12,7 @@ import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
 
 import { Card } from '../../../shared/components/Card';
-import { colors } from '../../../shared/theme/palette';
+import { colors } from 'src/theme';
 import { VaultStatusMetric } from '../../../modules/wallets';
 // Componentes modulares de domínio
 import { HostIntegrityCard } from '../../../modules/identity';
