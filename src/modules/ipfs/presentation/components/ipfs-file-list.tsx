@@ -18,8 +18,9 @@ import TableContainer from '@mui/material/TableContainer';
 import CircularProgress from '@mui/material/CircularProgress';
 import DialogContentText from '@mui/material/DialogContentText';
 
-import { colors } from 'src/theme';
 import { Card, StatusBadge } from 'src/shared/components/data-display';
+
+import { colors } from 'src/theme';
 
 export interface IpfsFileListProps {
   files: ManagedPinRecord[];
@@ -159,7 +160,7 @@ export function IpfsFileList({
                         <Button
                           size="small"
                           variant="outlined"
-                          disabled={Boolean(actionLoading)}
+                          disabled={Boolean(isItemLoading || actionLoading)}
                           onClick={(e) => {
                             e.stopPropagation();
                             onDownload(file.cid, file.name);
@@ -177,7 +178,7 @@ export function IpfsFileList({
                         <Button
                           size="small"
                           variant="outlined"
-                          disabled={Boolean(actionLoading)}
+                          disabled={Boolean(isItemLoading || actionLoading)}
                           onClick={(e) => {
                             e.stopPropagation();
                             setUnpinTarget(file);
