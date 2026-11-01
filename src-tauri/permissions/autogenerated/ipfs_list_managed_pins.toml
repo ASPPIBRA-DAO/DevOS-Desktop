@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-ipfs-list-managed-pins"
+description = "Enables the ipfs_list_managed_pins command without any pre-configured scope."
+commands.allow = ["ipfs_list_managed_pins"]
+
+[[permission]]
+identifier = "deny-ipfs-list-managed-pins"
+description = "Denies the ipfs_list_managed_pins command without any pre-configured scope."
+commands.deny = ["ipfs_list_managed_pins"]
