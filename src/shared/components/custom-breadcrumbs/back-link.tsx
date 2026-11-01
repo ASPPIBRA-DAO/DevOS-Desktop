@@ -2,7 +2,7 @@ import type { LinkProps } from '@mui/material/Link';
 
 import Link from '@mui/material/Link';
 
-import { RouterLink } from 'src/routes/components';
+import { RouterLink } from 'src/app/router/components';
 
 import { Iconify, iconifyClasses } from '../iconify';
 
