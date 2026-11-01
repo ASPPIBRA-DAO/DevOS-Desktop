@@ -4,7 +4,7 @@ import React from 'react';
 
 import Box from '@mui/material/Box';
 
-import { colors } from '../../../../shared/theme/palette';
+import { colors } from 'src/theme';
 import { Iconify } from '../../../../shared/components/iconify';
 import { MetricBox } from '../../../../shared/components/MetricBox';
 
