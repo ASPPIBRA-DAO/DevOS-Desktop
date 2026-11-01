@@ -1,4 +1,4 @@
-use crate::real_estate::RealEstateImporter;
+use crate::modules::real_estate::RealEstateImporter;
 use crate::storage::{RealEstateDatabase, RealEstateMigrationManager};
 use rusqlite::params;
 use std::fs;
@@ -901,7 +901,7 @@ fn test_real_estate_ambiguity_held_pending_without_arbitrary_merge() {
 
 #[test]
 fn test_real_estate_address_evidence_and_missing_fields() {
-    use crate::real_estate::importer::CandidateProperty;
+    use crate::modules::real_estate::importer::CandidateProperty;
 
     // Candidato completo com rua, bairro, número, quadra e lote
     let cand = CandidateProperty {
