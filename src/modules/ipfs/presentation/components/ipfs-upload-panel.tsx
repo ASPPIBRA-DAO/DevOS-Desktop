@@ -10,8 +10,9 @@ import Typography from '@mui/material/Typography';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import CircularProgress from '@mui/material/CircularProgress';
 
-import { colors } from 'src/theme';
 import { Card, StatusBadge } from 'src/shared/components/data-display';
+
+import { colors } from 'src/theme';
 
 export interface IpfsUploadPanelProps {
   uploading: boolean;
