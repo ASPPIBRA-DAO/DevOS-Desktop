@@ -79,6 +79,17 @@ export interface IpfsUnpinResult {
   was_managed_by_devos: boolean;
 }
 
+export interface ManagedPinRecord {
+  cid: string;
+  name: string;
+  original_sha256: string;
+  size_bytes: number;
+  pinned_at_utc: string;
+  pin_type: string;
+  origin: string;
+  repo_context?: string;
+}
+
 export type IntegrityState = 'PENDING' | 'CONFIRMED' | 'FAILED';
 
 export type CustodyState =
