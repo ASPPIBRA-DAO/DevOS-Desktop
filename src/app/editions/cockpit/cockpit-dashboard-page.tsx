@@ -6,7 +6,7 @@ import Card from '@mui/material/Card';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 
-import { paths } from '../../../routes/paths';
+import { paths } from 'src/app/router/paths';
 import { colors } from 'src/theme';
 import { Iconify } from '../../../shared/components/iconify';
 import { MetricBox, StatusBadge } from 'src/shared/components/data-display';
