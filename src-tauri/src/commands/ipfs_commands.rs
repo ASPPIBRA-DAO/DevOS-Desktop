@@ -6,7 +6,12 @@
 
 use sha2::{Digest, Sha256};
 use crate::modules::ipfs::{
-    DaemonManager, IpfsDaemonStatus, StorageProofChallenge, StorageProofResponse,
+    download_file, safe_unpin, upload_file, verify_all_pins, verify_cid_custody,
+    DaemonManager, IpfsAllPinsVerifyResult, IpfsCidCustodyStatus,
+    IpfsDaemonStatus, IpfsDownloadOptions, IpfsDownloadResult, IpfsPinRequest,
+    IpfsPinResult, IpfsPinType, IpfsProvidersResult, IpfsUnpinRequest,
+    IpfsUnpinResult, IpfsUploadOptions, IpfsUploadResult, KuboClient,
+    StorageProofChallenge, StorageProofResponse,
 };
 
 /// Consulta o estado operacional do daemon Kubo local.
@@ -61,3 +66,97 @@ pub async fn execute_storage_proof(
         node_operational_pubkey,
     })
 }
+
+/// Envia um arquivo para o nó IPFS local em streaming.
+#[tauri::command]
+pub async fn ipfs_upload_file(options: IpfsUploadOptions) -> Result<IpfsUploadResult, String> {
+    let client = KuboClient::new();
+    if !client.is_alive().await {
+        return Err("Nó IPFS (Kubo) não está em execução. Inicie o daemon antes de realizar uploads.".to_string());
+    }
+    upload_file(&client, options).await
+}
+
+/// Recupera um arquivo do nó IPFS por CID em streaming, gravando atomicamente no destino.
+#[tauri::command]
+pub async fn ipfs_download_file(options: IpfsDownloadOptions) -> Result<IpfsDownloadResult, String> {
+    let client = KuboClient::new();
+    if !client.is_alive().await {
+        return Err("Nó IPFS (Kubo) não está em execução. Inicie o daemon antes de recuperar arquivos.".to_string());
+    }
+    download_file(&client, options).await
+}
+
+/// Fixa um CID no repositório local do nó IPFS.
+#[tauri::command]
+pub async fn ipfs_pin_cid(request: IpfsPinRequest) -> Result<IpfsPinResult, String> {
+    if request.cid.trim().is_empty() {
+        return Err("CID ausente ou vazio.".to_string());
+    }
+    let client = KuboClient::new();
+    if !client.is_alive().await {
+        return Err("Nó IPFS (Kubo) inativo. Não foi possível fixar o conteúdo.".to_string());
+    }
+    let _ = client.pin_add(&request.cid, request.recursive).await?;
+    let pin_type = if request.recursive {
+        IpfsPinType::Recursive
+    } else {
+        IpfsPinType::Direct
+    };
+    Ok(IpfsPinResult {
+        cid: request.cid,
+        pinned: true,
+        pin_type,
+    })
+}
+
+/// Remove a fixação de um CID com proteção contra exclusão de pins externos de terceiros.
+#[tauri::command]
+pub async fn ipfs_unpin_cid(request: IpfsUnpinRequest) -> Result<IpfsUnpinResult, String> {
+    if request.cid.trim().is_empty() {
+        return Err("CID ausente ou vazio.".to_string());
+    }
+    let client = KuboClient::new();
+    if !client.is_alive().await {
+        return Err("Nó IPFS (Kubo) inativo. Não foi possível desfixar o conteúdo.".to_string());
+    }
+    safe_unpin(&client, &request.cid, request.recursive, request.force_external_unpin).await
+}
+
+/// Audita os três indicadores de armazenamento (Integridade, Custódia e Disponibilidade) para um CID específico.
+#[tauri::command]
+pub async fn ipfs_verify_cid_custody(
+    cid: String,
+    expected_sha256: Option<String>,
+) -> Result<IpfsCidCustodyStatus, String> {
+    let client = KuboClient::new();
+    if !client.is_alive().await {
+        return Err("Nó IPFS (Kubo) inativo. Não foi possível auditar a custódia do conteúdo.".to_string());
+    }
+    verify_cid_custody(&client, &cid, expected_sha256).await
+}
+
+/// Executa a auditoria completa de todos os pins recursivos do repositório Kubo.
+#[tauri::command]
+pub async fn ipfs_verify_all_pins() -> Result<IpfsAllPinsVerifyResult, String> {
+    let client = KuboClient::new();
+    if !client.is_alive().await {
+        return Err("Nó IPFS (Kubo) inativo. Não foi possível auditar os pins do repositório.".to_string());
+    }
+    verify_all_pins(&client).await
+}
+
+/// Consulta os peers que anunciam determinado CID na DHT.
+#[tauri::command]
+pub async fn ipfs_query_providers(cid: String) -> Result<IpfsProvidersResult, String> {
+    if cid.trim().is_empty() {
+        return Err("CID ausente ou vazio.".to_string());
+    }
+    let client = KuboClient::new();
+    if !client.is_alive().await {
+        return Err("Nó IPFS (Kubo) inativo. Não foi possível consultar provedores.".to_string());
+    }
+    let providers = client.routing_findprovs(&cid, 10).await?;
+    Ok(IpfsProvidersResult { cid, providers })
+}
+
