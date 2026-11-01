@@ -101,6 +101,125 @@ async fn test_storage_proof_rejects_empty_inputs() {
     assert!(execute_storage_proof(empty_id).await.is_err());
 }
 
+#[test]
+fn test_incremental_file_sha256_computation() {
+    use std::io::Write;
+    use crate::modules::ipfs::content::compute_file_sha256;
+
+    let temp_dir = std::env::temp_dir().join(format!("devos_test_{}", uuid::Uuid::new_v4()));
+    let _ = std::fs::create_dir_all(&temp_dir);
+    let test_file = temp_dir.join("test_sample.txt");
+
+    let sample_content = b"ASPPIBRA DevOS DePIN Storage Test Content";
+    let mut file = std::fs::File::create(&test_file).expect("Criar arquivo de teste");
+    file.write_all(sample_content).expect("Gravar conteudo");
+    drop(file);
+
+    let (calculated_hash, total_bytes) = compute_file_sha256(&test_file).expect("Calculo SHA-256");
+    assert_eq!(total_bytes, sample_content.len() as u64);
+    assert!(calculated_hash.starts_with("0x"));
+
+    // SHA-256 manual com sha2
+    use sha2::{Digest, Sha256};
+    let mut hasher = Sha256::new();
+    hasher.update(sample_content);
+    let expected = format!("0x{}", hex::encode(hasher.finalize()));
+
+    assert_eq!(calculated_hash, expected);
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+#[tokio::test]
+async fn test_managed_pins_catalog_lifecycle() {
+    use crate::modules::ipfs::pinning::{
+        is_managed_pin, list_managed_pins, register_managed_pin, set_custom_catalog_dir,
+        unregister_managed_pin,
+    };
+
+    let temp_dir = std::env::temp_dir().join(format!("devos_cat_test_{}", uuid::Uuid::new_v4()));
+    let _ = std::fs::create_dir_all(&temp_dir);
+    set_custom_catalog_dir(Some(temp_dir.clone()));
+
+    let cid = "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi";
+    assert!(!is_managed_pin(cid));
+
+    let record = ManagedPinRecord {
+        cid: cid.to_string(),
+        name: "documento_teste.pdf".to_string(),
+        original_sha256: "0x1234567890abcdef".to_string(),
+        size_bytes: 4096,
+        pinned_at_utc: "2026-11-01T15:00:00Z".to_string(),
+        pin_type: "recursive".to_string(),
+        origin: "unit_test".to_string(),
+    };
+
+    register_managed_pin(record).expect("Registro de pin no catalogo");
+    assert!(is_managed_pin(cid));
+
+    let list = list_managed_pins();
+    assert_eq!(list.len(), 1);
+    assert_eq!(list[0].cid, cid);
+
+    let removed = unregister_managed_pin(cid).expect("Remocao do registro");
+    assert!(removed);
+    assert!(!is_managed_pin(cid));
+
+    set_custom_catalog_dir(None);
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+#[tokio::test]
+async fn test_safe_unpin_rejects_unmanaged_pin_without_force() {
+    use crate::modules::ipfs::pinning::safe_unpin;
+
+    let client = KuboClient::with_base_url("http://127.0.0.1:59999/api/v0");
+    let unmanaged_cid = "bafybeihdwdcefghrandomcidtest123456";
+
+    // Sem force_external = true, a remocao de um CID nao catalogado DEVE ser rejeitada
+    let res = safe_unpin(&client, unmanaged_cid, true, false).await;
+    assert!(res.is_err());
+    let err_msg = res.unwrap_err();
+    assert!(err_msg.contains("não é gerenciado pelo DevOS"));
+    assert!(err_msg.contains("force_external_unpin = true"));
+}
+
+#[tokio::test]
+async fn test_ipfs_upload_rejects_missing_file() {
+    use crate::modules::ipfs::content::upload_file;
+
+    let client = KuboClient::with_base_url("http://127.0.0.1:59999/api/v0");
+    let missing_file_options = IpfsUploadOptions {
+        file_path: "/tmp/non_existent_devos_file_9999.xyz".to_string(),
+        pin: true,
+        expected_sha256: None,
+    };
+
+    let res = upload_file(&client, missing_file_options).await;
+    assert!(res.is_err());
+    assert!(res.unwrap_err().contains("não encontrado"));
+}
+
+#[tokio::test]
+async fn test_ipfs_download_rejects_empty_cid_or_invalid_dir() {
+    use crate::modules::ipfs::content::download_file;
+
+    let client = KuboClient::with_base_url("http://127.0.0.1:59999/api/v0");
+
+    let empty_cid_options = IpfsDownloadOptions {
+        cid: "   ".to_string(),
+        target_path: "/tmp/dest.pdf".to_string(),
+        expected_sha256: None,
+    };
+    assert!(download_file(&client, empty_cid_options).await.is_err());
+
+    let invalid_dir_options = IpfsDownloadOptions {
+        cid: "bafybeihdwdcefghrandomcidtest123456".to_string(),
+        target_path: "/non_existent_folder_abc_123/dest.pdf".to_string(),
+        expected_sha256: None,
+    };
+    assert!(download_file(&client, invalid_dir_options).await.is_err());
+}
+
 #[tokio::test]
 #[ignore]
 async fn test_real_kubo_connection_if_available() {
@@ -114,3 +233,4 @@ async fn test_real_kubo_connection_if_available() {
         println!("Kubo não está em execução na porta 5001 (teste ignorado)");
     }
 }
+
