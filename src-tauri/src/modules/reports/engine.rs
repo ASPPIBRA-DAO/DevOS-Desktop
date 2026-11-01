@@ -1,5 +1,5 @@
 use crate::modules::documents::{DocumentRequest, DocumentsService};
-use crate::reports::models::{CitizenLedgerPayload, InvoiceReportPayload};
+use super::models::{CitizenLedgerPayload, InvoiceReportPayload};
 
 /// Compila o PDF do Livro-Razão do Cidadão em memória.
 ///
@@ -36,7 +36,7 @@ fn compile_document_pdf(request: DocumentRequest) -> Result<Vec<u8>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::reports::models::InvoiceReportItem;
+    use crate::modules::reports::models::InvoiceReportItem;
     use serde_json::json;
 
     fn assert_valid_pdf(bytes: &[u8], document_name: &str) {
