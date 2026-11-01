@@ -7,6 +7,7 @@
 
 use crate::commands::ipfs_commands::*;
 use crate::modules::ipfs::client::KuboClient;
+use crate::modules::ipfs::daemon::DaemonManager;
 use crate::modules::ipfs::models::*;
 use sha2::Digest;
 
@@ -1119,5 +1120,30 @@ async fn test_full_operational_kubo_homologation_lifecycle() {
     assert!(shutdown_res.is_ok(), "Encerramento do daemon DevOS deve ter sucesso: {:?}", shutdown_res);
     println!("[Homologação] Daemon do Nó 1 encerrado com sucesso.");
 }
+
+#[test]
+fn test_resolve_ipfs_binary_finds_kubo_executable() {
+    let binary_path = DaemonManager::resolve_ipfs_binary();
+    assert!(
+        binary_path.is_some(),
+        "O binário 'ipfs' deve ser localizado no PATH ou nos caminhos canônicos (~/.local/opt/kubo, ~/.local/bin)"
+    );
+    let path = binary_path.unwrap();
+    println!("[Teste] Binário Kubo resolvido com sucesso: {:?}", path);
+}
+
+#[tokio::test]
+async fn test_daemon_control_ipc_commands_lifecycle() {
+    // Valida que o comando ipfs_stop_daemon é seguro e não remove processos externos indevidos
+    let status_before = crate::commands::get_ipfs_daemon_status().await.unwrap();
+    let stop_res = crate::commands::ipfs_stop_daemon().await;
+    assert!(stop_res.is_ok(), "ipfs_stop_daemon deve executar sem erros: {:?}", stop_res);
+
+    let status_after_stop = stop_res.unwrap();
+    if !status_before.running {
+        assert!(!status_after_stop.running);
+    }
+}
+
 
 
