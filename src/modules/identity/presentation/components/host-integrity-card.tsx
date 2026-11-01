@@ -5,9 +5,8 @@ import React from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 
-import { Card } from '../../../../shared/components/Card';
+import { Card, StatusBadge } from 'src/shared/components/data-display';
 import { colors } from 'src/theme';
-import { StatusBadge } from '../../../../shared/components/StatusBadge';
 
 export interface HostIntegrityCardProps {
   deviceStatus: DeviceStatusResponse | null;
