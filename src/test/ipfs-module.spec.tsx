@@ -32,6 +32,9 @@ describe('Módulo 11 — IPFS & Armazenamento Descentralizado (Testes do Módulo
     clearIpcMock('ipfs_verify_all_pins');
     clearIpcMock('ipfs_query_providers');
     clearIpcMock('execute_storage_proof');
+    clearIpcMock('ipfs_start_daemon');
+    clearIpcMock('ipfs_stop_daemon');
+    clearIpcMock('ipfs_restart_daemon');
   });
 
   describe('1. Contratos IPC & IpfsBridge', () => {
@@ -42,6 +45,7 @@ describe('Módulo 11 — IPFS & Armazenamento Descentralizado (Testes do Módulo
         peers_count: 15,
         repo_size_bytes: 1048576,
         version: '0.43.1',
+        origin: 'DevOsSpawned',
       };
       mockIpcResponse('get_ipfs_daemon_status', mockStatus);
 
@@ -50,6 +54,39 @@ describe('Módulo 11 — IPFS & Armazenamento Descentralizado (Testes do Módulo
       expect(status.peer_id).toBe('12D3KooWGeJjvgmCGAXcdPpoGZTwMpQCdEaf13uCkVw1Zs7zXjSK');
       expect(status.peers_count).toBe(15);
       expect(status.version).toBe('0.43.1');
+      expect(status.origin).toBe('DevOsSpawned');
+    });
+
+    it('deve iniciar o daemon via IpfsBridge.startDaemon()', async () => {
+      mockIpcResponse('ipfs_start_daemon', {
+        running: true,
+        peer_id: '12D3KooWGeJjvgmCGAXcdPpoGZTwMpQCdEaf13uCkVw1Zs7zXjSK',
+        peers_count: 1,
+        origin: 'DevOsSpawned',
+      });
+      const status = await IpfsBridge.startDaemon();
+      expect(status.running).toBe(true);
+      expect(status.origin).toBe('DevOsSpawned');
+    });
+
+    it('deve encerrar o daemon via IpfsBridge.stopDaemon()', async () => {
+      mockIpcResponse('ipfs_stop_daemon', {
+        running: false,
+        origin: 'Offline',
+      });
+      const status = await IpfsBridge.stopDaemon();
+      expect(status.running).toBe(false);
+    });
+
+    it('deve reiniciar o daemon via IpfsBridge.restartDaemon()', async () => {
+      mockIpcResponse('ipfs_restart_daemon', {
+        running: true,
+        peer_id: '12D3KooWGeJjvgmCGAXcdPpoGZTwMpQCdEaf13uCkVw1Zs7zXjSK',
+        origin: 'DevOsSpawned',
+      });
+      const status = await IpfsBridge.restartDaemon();
+      expect(status.running).toBe(true);
+      expect(status.origin).toBe('DevOsSpawned');
     });
 
     it('deve listar conteúdos gerenciados via IpfsBridge.listManagedPins()', async () => {
@@ -161,8 +198,28 @@ describe('Módulo 11 — IPFS & Armazenamento Descentralizado (Testes do Módulo
       );
       expect(React.isValidElement(onlineElement)).toBe(true);
 
-      const offlineElement = <IpfsNodeStatus status={{ running: false }} />;
+      const offlineElement = (
+        <IpfsNodeStatus
+          status={{ running: false, origin: 'Offline' }}
+          onStartDaemon={vi.fn()}
+        />
+      );
       expect(React.isValidElement(offlineElement)).toBe(true);
+
+      const withControlsElement = (
+        <IpfsNodeStatus
+          status={{
+            running: true,
+            peer_id: '12D3KooWGeJjvgmCGAXcdPpoGZTwMpQCdEaf13uCkVw1Zs7zXjSK',
+            origin: 'DevOsSpawned',
+          }}
+          onRefresh={vi.fn()}
+          onStartDaemon={vi.fn()}
+          onStopDaemon={vi.fn()}
+          onRestartDaemon={vi.fn()}
+        />
+      );
+      expect(React.isValidElement(withControlsElement)).toBe(true);
     });
 
     it('deve instanciar IpfsDaemonMetric com propriedades válidas', () => {
