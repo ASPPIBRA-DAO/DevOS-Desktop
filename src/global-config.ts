@@ -1,4 +1,4 @@
-import { paths } from 'src/routes/paths';
+import { paths } from 'src/app/router/paths';
 
 export type ConfigValue = {
   appName: string;
