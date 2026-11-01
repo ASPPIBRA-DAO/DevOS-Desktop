@@ -4,9 +4,11 @@ import React from 'react';
 
 import Box from '@mui/material/Box';
 
-import { colors } from 'src/theme';
-import { Iconify } from '../../../../shared/components/iconify';
 import { MetricBox } from 'src/shared/components/data-display';
+
+import { colors } from 'src/theme';
+
+import { Iconify } from '../../../../shared/components/iconify';
 
 export interface RealEstateMetricsBarProps {
   stats: RealEstateStats | null;
