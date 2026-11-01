@@ -26,7 +26,7 @@ import FormControl from '@mui/material/FormControl';
 import TableContainer from '@mui/material/TableContainer';
 import CircularProgress from '@mui/material/CircularProgress';
 
-import { colors } from '../../../../shared/theme/palette';
+import { colors } from 'src/theme';
 import { Iconify } from '../../../../shared/components/iconify';
 
 export interface RealEstateImporterCardProps {
