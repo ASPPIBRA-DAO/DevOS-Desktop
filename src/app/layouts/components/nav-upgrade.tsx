@@ -5,8 +5,7 @@ import Typography from '@mui/material/Typography';
 
 import { paths } from 'src/routes/paths';
 import { Label } from 'src/components/label';
-import { useUserProfile } from 'src/auth/facades';
-import { IdentityAvatar } from 'src/auth/components';
+import { useUserProfile, IdentityAvatar } from 'src/modules/authentication';
 import { CyberButton } from 'src/components/cyber-button';
 
 // ----------------------------------------------------------------------
