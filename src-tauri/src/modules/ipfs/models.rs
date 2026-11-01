@@ -122,6 +122,8 @@ pub struct IpfsDownloadOptions {
     pub cid: String,
     pub target_path: String,
     pub expected_sha256: Option<String>,
+    #[serde(default)]
+    pub overwrite: bool,
 }
 
 /// Resultado do download e recuperação com validação de checksum.
@@ -167,6 +169,8 @@ pub struct IpfsUnpinRequest {
     pub recursive: bool,
     #[serde(default)]
     pub force_external_unpin: bool,
+    #[serde(default)]
+    pub confirm_shared_repo_unpin: bool,
 }
 
 /// Resultado da operação de desfixação.
@@ -204,6 +208,7 @@ pub enum AvailabilityState {
     ProvidersFound,
     RecoveryConfirmed,
     Unavailable,
+    LookupFailed,
 }
 
 /// Relatório consolidado dos três indicadores de armazenamento para um CID específico.
@@ -244,6 +249,10 @@ pub struct IpfsProvidersResult {
     pub providers: Vec<IpfsProviderPeer>,
 }
 
+fn default_repo_context() -> String {
+    "shared_or_external".to_string()
+}
+
 /// Registro de catálogo local de pins gerenciados pelo DevOS ($APP_DATA_DIR/ipfs/managed-pins.json).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ManagedPinRecord {
@@ -254,6 +263,8 @@ pub struct ManagedPinRecord {
     pub pinned_at_utc: String,
     pub pin_type: String,
     pub origin: String,
+    #[serde(default = "default_repo_context")]
+    pub repo_context: String,
 }
 
 /// Resposta bruta da rota `/api/v0/add` do Kubo.
@@ -264,6 +275,9 @@ pub struct KuboAddResponse {
     pub hash: Option<String>,
     pub size: Option<String>,
     pub bytes: Option<u64>,
+    pub message: Option<String>,
+    pub code: Option<i32>,
+    pub r#type: Option<String>,
 }
 
 /// Resposta bruta da rota `/api/v0/pin/add` do Kubo.
