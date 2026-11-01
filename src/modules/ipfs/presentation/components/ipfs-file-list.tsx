@@ -64,8 +64,8 @@ export function IpfsFileList({
   };
 
   return (
-    <Card variant="glass">
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+    <Card variant="glass" sx={{ minWidth: 0, width: '100%' }}>
+      <Box sx={{ display: 'flex', alignItems: { xs: 'flex-start', sm: 'center' }, justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5, mb: 2 }}>
         <Box>
           <Typography variant="h5" sx={{ fontWeight: 700 }}>
             Catálogo de Conteúdos Gerenciados
@@ -95,8 +95,8 @@ export function IpfsFileList({
           </Typography>
         </Box>
       ) : (
-        <TableContainer>
-          <Table size="small">
+        <TableContainer sx={{ overflowX: 'auto', width: '100%' }}>
+          <Table size="small" sx={{ minWidth: 600 }}>
             <TableHead>
               <TableRow sx={{ '& th': { color: colors.text.secondary, fontWeight: 700, borderColor: colors.background.border } }}>
                 <TableCell>Arquivo</TableCell>
