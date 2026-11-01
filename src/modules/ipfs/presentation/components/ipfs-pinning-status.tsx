@@ -67,8 +67,8 @@ export function IpfsPinningStatus({ status, cid }: IpfsPinningStatusProps) {
   };
 
   return (
-    <Card variant="glass" sx={{ p: 2.5 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+    <Card variant="glass" sx={{ p: 2.5, minWidth: 0 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5, mb: 2 }}>
         <Typography variant="h6" sx={{ fontWeight: 700 }}>
           Indicadores de Armazenamento DePIN
         </Typography>
@@ -78,7 +78,7 @@ export function IpfsPinningStatus({ status, cid }: IpfsPinningStatusProps) {
             sx={{
               fontFamily: 'monospace',
               color: colors.text.secondary,
-              maxWidth: 240,
+              maxWidth: { xs: 200, sm: 280, md: 360 },
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
@@ -92,8 +92,12 @@ export function IpfsPinningStatus({ status, cid }: IpfsPinningStatusProps) {
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' },
+          gridTemplateColumns: {
+            xs: '1fr',
+            sm: 'repeat(auto-fit, minmax(220px, 1fr))',
+          },
           gap: 2,
+          minWidth: 0,
         }}
       >
         {/* 1. Integridade Física */}
