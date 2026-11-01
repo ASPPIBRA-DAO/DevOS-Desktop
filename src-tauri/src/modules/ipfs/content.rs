@@ -29,10 +29,10 @@ use super::pinning::{list_managed_pins, register_managed_pin};
 const CHUNK_SIZE_BYTES: usize = 65536; // 64 KiB chunks para streaming
 
 /// Leitor assíncrono que intercepta cada bloco transmitido para calcular o SHA-256 e tamanho de forma concorrente.
-struct HashingAsyncReader<R> {
-    inner: R,
-    hasher: Arc<Mutex<Sha256>>,
-    total_bytes: Arc<Mutex<u64>>,
+pub(crate) struct HashingAsyncReader<R> {
+    pub(crate) inner: R,
+    pub(crate) hasher: Arc<Mutex<Sha256>>,
+    pub(crate) total_bytes: Arc<Mutex<u64>>,
 }
 
 impl<R: AsyncRead + Unpin> AsyncRead for HashingAsyncReader<R> {
