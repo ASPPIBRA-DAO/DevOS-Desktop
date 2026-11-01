@@ -2,8 +2,9 @@ import type { VaultStatus } from '../../../../platform/tauri';
 
 import React from 'react';
 
-import { colors } from 'src/theme';
 import { MetricBox } from 'src/shared/components/data-display';
+
+import { colors } from 'src/theme';
 
 export interface VaultStatusMetricProps {
   status: VaultStatus | null;
