@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-ipfs-verify-all-pins"
+description = "Enables the ipfs_verify_all_pins command without any pre-configured scope."
+commands.allow = ["ipfs_verify_all_pins"]
+
+[[permission]]
+identifier = "deny-ipfs-verify-all-pins"
+description = "Denies the ipfs_verify_all_pins command without any pre-configured scope."
+commands.deny = ["ipfs_verify_all_pins"]
