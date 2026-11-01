@@ -16,6 +16,7 @@ import type {
   IpfsUnpinResult,
   IpfsUploadOptions,
   IpfsUploadResult,
+  ManagedPinRecord,
   StorageProofChallenge,
   StorageProofResponse,
 } from '../contracts/ipfs-contracts';
@@ -41,6 +42,7 @@ export type {
   IpfsUnpinResult,
   IpfsUploadOptions,
   IpfsUploadResult,
+  ManagedPinRecord,
   StorageProofChallenge,
   StorageProofResponse,
 };
@@ -118,6 +120,13 @@ export const IpfsBridge = {
    */
   async queryProviders(cid: string): Promise<IpfsProvidersResult> {
     return invokeNative<IpfsProvidersResult>('ipfs_query_providers', { cid });
+  },
+
+  /**
+   * Consulta a lista real de conteúdos gerenciados pelo DevOS no catálogo local
+   */
+  async listManagedPins(): Promise<ManagedPinRecord[]> {
+    return invokeNative<ManagedPinRecord[]>('ipfs_list_managed_pins');
   },
 };
 
