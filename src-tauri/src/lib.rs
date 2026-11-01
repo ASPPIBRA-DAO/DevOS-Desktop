@@ -55,7 +55,9 @@ macro_rules! app_invoke_handler {
             commands::restore_vault_backup,
             commands::fetch_wallet_balance,
             commands::batch_fetch_wallet_balances,
-            commands::generate_document
+            commands::generate_document,
+            commands::get_ipfs_daemon_status,
+            commands::execute_storage_proof
             $(, $edition_command)*
         ]
     };
