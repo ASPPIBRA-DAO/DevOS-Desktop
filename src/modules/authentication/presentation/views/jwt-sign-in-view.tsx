@@ -13,19 +13,19 @@ import IconButton from '@mui/material/IconButton';
 import { alpha, useTheme } from '@mui/material/styles';
 import InputAdornment from '@mui/material/InputAdornment';
 
+import { paths } from 'src/app/router/paths';
 import { useBootstrap } from 'src/app/bootstrap';
+import { RouterLink } from 'src/app/router/components';
+import { useRouter, useSearchParams } from 'src/app/router/hooks';
 
 import { Iconify } from 'src/shared/components/iconify';
 import { Form, Field, schemaUtils } from 'src/shared/components/hook-form';
 
-import { paths } from 'src/app/router/paths';
 import { CONFIG } from 'src/global-config';
-import { RouterLink } from 'src/app/router/components';
-import { useRouter, useSearchParams } from 'src/app/router/hooks';
 
-import { useAuthContext } from '../../application/hooks';
-import { getErrorMessage } from '../../utils';
 import { FormDivider } from '../components';
+import { getErrorMessage } from '../../utils';
+import { useAuthContext } from '../../application/hooks';
 import { signInWithWeb3, signInWithPassword } from '../../context/jwt';
 
 // ----------------------------------------------------------------------
