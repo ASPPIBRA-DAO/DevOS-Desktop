@@ -7,9 +7,12 @@ import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 
 import { paths } from 'src/app/router/paths';
-import { colors } from 'src/theme';
-import { Iconify } from '../../../shared/components/iconify';
+
 import { MetricBox, StatusBadge } from 'src/shared/components/data-display';
+
+import { colors } from 'src/theme';
+
+import { Iconify } from '../../../shared/components/iconify';
 
 export function CockpitDashboardPage() {
   const navigate = useNavigate();
