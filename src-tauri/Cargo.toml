@@ -28,11 +28,11 @@ argon2 = "0.5"
 rand = "0.8"
 hex = "0.4"
 zeroize = { version = "1.8", features = ["derive"] }
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "multipart", "stream"] }
 chrono = { version = "0.4", features = ["serde"] }
 thiserror = "2.0"
 k256 = { version = "0.13", features = ["ecdsa"] }
-tokio = { version = "1", features = ["sync", "macros"] }
+tokio = { version = "1", features = ["sync", "macros", "fs", "io-util"] }
 rusqlite = { version = "0.32", features = ["bundled"] }
 calamine = "0.37"
 sha2 = "0.10"
