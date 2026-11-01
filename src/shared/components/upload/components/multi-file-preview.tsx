@@ -7,7 +7,7 @@ import ListItemText from '@mui/material/ListItemText';
 
 import { Iconify } from '../../iconify';
 import { uploadClasses } from '../classes';
-import { fData } from '../../../utils/format-number';
+import { fData } from 'src/shared/utils';
 import { getFileMeta, FileThumbnail, useFilesPreview } from '../../file-thumbnail';
 
 // ----------------------------------------------------------------------
