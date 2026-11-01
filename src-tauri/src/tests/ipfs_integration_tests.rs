@@ -681,6 +681,111 @@ fn test_rfc7230_trailer_negotiation_headers_present() {
 }
 
 #[tokio::test]
+async fn test_tcp_server_captures_reqwest_multipart_te_trailers_header() {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpListener;
+
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+
+    let server_task = tokio::spawn(async move {
+        let (mut socket, _) = listener.accept().await.unwrap();
+        let mut buf = vec![0u8; 4096];
+        let n = socket.read(&mut buf).await.unwrap();
+        let request_str = String::from_utf8_lossy(&buf[..n]).to_string();
+
+        let body = "{\"Name\":\"test.txt\",\"Hash\":\"QmXoypizjW3WknFiJnKLwHCnL72vedxjQkDDP1mXWo6uco\"}\n";
+        let response = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+            body.len(),
+            body
+        );
+        let _ = socket.write_all(response.as_bytes()).await;
+        request_str
+    });
+
+    let client = KuboClient::with_base_url(&format!("http://127.0.0.1:{port}/api/v0"));
+    let res = client
+        .add_file_multipart("test.txt", reqwest::Body::from("dados_de_teste"), true)
+        .await;
+
+    assert!(res.is_ok(), "Upload multipart simulado deve ter sucesso: {:?}", res);
+    let captured_request = server_task.await.unwrap();
+    let lower = captured_request.to_lowercase();
+
+    // Comprova que o cliente Reqwest transmitiu efetivamente os headers no socket
+    assert!(
+        lower.contains("te: trailers"),
+        "Requisição real multipart DEVE conter 'te: trailers' no socket: {captured_request}"
+    );
+    assert!(
+        lower.contains("connection: te"),
+        "Requisição real multipart DEVE conter 'connection: te' no socket: {captured_request}"
+    );
+}
+
+#[tokio::test]
+async fn test_tcp_server_captures_cat_to_writer_te_trailers_header() {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpListener;
+    use sha2::Sha256;
+
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+
+    let server_task = tokio::spawn(async move {
+        let (mut socket, _) = listener.accept().await.unwrap();
+        let mut buf = vec![0u8; 4096];
+        let n = socket.read(&mut buf).await.unwrap();
+        let request_str = String::from_utf8_lossy(&buf[..n]).to_string();
+
+        let response = "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nHello\r\n0\r\n\r\n";
+        let _ = socket.write_all(response.as_bytes()).await;
+        request_str
+    });
+
+    let client = KuboClient::with_base_url(&format!("http://127.0.0.1:{port}/api/v0"));
+    let mut writer = Vec::new();
+    let mut hasher = Sha256::new();
+    let res = client
+        .cat_to_writer("QmXoypizjW3WknFiJnKLwHCnL72vedxjQkDDP1mXWo6uco", false, &mut writer, &mut hasher)
+        .await;
+
+    assert!(res.is_ok(), "cat_to_writer simulado deve ter sucesso: {:?}", res);
+    assert_eq!(&writer, b"Hello");
+
+    let captured_request = server_task.await.unwrap();
+
+    // Comprova que cat_to_writer transmitiu efetivamente TE: trailers e Connection: close, TE
+    assert!(
+        captured_request.contains("TE: trailers"),
+        "Requisição /cat DEVE conter 'TE: trailers' no socket: {captured_request}"
+    );
+    assert!(
+        captured_request.contains("Connection: close, TE"),
+        "Requisição /cat DEVE conter 'Connection: close, TE' no socket: {captured_request}"
+    );
+}
+
+#[test]
+fn test_daemon_manager_tracks_explicit_child_repo_path() {
+    use std::path::PathBuf;
+    use crate::modules::ipfs::daemon::{
+        set_spawned_repo_path_for_test, DaemonManager,
+    };
+
+    let dedicated_path = PathBuf::from("/tmp/devos_mock_dedicated_repo/ipfs");
+    set_spawned_repo_path_for_test(Some(dedicated_path.clone()));
+
+    // Confirma que get_effective_repo_path utiliza o caminho explicitamente mantido no estado do processo filho
+    let effective = DaemonManager::get_effective_repo_path();
+    assert_eq!(effective, Some(dedicated_path));
+
+    // Limpeza do estado de teste
+    set_spawned_repo_path_for_test(None);
+}
+
+#[tokio::test]
 #[ignore]
 async fn test_real_kubo_connection_if_available() {
     let client = KuboClient::new();
