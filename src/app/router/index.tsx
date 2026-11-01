@@ -4,7 +4,7 @@ import { Route, Routes } from 'react-router';
 
 import { DevOSLayout } from '../layouts/devos/layout';
 import { NotFoundView } from '../pages/not-found-view';
-import { AuthCenteredLayout } from '../../layouts/auth-centered';
+import { AuthCenteredLayout } from '../layouts/authentication';
 import { useBootstrap } from '../bootstrap';
 import {
   JwtSignInView,
@@ -12,7 +12,7 @@ import {
   JwtVerifyView,
   JwtResetPasswordView,
   JwtUpdatePasswordView,
-} from '../../auth/view/jwt';
+} from 'src/modules/authentication';
 
 export function AppRouter() {
   const { state } = useBootstrap();
