@@ -4,7 +4,7 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 
 import { Card } from './card';
-import { colors } from '../../theme/palette';
+import { colors } from 'src/theme';
 
 export interface MetricBoxProps {
   label: string;
