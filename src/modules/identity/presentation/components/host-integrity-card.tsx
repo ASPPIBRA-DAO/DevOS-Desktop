@@ -6,7 +6,7 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 
 import { Card } from '../../../../shared/components/Card';
-import { colors } from '../../../../shared/theme/palette';
+import { colors } from 'src/theme';
 import { StatusBadge } from '../../../../shared/components/StatusBadge';
 
 export interface HostIntegrityCardProps {
