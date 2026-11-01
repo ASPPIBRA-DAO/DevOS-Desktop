@@ -16,9 +16,9 @@ import { styled, useTheme } from '@mui/material/styles';
 
 import { WindowModeToggle } from 'src/shared/components/window-mode-toggle';
 
-import { paths } from 'src/routes/paths';
+import { paths } from 'src/app/router/paths';
 import { Logo } from 'src/components/logo';
-import { usePathname } from 'src/routes/hooks';
+import { usePathname } from 'src/app/router/hooks';
 import { Iconify } from 'src/components/iconify';
 import { NavSectionMini, NavSectionVertical } from 'src/components/nav-section';
 
