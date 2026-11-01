@@ -4,7 +4,7 @@ import { alpha, styled } from '@mui/material/styles';
 
 import { uploadClasses } from '../classes';
 import { getFileMeta } from '../../file-thumbnail';
-import { fData } from '../../../utils/format-number';
+import { fData } from 'src/shared/utils';
 
 // ----------------------------------------------------------------------
 
