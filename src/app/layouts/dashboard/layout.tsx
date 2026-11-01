@@ -14,7 +14,7 @@ import { WindowModeToggle } from 'src/shared/components/window-mode-toggle';
 
 import { allLangs } from 'src/locales';
 import { Logo } from 'src/components/logo';
-import { useAuthContext } from 'src/auth/hooks';
+import { useAuthContext } from 'src/modules/authentication';
 import { _contacts, _notifications } from 'src/_mock';
 import { useSettingsContext } from 'src/components/settings';
 
