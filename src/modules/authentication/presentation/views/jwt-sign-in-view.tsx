@@ -18,10 +18,10 @@ import { useBootstrap } from 'src/app/bootstrap';
 import { Iconify } from 'src/shared/components/iconify';
 import { Form, Field, schemaUtils } from 'src/shared/components/hook-form';
 
-import { paths } from 'src/routes/paths';
+import { paths } from 'src/app/router/paths';
 import { CONFIG } from 'src/global-config';
-import { RouterLink } from 'src/routes/components';
-import { useRouter, useSearchParams } from 'src/routes/hooks';
+import { RouterLink } from 'src/app/router/components';
+import { useRouter, useSearchParams } from 'src/app/router/hooks';
 
 import { useAuthContext } from '../../application/hooks';
 import { getErrorMessage } from '../../utils';
