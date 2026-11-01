@@ -8,8 +8,8 @@ use std::time::Duration;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
-use crate::vault::access_control::{VaultHeader, VaultStatus};
-use crate::vault::encryption::{EncryptedEnvelope, VaultCryptoError};
+use crate::modules::vault::access_control::{VaultHeader, VaultStatus};
+use crate::modules::vault::encryption::{EncryptedEnvelope, VaultCryptoError};
 
 // ----------------------------------------------------------------------
 // Erros de armazenamento
@@ -864,7 +864,7 @@ mod tests {
         assert!(secret_none.is_none());
 
         let fake_envelope =
-            crate::vault::encryption::VaultCrypto::encrypt("master_123", b"secret_words").unwrap();
+            crate::modules::vault::encryption::VaultCrypto::encrypt("master_123", b"secret_words").unwrap();
         let stored_secret = StoredSecret {
             vault_id: "dao_vault_1".to_string(),
             target: "DAO".to_string(),
@@ -899,7 +899,7 @@ mod tests {
         drop(conn);
 
         let canary =
-            crate::vault::encryption::VaultCrypto::encrypt("master_123", b"canary_canary").unwrap();
+            crate::modules::vault::encryption::VaultCrypto::encrypt("master_123", b"canary_canary").unwrap();
         let header = VaultHeader {
             version: 1,
             canary_envelope: canary.clone(),
@@ -939,11 +939,11 @@ mod tests {
         let header = VaultHeader::new(master_password).expect("Header deve ser gerado com sucesso");
         db.save_header(&header).expect("Header deve ser persistido");
 
-        let mnemonic = crate::wallets::mnemonic::MnemonicService::generate(24)
+        let mnemonic = crate::modules::wallets::mnemonic::MnemonicService::generate(24)
             .expect("Mnemônica de 24 palavras");
-        let seed = crate::wallets::mnemonic::MnemonicService::to_seed(&mnemonic, "")
+        let seed = crate::modules::wallets::mnemonic::MnemonicService::to_seed(&mnemonic, "")
             .expect("Seed derivada");
-        let previews = crate::wallets::derivation::DerivationService::derive_batch(
+        let previews = crate::modules::wallets::derivation::DerivationService::derive_batch(
             &seed,
             0,
             1,
@@ -955,7 +955,7 @@ mod tests {
         let derivation_path = previews[0].derivation_path.clone();
 
         let envelope =
-            crate::vault::encryption::VaultCrypto::encrypt(master_password, mnemonic.as_bytes())
+            crate::modules::vault::encryption::VaultCrypto::encrypt(master_password, mnemonic.as_bytes())
                 .expect("Cifragem AEAD");
         let vault_id = "dao_vault_lifecycle_test".to_string();
         let secret_record = StoredSecret {
@@ -1008,7 +1008,7 @@ mod tests {
             .get_secret_by_vault_id(&vault_id)
             .unwrap()
             .expect("Segredo deve existir");
-        let decrypted_bytes = crate::vault::encryption::VaultCrypto::decrypt(
+        let decrypted_bytes = crate::modules::vault::encryption::VaultCrypto::decrypt(
             master_password,
             &retrieved_secret.envelope,
         )
@@ -1017,9 +1017,9 @@ mod tests {
         assert_eq!(recovered_mnemonic, mnemonic);
 
         let recovered_seed =
-            crate::wallets::mnemonic::MnemonicService::to_seed(&recovered_mnemonic, "")
+            crate::modules::wallets::mnemonic::MnemonicService::to_seed(&recovered_mnemonic, "")
                 .expect("Seed recuperada");
-        let recovered_previews = crate::wallets::derivation::DerivationService::derive_batch(
+        let recovered_previews = crate::modules::wallets::derivation::DerivationService::derive_batch(
             &recovered_seed,
             0,
             1,
@@ -1035,7 +1035,7 @@ mod tests {
         assert!(!retrieved_secret.envelope.ciphertext_hex.is_empty());
         assert!(!retrieved_secret.envelope.ciphertext_hex.contains(&mnemonic));
 
-        let fail_result = crate::vault::encryption::VaultCrypto::decrypt(
+        let fail_result = crate::modules::vault::encryption::VaultCrypto::decrypt(
             "SenhaIncorreta999!",
             &retrieved_secret.envelope,
         );
