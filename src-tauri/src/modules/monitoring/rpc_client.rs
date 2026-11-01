@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
-use crate::wallets::address::is_valid_evm_address;
+use crate::modules::wallets::address::is_valid_evm_address;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum BalanceQueryStatus {
