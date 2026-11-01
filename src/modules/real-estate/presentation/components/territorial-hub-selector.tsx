@@ -13,9 +13,11 @@ import Typography from '@mui/material/Typography';
 import CardActionArea from '@mui/material/CardActionArea';
 import InputAdornment from '@mui/material/InputAdornment';
 
-import { colors } from 'src/theme';
-import { Iconify } from '../../../../shared/components/iconify';
 import { StatusBadge } from 'src/shared/components/data-display';
+
+import { colors } from 'src/theme';
+
+import { Iconify } from '../../../../shared/components/iconify';
 
 export interface CityTerritory {
   id: string;
