@@ -13,7 +13,7 @@ import LinearProgress from '@mui/material/LinearProgress';
 import { Label } from 'src/shared/components/label';
 import { Iconify } from 'src/shared/components/iconify';
 
-import { IdentityAvatar } from 'src/auth/components';
+import { IdentityAvatar } from 'src/modules/authentication';
 
 // ----------------------------------------------------------------------
 
