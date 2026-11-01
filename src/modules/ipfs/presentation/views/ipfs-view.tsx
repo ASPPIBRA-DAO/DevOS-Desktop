@@ -60,7 +60,7 @@ export function IpfsView() {
   const activeCustodyStatus = selectedCid ? custodyMap[selectedCid] : null;
 
   return (
-    <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: 1400, mx: 'auto' }}>
+    <Box sx={{ p: { xs: 1.5, sm: 2.5, md: 3 }, maxWidth: 1400, mx: 'auto', width: '100%', minWidth: 0 }}>
       {/* Cabeçalho Institucional */}
       <Box
         sx={{
@@ -72,11 +72,20 @@ export function IpfsView() {
           mb: 4,
           pb: 3,
           borderBottom: `1px solid ${colors.background.border}`,
+          minWidth: 0,
         }}
       >
-        <Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.75 }}>
-            <Typography variant="h3" sx={{ fontWeight: 800, letterSpacing: '-0.02em' }}>
+        <Box sx={{ minWidth: 0, width: '100%' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1.5, mb: 0.75 }}>
+            <Typography
+              variant="h3"
+              sx={{
+                fontWeight: 800,
+                letterSpacing: '-0.02em',
+                fontSize: { xs: '1.4rem', sm: '1.75rem', md: '2.1rem' },
+                wordBreak: 'break-word',
+              }}
+            >
               Armazenamento IPFS & DePIN
             </Typography>
             <StatusBadge
@@ -111,9 +120,14 @@ export function IpfsView() {
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
-          gap: 3,
+          gridTemplateColumns: {
+            xs: '1fr',
+            lg: 'repeat(2, minmax(0, 1fr))',
+          },
+          gap: { xs: 2, sm: 2.5, md: 3 },
           mb: 3,
+          width: '100%',
+          minWidth: 0,
         }}
       >
         <IpfsNodeStatus
