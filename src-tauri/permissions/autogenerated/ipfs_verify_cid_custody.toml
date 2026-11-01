@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-ipfs-verify-cid-custody"
+description = "Enables the ipfs_verify_cid_custody command without any pre-configured scope."
+commands.allow = ["ipfs_verify_cid_custody"]
+
+[[permission]]
+identifier = "deny-ipfs-verify-cid-custody"
+description = "Denies the ipfs_verify_cid_custody command without any pre-configured scope."
+commands.deny = ["ipfs_verify_cid_custody"]
