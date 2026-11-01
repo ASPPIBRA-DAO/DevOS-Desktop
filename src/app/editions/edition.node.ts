@@ -1,6 +1,7 @@
 import type { EditionConfig } from './types';
 
 import { paths } from '../router/paths';
+import { IpfsView } from '../../modules/ipfs';
 import { RealEstateView } from '../../modules/real-estate';
 import { NodeDashboardPage } from './node/node-dashboard-page';
 
@@ -15,6 +16,12 @@ export const currentEdition: EditionConfig = {
       label: 'Painel do Nó',
       icon: 'solar:server-square-bold-duotone',
       component: NodeDashboardPage,
+    },
+    {
+      path: paths.devos.ipfs,
+      label: 'Armazenamento IPFS',
+      icon: 'solar:server-path-bold-duotone',
+      component: IpfsView,
     },
     {
       path: paths.devos.cadastre,
