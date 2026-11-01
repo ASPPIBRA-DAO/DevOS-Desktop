@@ -61,10 +61,10 @@ export function IpfsNodeStatus({
   };
 
   return (
-    <Card variant="glass" sx={{ height: '100%' }}>
+    <Card variant="glass" sx={{ height: '100%', minWidth: 0 }}>
       {/* Cabeçalho */}
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2.5 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5, mb: 2.5 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1.5 }}>
           <Typography variant="h5" sx={{ fontWeight: 700 }}>
             Telemetria do Nó Kubo
           </Typography>
@@ -97,13 +97,15 @@ export function IpfsNodeStatus({
       </Box>
 
       {/* Grid de Informações Técnicas */}
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, minWidth: 0 }}>
         {/* PeerID */}
         <Box
           sx={{
             display: 'flex',
-            alignItems: 'center',
+            flexDirection: { xs: 'column', sm: 'row' },
+            alignItems: { xs: 'flex-start', sm: 'center' },
             justifyContent: 'space-between',
+            gap: 0.5,
             py: 1,
             borderBottom: `1px solid ${colors.background.border}`,
           }}
@@ -111,13 +113,13 @@ export function IpfsNodeStatus({
           <Typography variant="body2" sx={{ color: colors.text.secondary }}>
             Identidade do Nó (PeerID):
           </Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, maxWidth: '100%', minWidth: 0 }}>
             <Typography
               variant="body2"
               sx={{
                 fontWeight: 600,
                 fontFamily: 'monospace',
-                maxWidth: { xs: 180, sm: 260 },
+                maxWidth: { xs: 200, sm: 260 },
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
@@ -147,7 +149,10 @@ export function IpfsNodeStatus({
         <Box
           sx={{
             display: 'flex',
+            flexDirection: { xs: 'column', sm: 'row' },
             justifyContent: 'space-between',
+            alignItems: { xs: 'flex-start', sm: 'center' },
+            gap: 0.5,
             py: 1,
             borderBottom: `1px solid ${colors.background.border}`,
           }}
@@ -164,7 +169,10 @@ export function IpfsNodeStatus({
         <Box
           sx={{
             display: 'flex',
+            flexDirection: { xs: 'column', sm: 'row' },
             justifyContent: 'space-between',
+            alignItems: { xs: 'flex-start', sm: 'center' },
+            gap: 0.5,
             py: 1,
             borderBottom: `1px solid ${colors.background.border}`,
           }}
@@ -195,7 +203,10 @@ export function IpfsNodeStatus({
         <Box
           sx={{
             display: 'flex',
+            flexDirection: { xs: 'column', sm: 'row' },
             justifyContent: 'space-between',
+            alignItems: { xs: 'flex-start', sm: 'center' },
+            gap: 0.5,
             py: 1,
             borderBottom: `1px solid ${colors.background.border}`,
           }}
@@ -215,7 +226,10 @@ export function IpfsNodeStatus({
         <Box
           sx={{
             display: 'flex',
+            flexDirection: { xs: 'column', sm: 'row' },
             justifyContent: 'space-between',
+            alignItems: { xs: 'flex-start', sm: 'center' },
+            gap: 0.5,
             py: 1,
             borderBottom: `1px solid ${colors.background.border}`,
           }}
@@ -232,7 +246,10 @@ export function IpfsNodeStatus({
         <Box
           sx={{
             display: 'flex',
+            flexDirection: { xs: 'column', sm: 'row' },
             justifyContent: 'space-between',
+            alignItems: { xs: 'flex-start', sm: 'center' },
+            gap: 0.5,
             py: 1,
             borderBottom: `1px solid ${colors.background.border}`,
           }}
@@ -249,7 +266,7 @@ export function IpfsNodeStatus({
         </Box>
 
         {/* Barra de Controles Operacionais do Daemon */}
-        <Box sx={{ mt: 1.5, pt: 1, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+        <Box sx={{ mt: 1.5, pt: 1, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1.5 }}>
           {!isRunning && onStartDaemon && (
             <Button
               variant="contained"
