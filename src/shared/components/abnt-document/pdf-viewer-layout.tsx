@@ -5,6 +5,7 @@ import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 
 import { useRouter } from 'src/app/router/hooks';
+
 import { Iconify } from 'src/components/iconify';
 
 type PdfViewerLayoutProps = {
