@@ -4,15 +4,20 @@
 //! de credenciais ou rotas administrativas à rede pública.
 
 use std::time::Duration;
-use reqwest::Client;
+use reqwest::multipart::{Form, Part};
+use reqwest::{Body, Client, Response};
 
 use super::models::{
-    IpfsDaemonStatus, KuboIdResponse, KuboRepoStatResponse, KuboSwarmPeersResponse,
-    KuboVersionResponse,
+    IpfsAllPinsVerifyResult, IpfsDaemonStatus, IpfsPinType, IpfsProviderPeer,
+    KuboAddResponse, KuboIdResponse, KuboPinAddResponse, KuboPinLsResponse,
+    KuboPinRmResponse, KuboPinVerifyItem, KuboRepoStatResponse,
+    KuboRoutingFindprovsItem, KuboSwarmPeersResponse, KuboVersionResponse,
 };
 
 pub const DEFAULT_KUBO_RPC_BASE_URL: &str = "http://127.0.0.1:5001/api/v0";
-const RPC_TIMEOUT_SECS: u64 = 2;
+const STATUS_TIMEOUT_SECS: u64 = 2;
+const TRANSFER_TIMEOUT_SECS: u64 = 300;
+const ROUTING_TIMEOUT_SECS: u64 = 20;
 
 #[derive(Clone, Debug)]
 pub struct KuboClient {
@@ -33,7 +38,7 @@ impl KuboClient {
 
     pub fn with_base_url(base_url: impl Into<String>) -> Self {
         let client = Client::builder()
-            .timeout(Duration::from_secs(RPC_TIMEOUT_SECS))
+            .timeout(Duration::from_secs(STATUS_TIMEOUT_SECS))
             .build()
             .unwrap_or_default();
 
@@ -139,5 +144,280 @@ impl KuboClient {
             peers_count,
             version,
         }
+    }
+
+    /// Envia um fluxo de arquivo para o Kubo via `/api/v0/add`.
+    /// O parâmetro `pin` é definido explicitamente conforme política do DevOS.
+    pub async fn add_file_multipart(
+        &self,
+        file_name: &str,
+        body: Body,
+        pin: bool,
+    ) -> Result<KuboAddResponse, String> {
+        let url = format!("{}/add?pin={}&quieter=true", self.base_url, pin);
+        let part = Part::stream(body).file_name(file_name.to_string());
+        let form = Form::new().part("file", part);
+
+        let res = self
+            .client
+            .post(&url)
+            .timeout(Duration::from_secs(TRANSFER_TIMEOUT_SECS))
+            .multipart(form)
+            .send()
+            .await
+            .map_err(|e| format!("Falha de conexão com Kubo RPC (/add): {e}"))?;
+
+        if !res.status().is_success() {
+            let status = res.status();
+            let err_text = res.text().await.unwrap_or_default();
+            return Err(format!("Kubo RPC (/add) retornou status {status}: {err_text}"));
+        }
+
+        res.json::<KuboAddResponse>()
+            .await
+            .map_err(|e| format!("Falha ao decodificar resposta de upload do Kubo: {e}"))
+    }
+
+    /// Abre um stream de leitura de arquivo via `/api/v0/cat?arg=<cid>`.
+    /// Permite especificar se deve operar em modo offline (somente blocos locais).
+    pub async fn cat_stream(&self, cid: &str, offline: bool) -> Result<Response, String> {
+        let url = format!(
+            "{}/cat?arg={}{}",
+            self.base_url,
+            cid,
+            if offline { "&offline=true" } else { "" }
+        );
+
+        let res = self
+            .client
+            .post(&url)
+            .timeout(Duration::from_secs(TRANSFER_TIMEOUT_SECS))
+            .send()
+            .await
+            .map_err(|e| format!("Falha de conexão com Kubo RPC (/cat): {e}"))?;
+
+        if !res.status().is_success() {
+            let status = res.status();
+            let err_text = res.text().await.unwrap_or_default();
+            return Err(format!("Kubo RPC (/cat) retornou status {status}: {err_text}"));
+        }
+
+        Ok(res)
+    }
+
+    /// Fixa um CID no repositório local via `/api/v0/pin/add`.
+    pub async fn pin_add(&self, cid: &str, recursive: bool) -> Result<Vec<String>, String> {
+        let url = format!(
+            "{}/pin/add?arg={}&recursive={}",
+            self.base_url, cid, recursive
+        );
+
+        let res = self
+            .client
+            .post(&url)
+            .timeout(Duration::from_secs(TRANSFER_TIMEOUT_SECS))
+            .send()
+            .await
+            .map_err(|e| format!("Falha de conexão com Kubo RPC (/pin/add): {e}"))?;
+
+        if !res.status().is_success() {
+            let status = res.status();
+            let err_text = res.text().await.unwrap_or_default();
+            return Err(format!("Kubo RPC (/pin/add) retornou status {status}: {err_text}"));
+        }
+
+        let body = res
+            .json::<KuboPinAddResponse>()
+            .await
+            .map_err(|e| format!("Falha ao decodificar resposta de pin/add: {e}"))?;
+
+        Ok(body.pins.unwrap_or_default())
+    }
+
+    /// Remove a fixação de um CID via `/api/v0/pin/rm`.
+    pub async fn pin_rm(&self, cid: &str, recursive: bool) -> Result<Vec<String>, String> {
+        let url = format!(
+            "{}/pin/rm?arg={}&recursive={}",
+            self.base_url, cid, recursive
+        );
+
+        let res = self
+            .client
+            .post(&url)
+            .timeout(Duration::from_secs(STATUS_TIMEOUT_SECS * 10))
+            .send()
+            .await
+            .map_err(|e| format!("Falha de conexão com Kubo RPC (/pin/rm): {e}"))?;
+
+        if !res.status().is_success() {
+            let status = res.status();
+            let err_text = res.text().await.unwrap_or_default();
+            return Err(format!("Kubo RPC (/pin/rm) retornou status {status}: {err_text}"));
+        }
+
+        let body = res
+            .json::<KuboPinRmResponse>()
+            .await
+            .map_err(|e| format!("Falha ao decodificar resposta de pin/rm: {e}"))?;
+
+        Ok(body.pins.unwrap_or_default())
+    }
+
+    /// Consulta se um CID específico está fixado via `/api/v0/pin/ls?arg=<cid>&type=all`.
+    /// Retorna `Ok(Some(pin_type))` se estiver fixado, `Ok(None)` se não estiver fixado.
+    pub async fn pin_ls(&self, cid: &str) -> Result<Option<IpfsPinType>, String> {
+        let url = format!("{}/pin/ls?arg={}&type=all", self.base_url, cid);
+
+        let res = self
+            .client
+            .post(&url)
+            .timeout(Duration::from_secs(STATUS_TIMEOUT_SECS * 5))
+            .send()
+            .await
+            .map_err(|e| format!("Falha de conexão com Kubo RPC (/pin/ls): {e}"))?;
+
+        if !res.status().is_success() {
+            let err_text = res.text().await.unwrap_or_default();
+            // Quando não está fixado, o Kubo retorna 500 com mensagem contendo "not pinned" ou "is not pinned"
+            if err_text.contains("not pinned") || err_text.contains("is not pinned") {
+                return Ok(None);
+            }
+            return Err(format!("Kubo RPC (/pin/ls) retornou erro: {err_text}"));
+        }
+
+        let body = res
+            .json::<KuboPinLsResponse>()
+            .await
+            .map_err(|e| format!("Falha ao decodificar resposta de pin/ls: {e}"))?;
+
+        if let Some(keys) = body.keys {
+            if let Some(item) = keys.get(cid) {
+                let pin_type = match item.r#type.as_deref() {
+                    Some("direct") => IpfsPinType::Direct,
+                    Some("indirect") => IpfsPinType::Indirect,
+                    _ => IpfsPinType::Recursive,
+                };
+                return Ok(Some(pin_type));
+            }
+        }
+
+        Ok(None)
+    }
+
+    /// Executa a auditoria completa de todos os pins recursivos do repositório via `/api/v0/pin/verify?verbose=true`.
+    pub async fn pin_verify(&self, verbose: bool) -> Result<IpfsAllPinsVerifyResult, String> {
+        let url = format!("{}/pin/verify?verbose={}", self.base_url, verbose);
+
+        let res = self
+            .client
+            .post(&url)
+            .timeout(Duration::from_secs(ROUTING_TIMEOUT_SECS * 3))
+            .send()
+            .await
+            .map_err(|e| format!("Falha de conexão com Kubo RPC (/pin/verify): {e}"))?;
+
+        if !res.status().is_success() {
+            let status = res.status();
+            let err_text = res.text().await.unwrap_or_default();
+            return Err(format!("Kubo RPC (/pin/verify) retornou status {status}: {err_text}"));
+        }
+
+        let text = res
+            .text()
+            .await
+            .map_err(|e| format!("Falha ao ler stream de pin/verify: {e}"))?;
+
+        let mut total_audited = 0u32;
+        let mut bad_nodes = Vec::new();
+
+        for line in text.lines() {
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            if let Ok(item) = serde_json::from_str::<KuboPinVerifyItem>(trimmed) {
+                total_audited += 1;
+                if let Some(status) = item.pin_status {
+                    if status.ok != Some(true) {
+                        if let Some(mut bad) = status.bad_nodes {
+                            bad_nodes.append(&mut bad);
+                        } else if let Some(cid) = item.cid {
+                            bad_nodes.push(cid);
+                        }
+                    }
+                }
+            }
+        }
+
+        let is_clean = bad_nodes.is_empty();
+        Ok(IpfsAllPinsVerifyResult {
+            total_pins_audited: total_audited,
+            bad_nodes_count: bad_nodes.len() as u32,
+            bad_nodes,
+            is_clean,
+        })
+    }
+
+    /// Consulta provedores que anunciam determinado CID na DHT via `/api/v0/routing/findprovs`.
+    pub async fn routing_findprovs(
+        &self,
+        cid: &str,
+        num_providers: u32,
+    ) -> Result<Vec<IpfsProviderPeer>, String> {
+        let url = format!(
+            "{}/routing/findprovs?arg={}&num-providers={}",
+            self.base_url, cid, num_providers
+        );
+
+        let res = self
+            .client
+            .post(&url)
+            .timeout(Duration::from_secs(ROUTING_TIMEOUT_SECS))
+            .send()
+            .await
+            .map_err(|e| format!("Falha de conexão com Kubo RPC (/routing/findprovs): {e}"))?;
+
+        if !res.status().is_success() {
+            let status = res.status();
+            let err_text = res.text().await.unwrap_or_default();
+            return Err(format!("Kubo RPC (/routing/findprovs) retornou status {status}: {err_text}"));
+        }
+
+        let text = res
+            .text()
+            .await
+            .map_err(|e| format!("Falha ao ler stream de routing/findprovs: {e}"))?;
+
+        let mut providers = Vec::new();
+
+        for line in text.lines() {
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            if let Ok(item) = serde_json::from_str::<KuboRoutingFindprovsItem>(trimmed) {
+                if let Some(responses) = item.responses {
+                    for r in responses {
+                        if let Some(peer_id) = r.id {
+                            if !peer_id.is_empty() {
+                                providers.push(IpfsProviderPeer {
+                                    peer_id,
+                                    addresses: r.addrs.unwrap_or_default(),
+                                });
+                            }
+                        }
+                    }
+                } else if let Some(peer_id) = item.id {
+                    if !peer_id.is_empty() {
+                        providers.push(IpfsProviderPeer {
+                            peer_id,
+                            addresses: Vec::new(),
+                        });
+                    }
+                }
+            }
+        }
+
+        Ok(providers)
     }
 }
