@@ -6,7 +6,7 @@
 //! 3. Não inicia processos concorrentes se uma instância já estiver respondendo.
 //! 4. Nunca encerra processos externos iniciados fora do ciclo do DevOS.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
 
@@ -59,15 +59,75 @@ impl DaemonManager {
         None
     }
 
-    /// Verifica se o binário `ipfs` (Kubo) está instalado e acessível no PATH do sistema.
-    pub fn is_binary_installed() -> bool {
-        Command::new("ipfs")
+    /// Resolve o caminho executável do binário `ipfs` (Kubo).
+    ///
+    /// Primeiro testa se `ipfs` responde no `PATH` atual. Se não responder
+    /// (comum quando o app é iniciado por gerenciador gráfico de desktop sem shell interativo),
+    /// procura nos diretórios canônicos de usuário (~/.local/opt/kubo, ~/.local/bin) e do sistema (/usr/local/bin, /usr/bin).
+    pub fn resolve_ipfs_binary() -> Option<PathBuf> {
+        // 1. Tentar `ipfs` diretamente no PATH
+        if let Ok(status) = Command::new("ipfs")
             .arg("version")
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .status()
-            .map(|s| s.success())
-            .unwrap_or(false)
+        {
+            if status.success() {
+                return Some(PathBuf::from("ipfs"));
+            }
+        }
+
+        // 2. Verificar diretórios canônicos do usuário
+        if let Ok(home) = std::env::var("HOME") {
+            let home_path = Path::new(&home);
+            let user_candidates = [
+                home_path.join(".local/opt/kubo/v0.43.1/ipfs"),
+                home_path.join(".local/bin/ipfs"),
+                home_path.join(".bin/ipfs"),
+            ];
+            for candidate in user_candidates {
+                if candidate.is_file() {
+                    if let Ok(status) = Command::new(&candidate)
+                        .arg("version")
+                        .stdout(Stdio::null())
+                        .stderr(Stdio::null())
+                        .status()
+                    {
+                        if status.success() {
+                            return Some(candidate);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. Verificar diretórios de sistema
+        let system_candidates = [
+            PathBuf::from("/usr/local/bin/ipfs"),
+            PathBuf::from("/usr/bin/ipfs"),
+            PathBuf::from("/opt/kubo/ipfs"),
+        ];
+        for candidate in system_candidates {
+            if candidate.is_file() {
+                if let Ok(status) = Command::new(&candidate)
+                    .arg("version")
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .status()
+                {
+                    if status.success() {
+                        return Some(candidate);
+                    }
+                }
+            }
+        }
+
+        None
+    }
+
+    /// Verifica se o binário `ipfs` (Kubo) está instalado e acessível no sistema.
+    pub fn is_binary_installed() -> bool {
+        Self::resolve_ipfs_binary().is_some()
     }
 
     /// Identifica a origem do daemon: externo, gerido pelo DevOS ou inativo.
@@ -85,10 +145,19 @@ impl DaemonManager {
         }
     }
 
-    /// Consulta o status completo do daemon local via cliente HTTP RPC.
+    /// Consulta o status completo do daemon local via cliente HTTP RPC, enriquecido com a origem do daemon.
     pub async fn get_status() -> IpfsDaemonStatus {
         let client = KuboClient::new();
-        client.query_daemon_status().await
+        let mut status = client.query_daemon_status().await;
+        if status.running {
+            let origin = Self::check_daemon_origin().await;
+            status.origin = Some(match origin {
+                DaemonOrigin::DevOsSpawned => "DevOsSpawned".to_string(),
+                DaemonOrigin::External => "External".to_string(),
+                DaemonOrigin::Offline => "Offline".to_string(),
+            });
+        }
+        status
     }
 
     /// Tenta iniciar o `ipfs daemon` de forma segura caso ele não esteja ativo.
@@ -99,9 +168,8 @@ impl DaemonManager {
             return Ok(DaemonOrigin::External);
         }
 
-        if !Self::is_binary_installed() {
-            return Err("Binário 'ipfs' (Kubo) não encontrado no PATH do sistema.".to_string());
-        }
+        let bin_path = Self::resolve_ipfs_binary()
+            .ok_or_else(|| "Binário 'ipfs' (Kubo) não encontrado no PATH do sistema nem nos caminhos canônicos (~/.local/opt/kubo, ~/.local/bin, /usr/local/bin).".to_string())?;
 
         let mut guard = SPAWNED_DAEMON_CHILD.lock().unwrap_or_else(|p| p.into_inner());
         if guard.is_some() {
@@ -110,7 +178,7 @@ impl DaemonManager {
 
         let dedicated_dir = Self::get_dedicated_devos_repo_dir();
 
-        let mut cmd = Command::new("ipfs");
+        let mut cmd = Command::new(&bin_path);
         cmd.arg("daemon")
             .stdout(Stdio::null())
             .stderr(Stdio::null());
