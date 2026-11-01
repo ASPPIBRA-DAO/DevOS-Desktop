@@ -14,7 +14,11 @@ import { Card, StatusBadge } from 'src/shared/components/data-display';
 export interface IpfsNodeStatusProps {
   status: IpfsDaemonStatus | null;
   loading?: boolean;
+  actionLoading?: boolean;
   onRefresh?: () => void;
+  onStartDaemon?: () => void;
+  onStopDaemon?: () => void;
+  onRestartDaemon?: () => void;
 }
 
 function formatBytes(bytes?: number): string {
@@ -28,7 +32,15 @@ function formatBytes(bytes?: number): string {
 /**
  * Painel Operacional do Nó IPFS / Kubo com telemetria e diagnóstico em tempo real.
  */
-export function IpfsNodeStatus({ status, loading = false, onRefresh }: IpfsNodeStatusProps) {
+export function IpfsNodeStatus({
+  status,
+  loading = false,
+  actionLoading = false,
+  onRefresh,
+  onStartDaemon,
+  onStopDaemon,
+  onRestartDaemon,
+}: IpfsNodeStatusProps) {
   const [copied, setCopied] = useState(false);
 
   const isRunning = Boolean(status?.running);
@@ -36,6 +48,8 @@ export function IpfsNodeStatus({ status, loading = false, onRefresh }: IpfsNodeS
   const peersCount = status?.peers_count ?? 0;
   const version = status?.version || 'Kubo (Offline)';
   const repoSize = formatBytes(status?.repo_size_bytes);
+  const origin = status?.origin || (isRunning ? 'External' : 'Offline');
+  const isDevOsSpawned = origin === 'DevOsSpawned';
 
   const handleCopyPeerId = () => {
     if (status?.peer_id) {
@@ -63,7 +77,7 @@ export function IpfsNodeStatus({ status, loading = false, onRefresh }: IpfsNodeS
             size="small"
             variant="outlined"
             onClick={onRefresh}
-            disabled={loading}
+            disabled={loading || actionLoading}
             startIcon={loading ? <CircularProgress size={14} color="inherit" /> : undefined}
             sx={{
               borderColor: colors.primary.main,
@@ -145,6 +159,37 @@ export function IpfsNodeStatus({ status, loading = false, onRefresh }: IpfsNodeS
           </Typography>
         </Box>
 
+        {/* Origem e Contexto do Repositório */}
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            py: 1,
+            borderBottom: `1px solid ${colors.background.border}`,
+          }}
+        >
+          <Typography variant="body2" sx={{ color: colors.text.secondary }}>
+            Origem do Processo:
+          </Typography>
+          <Typography
+            variant="body2"
+            sx={{
+              fontWeight: 600,
+              color: isDevOsSpawned
+                ? colors.primary.main
+                : isRunning
+                  ? colors.warning.main
+                  : colors.text.disabled,
+            }}
+          >
+            {isDevOsSpawned
+              ? 'DevOS Dedicado (Repositório Exclusivo)'
+              : isRunning
+                ? 'Nó Externo / Sistema (Compartilhado)'
+                : 'Inativo (Offline)'}
+          </Typography>
+        </Box>
+
         {/* Peers Conectados */}
         <Box
           sx={{
@@ -183,7 +228,14 @@ export function IpfsNodeStatus({ status, loading = false, onRefresh }: IpfsNodeS
         </Box>
 
         {/* Endereço RPC Local */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            py: 1,
+            borderBottom: `1px solid ${colors.background.border}`,
+          }}
+        >
           <Typography variant="body2" sx={{ color: colors.text.secondary }}>
             Interface Administrativa RPC:
           </Typography>
@@ -193,6 +245,71 @@ export function IpfsNodeStatus({ status, loading = false, onRefresh }: IpfsNodeS
           >
             127.0.0.1:5001 (Local Estrito)
           </Typography>
+        </Box>
+
+        {/* Barra de Controles Operacionais do Daemon */}
+        <Box sx={{ mt: 1.5, pt: 1, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          {!isRunning && onStartDaemon && (
+            <Button
+              variant="contained"
+              size="small"
+              onClick={onStartDaemon}
+              disabled={actionLoading}
+              startIcon={actionLoading ? <CircularProgress size={14} color="inherit" /> : undefined}
+              sx={{
+                backgroundColor: colors.primary.main,
+                color: '#000',
+                fontWeight: 600,
+                textTransform: 'none',
+                '&:hover': { backgroundColor: colors.primary.light },
+              }}
+            >
+              {actionLoading ? 'Iniciando Nó...' : 'Iniciar Nó DevOS'}
+            </Button>
+          )}
+
+          {isRunning && isDevOsSpawned && (
+            <>
+              {onRestartDaemon && (
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={onRestartDaemon}
+                  disabled={actionLoading}
+                  startIcon={actionLoading ? <CircularProgress size={14} color="inherit" /> : undefined}
+                  sx={{
+                    borderColor: colors.warning.main,
+                    color: colors.warning.light,
+                    textTransform: 'none',
+                  }}
+                >
+                  {actionLoading ? 'Reiniciando...' : 'Reiniciar Nó'}
+                </Button>
+              )}
+              {onStopDaemon && (
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={onStopDaemon}
+                  disabled={actionLoading}
+                  startIcon={actionLoading ? <CircularProgress size={14} color="inherit" /> : undefined}
+                  sx={{
+                    borderColor: colors.error.main,
+                    color: colors.error.light,
+                    textTransform: 'none',
+                  }}
+                >
+                  {actionLoading ? 'Encerrando...' : 'Parar Nó'}
+                </Button>
+              )}
+            </>
+          )}
+
+          {isRunning && !isDevOsSpawned && (
+            <Typography variant="caption" sx={{ color: colors.warning.light }}>
+              🛡️ Processo externo detectado: encerramento bloqueado para proteger serviços do sistema.
+            </Typography>
+          )}
         </Box>
       </Box>
     </Card>
