@@ -16,6 +16,8 @@ pub struct IpfsDaemonStatus {
     pub peers_count: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub origin: Option<String>,
 }
 
 impl Default for IpfsDaemonStatus {
@@ -26,6 +28,7 @@ impl Default for IpfsDaemonStatus {
             repo_size_bytes: None,
             peers_count: None,
             version: None,
+            origin: None,
         }
     }
 }
