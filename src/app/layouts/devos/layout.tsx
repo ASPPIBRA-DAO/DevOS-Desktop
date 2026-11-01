@@ -96,6 +96,11 @@ export function createDevosNavData(): NavSectionProps['data'] {
           icon: <Iconify icon={'solar:graph-up-bold' as any} />,
         },
         {
+          title: 'Armazenamento IPFS',
+          path: paths.devos.ipfs,
+          icon: <Iconify icon={'solar:server-path-bold-duotone' as any} />,
+        },
+        {
           title: 'Database Explorer',
           path: paths.devos.database,
           icon: <Iconify icon={'solar:database-bold' as any} />,
@@ -145,6 +150,9 @@ export const DEVOS_NAV_DATA = createDevosNavData();
 export function getSectionTitle(pathname: string): string {
   if (pathname === paths.devos.root || pathname === `${paths.devos.root}/`) {
     return 'Observability';
+  }
+  if (pathname.startsWith(paths.devos.ipfs)) {
+    return 'Armazenamento IPFS & DePIN';
   }
   if (
     pathname.startsWith(paths.devos.cadastre) ||
