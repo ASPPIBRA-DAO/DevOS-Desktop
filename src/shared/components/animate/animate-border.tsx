@@ -14,7 +14,7 @@ import {
 import Box from '@mui/material/Box';
 import { useTheme } from '@mui/material/styles';
 
-import { createClasses } from '../../theme/create-classes';
+import { createClasses } from 'src/theme/create-classes';
 
 // ----------------------------------------------------------------------
 
