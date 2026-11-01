@@ -9,7 +9,7 @@ import {
   resolveVaultState,
   hasValidVaultFlags,
   getBootstrapErrorMessage,
-} from '../app/providers/app-bootstrap-provider';
+} from '../app/bootstrap';
 
 // ----------------------------------------------------------------------
 // Mock Explícito da Camada Nativa Tauri
