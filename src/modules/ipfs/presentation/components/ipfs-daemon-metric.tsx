@@ -2,8 +2,9 @@ import type { IpfsDaemonStatus } from '../../../../platform/tauri';
 
 import React from 'react';
 
-import { colors } from 'src/theme';
 import { MetricBox } from 'src/shared/components/data-display';
+
+import { colors } from 'src/theme';
 
 export interface IpfsDaemonMetricProps {
   status: IpfsDaemonStatus | null;
