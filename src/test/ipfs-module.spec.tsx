@@ -7,16 +7,16 @@ import type {
 import React from 'react';
 import { it, vi, expect, describe, afterEach } from 'vitest';
 
-import { mockIpcResponse, clearIpcMock } from './test-utils';
 import { IpfsBridge } from '../platform/tauri';
+import { clearIpcMock, mockIpcResponse } from './test-utils';
 import {
   IpfsView,
   IpfsFileList,
   IpfsNodeStatus,
   IpfsUploadPanel,
-  IpfsPinningStatus,
   StorageProofCard,
   IpfsDaemonMetric,
+  IpfsPinningStatus,
 } from '../modules/ipfs';
 
 describe('Módulo 11 — IPFS & Armazenamento Descentralizado (Testes do Módulo Frontend)', () => {
