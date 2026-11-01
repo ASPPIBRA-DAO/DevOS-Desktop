@@ -12,6 +12,7 @@ import { EdgerSquircleBadge } from './edger-badge';
 
 // ----------------------------------------------------------------------
 // EDGER Lights Card: "Soft Colors. Sharp Edges."
+// Procedência: Baseado no componente de notificação com 3D Offset & Tactile Buttons (Uiverse.io)
 // ----------------------------------------------------------------------
 
 export function EdgerCard({
