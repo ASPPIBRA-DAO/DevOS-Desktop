@@ -8,6 +8,7 @@ export interface IpfsDaemonStatus {
   repo_size_bytes?: number;
   peers_count?: number;
   version?: string;
+  origin?: 'DevOsSpawned' | 'External' | 'Offline' | string;
 }
 
 export interface StorageProofChallenge {
