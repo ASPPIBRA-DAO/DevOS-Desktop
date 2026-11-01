@@ -16,9 +16,8 @@ import Typography from '@mui/material/Typography';
 import TableContainer from '@mui/material/TableContainer';
 import TablePagination from '@mui/material/TablePagination';
 
-import { fDate } from 'src/shared/utils/format-time';
+import { fDate, fNumber } from 'src/shared/utils';
 import { Iconify } from 'src/shared/components/iconify';
-import { fNumber } from 'src/shared/utils/format-number';
 import { Scrollbar } from 'src/shared/components/scrollbar';
 import { TableHeadCustom } from 'src/shared/components/table';
 
