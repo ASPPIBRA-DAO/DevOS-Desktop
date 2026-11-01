@@ -85,6 +85,42 @@ impl DaemonManager {
         Ok(DaemonOrigin::DevOsSpawned)
     }
 
+    /// Verifica se o daemon atual opera comprovadamente sobre um repositório exclusivo do DevOS.
+    ///
+    /// Retorna `true` apenas se:
+    /// 1. A origem do processo for `DaemonOrigin::DevOsSpawned`; E
+    /// 2. O repositório apontar comprovadamente para um caminho isolado do DevOS
+    ///    (configurado via IPFS_PATH dentro de $APP_DATA_DIR/devos/ipfs).
+    ///
+    /// Em qualquer outro caso (daemon externo ou daemon utilizando o repositório padrão ~/.ipfs),
+    /// o repositório é estritamente considerado compartilhado.
+    pub async fn is_exclusive_devos_repo() -> bool {
+        if Self::check_daemon_origin().await != DaemonOrigin::DevOsSpawned {
+            return false;
+        }
+
+        if let Ok(ipfs_path_val) = std::env::var("IPFS_PATH") {
+            let custom_path = std::path::PathBuf::from(ipfs_path_val);
+            if let Some(data_dir) = dirs::data_dir() {
+                let devos_repo_dir = data_dir.join("devos").join("ipfs");
+                return custom_path.starts_with(devos_repo_dir);
+            }
+        }
+
+        false
+    }
+
+    /// Obtém o identificador de contexto do repositório ativo (ex: PeerID ou 'shared_or_external').
+    pub async fn get_repo_context() -> String {
+        let client = KuboClient::new();
+        if let Ok(node_id) = client.get_node_id().await {
+            if let Some(id) = node_id.id {
+                return format!("peer_{id}");
+            }
+        }
+        "shared_or_external".to_string()
+    }
+
     /// Encerra controladamente o daemon SOMENTE se ele tiver sido iniciado pelo DevOS.
     pub fn shutdown_if_spawned_by_devos() -> Result<bool, String> {
         let mut guard = SPAWNED_DAEMON_CHILD.lock().unwrap_or_else(|p| p.into_inner());
