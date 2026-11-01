@@ -96,5 +96,6 @@ export const paths = {
     audit: `${ROOTS.DEVOS}/audit`,
     apis: `${ROOTS.DEVOS}/apis`,
     infrastructure: `${ROOTS.DEVOS}/infrastructure`,
+    ipfs: `${ROOTS.DEVOS}/ipfs`,
   },
 };
