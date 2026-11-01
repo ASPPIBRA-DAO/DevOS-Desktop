@@ -1,4 +1,4 @@
-use crate::real_estate::{ImportExecutionReport, RealEstateImporter, XlsxPreviewReport};
+use crate::modules::real_estate::{ImportExecutionReport, RealEstateImporter, XlsxPreviewReport};
 use crate::storage::{
     AuditFindingSummary, ImportBatchSummary, PropertySummary, RealEstateDatabase, RealEstateStats,
 };
