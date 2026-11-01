@@ -162,6 +162,8 @@ impl KuboClient {
         let res = self
             .client
             .post(&url)
+            .header("TE", "trailers")
+            .header("Connection", "TE")
             .timeout(Duration::from_secs(TRANSFER_TIMEOUT_SECS))
             .multipart(form)
             .send()
@@ -237,6 +239,7 @@ impl KuboClient {
 
     /// Executa a leitura de arquivo via `/api/v0/cat?arg=<cid>` em streaming com leitura
     /// direta de frames e captura estrita de erros terminais em trailers HTTP (ex: X-Stream-Error).
+    /// Em conformidade com o RFC 7230, negocia explicitamente o recebimento de trailers via TE: trailers.
     pub async fn cat_to_writer<W: std::io::Write>(
         &self,
         cid: &str,
@@ -262,10 +265,12 @@ impl KuboClient {
             format!("{base_path}/cat?arg={cid}")
         };
 
+        // RFC 7230: TE: trailers e Connection: close, TE instruem o servidor (net/http Go) a enviar trailers
         let req = format!(
             "POST {query} HTTP/1.1\r\n\
              Host: {host}:{port}\r\n\
-             Connection: close\r\n\
+             Connection: close, TE\r\n\
+             TE: trailers\r\n\
              Content-Length: 0\r\n\
              \r\n"
         );
