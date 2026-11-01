@@ -13,10 +13,9 @@ import DialogContent from '@mui/material/DialogContent';
 import LinearProgress from '@mui/material/LinearProgress';
 import CircularProgress from '@mui/material/CircularProgress';
 
-import { fDate } from 'src/shared/utils/format-time';
+import { fDate, fNumber } from 'src/shared/utils';
 import { toast } from 'src/shared/components/snackbar';
 import { Iconify } from 'src/shared/components/iconify';
-import { fNumber } from 'src/shared/utils/format-number';
 
 import { useGetCitizenLedger } from '../../hooks/treasury-hooks';
 import { AssociateSearchCard } from '../components/associate-search-card';
