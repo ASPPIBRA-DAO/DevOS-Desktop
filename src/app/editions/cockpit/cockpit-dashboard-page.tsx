@@ -121,6 +121,65 @@ export function CockpitDashboardPage() {
           Acessar Banco Imobiliário
         </Button>
       </Card>
+
+      {/* Acesso Direto ao Armazenamento IPFS & DePIN */}
+      <Card
+        sx={{
+          mt: 2.5,
+          p: 3,
+          borderRadius: 2,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 2,
+          background: 'linear-gradient(135deg, rgba(0, 240, 255, 0.08) 0%, rgba(0, 167, 111, 0.04) 100%)',
+          border: '1px solid rgba(0, 240, 255, 0.25)',
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Box
+            sx={{
+              width: 48,
+              height: 48,
+              borderRadius: 1.5,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              bgcolor: 'rgba(0, 240, 255, 0.16)',
+              color: colors.primary.main,
+            }}
+          >
+            <Iconify icon="solar:server-path-bold-duotone" width={28} />
+          </Box>
+          <Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                Armazenamento Descentralizado IPFS (Kubo)
+              </Typography>
+              <StatusBadge status="ACTIVE" label="Módulo 11 Ativo" />
+            </Box>
+            <Typography variant="body2" sx={{ color: colors.text.secondary }}>
+              Controle operacional do nó Kubo, upload/download em streaming com SHA-256 e resolução de desafios DePIN ADR-012.
+            </Typography>
+          </Box>
+        </Box>
+
+        <Button
+          variant="contained"
+          onClick={() => navigate(paths.devos.ipfs)}
+          endIcon={<Iconify icon="solar:arrow-right-bold" />}
+          sx={{
+            fontWeight: 700,
+            px: 2.5,
+            backgroundColor: colors.primary.main,
+            color: '#000',
+            '&:hover': { backgroundColor: colors.primary.light },
+          }}
+        >
+          Acessar Armazenamento IPFS
+        </Button>
+      </Card>
     </Box>
   );
 }
