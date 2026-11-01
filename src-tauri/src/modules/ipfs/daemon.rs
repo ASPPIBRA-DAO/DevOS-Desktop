@@ -6,6 +6,7 @@
 //! 3. Não inicia processos concorrentes se uma instância já estiver respondendo.
 //! 4. Nunca encerra processos externos iniciados fora do ciclo do DevOS.
 
+use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
 
@@ -13,6 +14,7 @@ use super::client::KuboClient;
 use super::models::IpfsDaemonStatus;
 
 static SPAWNED_DAEMON_CHILD: Mutex<Option<Child>> = Mutex::new(None);
+static SPAWNED_REPO_PATH: Mutex<Option<PathBuf>> = Mutex::new(None);
 
 #[cfg(test)]
 static EXCLUSIVE_REPO_OVERRIDE: Mutex<Option<bool>> = Mutex::new(None);
@@ -20,6 +22,12 @@ static EXCLUSIVE_REPO_OVERRIDE: Mutex<Option<bool>> = Mutex::new(None);
 #[cfg(test)]
 pub fn set_exclusive_repo_override_for_test(val: Option<bool>) {
     let mut g = EXCLUSIVE_REPO_OVERRIDE.lock().unwrap_or_else(|p| p.into_inner());
+    *g = val;
+}
+
+#[cfg(test)]
+pub fn set_spawned_repo_path_for_test(val: Option<PathBuf>) {
+    let mut g = SPAWNED_REPO_PATH.lock().unwrap_or_else(|p| p.into_inner());
     *g = val;
 }
 
@@ -33,6 +41,24 @@ pub enum DaemonOrigin {
 pub struct DaemonManager;
 
 impl DaemonManager {
+    /// Obtém o diretório de dados canônico dedicado para o repositório IPFS do DevOS ($APP_DATA_DIR/devos/ipfs).
+    pub fn get_dedicated_devos_repo_dir() -> Option<PathBuf> {
+        dirs::data_dir().map(|d| d.join("devos").join("ipfs"))
+    }
+
+    /// Obtém o caminho efetivo do repositório Kubo.
+    /// Prioriza o caminho explicitamente mantido no estado do processo filho iniciado pelo DevOS.
+    /// Caso não tenha sido iniciado pelo DevOS, recorre ao IPFS_PATH do processo atual se definido.
+    pub fn get_effective_repo_path() -> Option<PathBuf> {
+        if let Some(ref path) = *SPAWNED_REPO_PATH.lock().unwrap_or_else(|p| p.into_inner()) {
+            return Some(path.clone());
+        }
+        if let Ok(ipfs_path_val) = std::env::var("IPFS_PATH") {
+            return Some(PathBuf::from(ipfs_path_val));
+        }
+        None
+    }
+
     /// Verifica se o binário `ipfs` (Kubo) está instalado e acessível no PATH do sistema.
     pub fn is_binary_installed() -> bool {
         Command::new("ipfs")
@@ -66,8 +92,7 @@ impl DaemonManager {
     }
 
     /// Tenta iniciar o `ipfs daemon` de forma segura caso ele não esteja ativo.
-    ///
-    /// Se já existir um daemon respondendo na porta 5001, retorna com sucesso sem criar concorrência.
+    /// Configura explicitamente a variável IPFS_PATH apontando para o repositório dedicado.
     pub async fn start_daemon_if_needed() -> Result<DaemonOrigin, String> {
         let client = KuboClient::new();
         if client.is_alive().await {
@@ -83,14 +108,25 @@ impl DaemonManager {
             return Ok(DaemonOrigin::DevOsSpawned);
         }
 
-        let child = Command::new("ipfs")
-            .arg("daemon")
+        let dedicated_dir = Self::get_dedicated_devos_repo_dir();
+
+        let mut cmd = Command::new("ipfs");
+        cmd.arg("daemon")
             .stdout(Stdio::null())
-            .stderr(Stdio::null())
+            .stderr(Stdio::null());
+
+        if let Some(ref dir) = dedicated_dir {
+            cmd.env("IPFS_PATH", dir);
+        }
+
+        let child = cmd
             .spawn()
             .map_err(|e| format!("Falha ao iniciar processo 'ipfs daemon': {e}"))?;
 
         *guard = Some(child);
+        let mut repo_guard = SPAWNED_REPO_PATH.lock().unwrap_or_else(|p| p.into_inner());
+        *repo_guard = dedicated_dir;
+
         Ok(DaemonOrigin::DevOsSpawned)
     }
 
@@ -99,7 +135,7 @@ impl DaemonManager {
     /// Retorna `true` apenas se:
     /// 1. A origem do processo for `DaemonOrigin::DevOsSpawned`; E
     /// 2. O repositório apontar comprovadamente para um caminho isolado do DevOS
-    ///    (configurado via IPFS_PATH dentro de $APP_DATA_DIR/devos/ipfs).
+    ///    (mantido no estado do processo filho ou em IPFS_PATH canônico).
     ///
     /// Em qualquer outro caso (daemon externo ou daemon utilizando o repositório padrão ~/.ipfs),
     /// o repositório é estritamente considerado compartilhado.
@@ -115,13 +151,11 @@ impl DaemonManager {
             return false;
         }
 
-        if let Ok(ipfs_path_val) = std::env::var("IPFS_PATH") {
-            let custom_path = std::path::PathBuf::from(ipfs_path_val);
-            if let Some(data_dir) = dirs::data_dir() {
-                let devos_repo_dir = data_dir.join("devos").join("ipfs");
-                let canon_custom = custom_path.canonicalize().unwrap_or(custom_path);
+        if let Some(effective_path) = Self::get_effective_repo_path() {
+            if let Some(devos_repo_dir) = Self::get_dedicated_devos_repo_dir() {
+                let canon_effective = effective_path.canonicalize().unwrap_or(effective_path);
                 let canon_devos = devos_repo_dir.canonicalize().unwrap_or(devos_repo_dir);
-                return canon_custom.starts_with(canon_devos);
+                return canon_effective.starts_with(canon_devos);
             }
         }
 
@@ -134,13 +168,10 @@ impl DaemonManager {
     pub async fn get_repo_context() -> String {
         let is_exclusive = Self::is_exclusive_devos_repo().await;
         if is_exclusive {
-            let path_fingerprint = std::env::var("IPFS_PATH")
-                .ok()
+            let path_fingerprint = Self::get_effective_repo_path()
                 .map(|p| {
                     use sha2::{Digest, Sha256};
-                    let canon = std::path::PathBuf::from(&p)
-                        .canonicalize()
-                        .unwrap_or_else(|_| std::path::PathBuf::from(&p));
+                    let canon = p.canonicalize().unwrap_or(p);
                     let hash = Sha256::digest(canon.to_string_lossy().as_bytes());
                     hex::encode(&hash[0..6])
                 })
@@ -161,6 +192,9 @@ impl DaemonManager {
     /// Encerra controladamente o daemon SOMENTE se ele tiver sido iniciado pelo DevOS.
     pub fn shutdown_if_spawned_by_devos() -> Result<bool, String> {
         let mut guard = SPAWNED_DAEMON_CHILD.lock().unwrap_or_else(|p| p.into_inner());
+        let mut repo_guard = SPAWNED_REPO_PATH.lock().unwrap_or_else(|p| p.into_inner());
+        *repo_guard = None;
+
         if let Some(mut child) = guard.take() {
             log::info!("[IPFS Daemon] Encerrando daemon iniciado pelo DevOS (PID: {:?})", child.id());
             let _ = child.kill();
