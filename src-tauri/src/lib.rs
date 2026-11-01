@@ -57,7 +57,14 @@ macro_rules! app_invoke_handler {
             commands::batch_fetch_wallet_balances,
             commands::generate_document,
             commands::get_ipfs_daemon_status,
-            commands::execute_storage_proof
+            commands::execute_storage_proof,
+            commands::ipfs_upload_file,
+            commands::ipfs_download_file,
+            commands::ipfs_pin_cid,
+            commands::ipfs_unpin_cid,
+            commands::ipfs_verify_cid_custody,
+            commands::ipfs_verify_all_pins,
+            commands::ipfs_query_providers
             $(, $edition_command)*
         ]
     };
