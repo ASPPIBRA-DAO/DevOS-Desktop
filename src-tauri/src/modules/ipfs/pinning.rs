@@ -12,6 +12,7 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 
 use super::client::KuboClient;
+use super::daemon::DaemonManager;
 use super::models::{IpfsUnpinResult, ManagedPinRecord};
 
 static CATALOG_MUTEX: Mutex<()> = Mutex::new(());
@@ -95,6 +96,14 @@ pub fn is_managed_pin(cid: &str) -> bool {
     load_records_internal().iter().any(|r| r.cid == cid)
 }
 
+/// Verifica se um CID está registrado sob um contexto de repositório específico.
+pub fn is_managed_pin_in_context(cid: &str, repo_context: &str) -> bool {
+    let _lock = CATALOG_MUTEX.lock().unwrap_or_else(|p| p.into_inner());
+    load_records_internal().iter().any(|r| {
+        r.cid == cid && (r.repo_context == repo_context || r.repo_context == "shared_or_external")
+    })
+}
+
 /// Registra um novo pin no catálogo gerenciado.
 pub fn register_managed_pin(record: ManagedPinRecord) -> Result<(), String> {
     let _lock = CATALOG_MUTEX.lock().unwrap_or_else(|p| p.into_inner());
@@ -122,23 +131,46 @@ pub fn unregister_managed_pin(cid: &str) -> Result<bool, String> {
     Ok(removed)
 }
 
-/// Executa a desfixação segura de um CID.
+/// Executa a desfixação segura de um CID com verificação estrita de compartilhamento de repositório.
 ///
-/// Se o CID não pertencer ao catálogo do DevOS e `force_external == false`,
-/// a operação é rejeitada para impedir a exclusão inadvertida de dados de terceiros
-/// em daemons compartilhados.
+/// Políticas de Segurança (Correção 02):
+/// 1. Repositório Compartilhado (daemon externo ou daemon do DevOS sem repositório isolado comprovado):
+///    - Exige confirmação explícita (`confirm_shared_repo = true`) MESMO QUE o CID conste no catálogo.
+///    - Se não for gerenciado pelo DevOS, a remoção é igualmente bloqueada sem confirmação.
+/// 2. Repositório Exclusivo:
+///    - Permite desfixação direta se o CID constar no catálogo gerenciado.
 pub async fn safe_unpin(
     client: &KuboClient,
     cid: &str,
     recursive: bool,
     force_external: bool,
+    confirm_shared_repo: bool,
 ) -> Result<IpfsUnpinResult, String> {
     let was_managed = is_managed_pin(cid);
+    let is_exclusive = DaemonManager::is_exclusive_devos_repo().await;
+    let confirmed = confirm_shared_repo || force_external;
 
-    if !was_managed && !force_external {
-        return Err(format!(
-            "O CID '{cid}' não é gerenciado pelo DevOS. Para desfixar conteúdos externos de terceiros no daemon compartilhado, é necessária confirmação explícita (force_external_unpin = true)."
-        ));
+    if !is_exclusive {
+        // Em repositório compartilhado, NENHUM pin pode ser removido sem confirmação explícita,
+        // impedindo que o DevOS descarte dados utilizados por outros aplicativos ou usuários.
+        if !confirmed {
+            if was_managed {
+                return Err(format!(
+                    "O nó IPFS opera em repositório compartilhado. O CID '{cid}' é gerenciado pelo DevOS, mas a desfixação em nó compartilhado exige confirmação explícita (confirm_shared_repo_unpin = true) para proteger aplicações concorrentes."
+                ));
+            } else {
+                return Err(format!(
+                    "O CID '{cid}' não é gerenciado pelo DevOS e o nó opera em repositório compartilhado. Remoção bloqueada sem confirmação explícita (confirm_shared_repo_unpin = true)."
+                ));
+            }
+        }
+    } else {
+        // Em repositório exclusivo demonstrado
+        if !was_managed && !confirmed {
+            return Err(format!(
+                "O CID '{cid}' não pertence ao catálogo do DevOS. Remoção em repositório exclusivo requer confirmação explícita."
+            ));
+        }
     }
 
     let _ = client.pin_rm(cid, recursive).await?;
