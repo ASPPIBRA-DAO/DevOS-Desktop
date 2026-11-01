@@ -9,8 +9,7 @@ import Typography from '@mui/material/Typography';
 import { paths } from '../../../routes/paths';
 import { colors } from 'src/theme';
 import { Iconify } from '../../../shared/components/iconify';
-import { MetricBox } from '../../../shared/components/MetricBox';
-import { StatusBadge } from '../../../shared/components/StatusBadge';
+import { MetricBox, StatusBadge } from 'src/shared/components/data-display';
 
 export function CockpitDashboardPage() {
   const navigate = useNavigate();
