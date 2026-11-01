@@ -11,13 +11,11 @@ import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
 
-import { Card } from '../../../shared/components/Card';
+import { Card, MetricBox, StatusBadge } from 'src/shared/components/data-display';
 import { colors } from 'src/theme';
 import { VaultStatusMetric } from '../../../modules/wallets';
 import { HostIntegrityCard } from '../../../modules/identity';
-import { MetricBox } from '../../../shared/components/MetricBox';
 import { formatAsppbr } from 'src/shared/utils';
-import { StatusBadge } from '../../../shared/components/StatusBadge';
 import { StorageProofCard, IpfsDaemonMetric } from '../../../modules/ipfs';
 import {
   IpfsBridge,
