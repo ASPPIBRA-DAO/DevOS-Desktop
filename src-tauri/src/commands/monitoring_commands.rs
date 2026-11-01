@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use crate::monitoring::rpc_client::{EvmRpcClient, WalletBalanceReport};
+use crate::modules::monitoring::rpc_client::{EvmRpcClient, WalletBalanceReport};
 
 #[derive(Debug, Deserialize)]
 pub struct WalletBalanceQuery {
