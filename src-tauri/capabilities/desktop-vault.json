@@ -22,6 +22,8 @@
     "allow-fetch-wallet-balance",
     "allow-batch-fetch-wallet-balances",
     "allow-generate-document",
+    "allow-get-ipfs-daemon-status",
+    "allow-execute-storage-proof",
     "core:window:allow-set-fullscreen",
     "core:window:allow-is-fullscreen",
     "core:window:allow-center",
