@@ -173,4 +173,52 @@ pub async fn ipfs_list_managed_pins() -> Result<Vec<crate::modules::ipfs::Manage
     Ok(crate::modules::ipfs::list_managed_pins())
 }
 
+/// Inicia o daemon Kubo pelo DevOS caso não esteja em execução.
+/// Aguarda a inicialização do nó e retorna o status atualizado.
+#[tauri::command]
+pub async fn ipfs_start_daemon() -> Result<IpfsDaemonStatus, String> {
+    let client = KuboClient::new();
+    if client.is_alive().await {
+        return Ok(DaemonManager::get_status().await);
+    }
+
+    DaemonManager::start_daemon_if_needed().await?;
+
+    for _ in 0..15 {
+        tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
+        if client.is_alive().await {
+            break;
+        }
+    }
+
+    Ok(DaemonManager::get_status().await)
+}
+
+/// Encerra controladamente o daemon iniciado pelo DevOS.
+/// Daemons externos de terceiros são protegidos contra encerramento.
+#[tauri::command]
+pub async fn ipfs_stop_daemon() -> Result<IpfsDaemonStatus, String> {
+    let _ = DaemonManager::shutdown_if_spawned_by_devos();
+    tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
+    Ok(DaemonManager::get_status().await)
+}
+
+/// Reinicia o daemon DevOS gerenciado.
+#[tauri::command]
+pub async fn ipfs_restart_daemon() -> Result<IpfsDaemonStatus, String> {
+    let _ = DaemonManager::shutdown_if_spawned_by_devos();
+    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+    DaemonManager::start_daemon_if_needed().await?;
+
+    let client = KuboClient::new();
+    for _ in 0..15 {
+        tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
+        if client.is_alive().await {
+            break;
+        }
+    }
+
+    Ok(DaemonManager::get_status().await)
+}
+
 
