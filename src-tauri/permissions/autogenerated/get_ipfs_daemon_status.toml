@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-get-ipfs-daemon-status"
+description = "Enables the get_ipfs_daemon_status command without any pre-configured scope."
+commands.allow = ["get_ipfs_daemon_status"]
+
+[[permission]]
+identifier = "deny-get-ipfs-daemon-status"
+description = "Denies the get_ipfs_daemon_status command without any pre-configured scope."
+commands.deny = ["get_ipfs_daemon_status"]
