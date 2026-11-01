@@ -1,8 +1,7 @@
-use app_lib::reports::engine::{compile_citizen_ledger_pdf, compile_invoice_pdf};
-use app_lib::reports::models::{CitizenLedgerPayload, InvoiceReportItem, InvoiceReportPayload};
+use app_lib::modules::reports::engine::{compile_citizen_ledger_pdf, compile_invoice_pdf};
+use app_lib::modules::reports::models::{CitizenLedgerPayload, InvoiceReportItem, InvoiceReportPayload};
 use serde_json::json;
 use std::fs;
-use std::path::Path;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output_dir = std::env::temp_dir().join("pdf_previews");
@@ -121,7 +120,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 3. Compilar Contrato de Cessão de Posse
     println!("Compilando Contrato de Cessão via Typst...");
-    let cessao_payload = app_lib::reports::models::CessaoPossePayload {
+    let cessao_payload = app_lib::modules::reports::models::CessaoPossePayload {
         document_number: "2026-0001/CP".to_string(),
         auth_code: "2026-X7Y9".to_string(),
         data: serde_json::json!({
