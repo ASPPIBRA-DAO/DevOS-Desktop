@@ -3,12 +3,13 @@ import React, { useState } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 
-import { colors } from 'src/theme';
 import { Card, StatusBadge } from 'src/shared/components/data-display';
 
+import { colors } from 'src/theme';
+
 import { useIpfsDaemon } from '../../hooks/use-ipfs-daemon';
-import { useIpfsStorage } from '../../hooks/use-ipfs-storage';
 import { IpfsFileList } from '../components/ipfs-file-list';
+import { useIpfsStorage } from '../../hooks/use-ipfs-storage';
 import { IpfsNodeStatus } from '../components/ipfs-node-status';
 import { IpfsUploadPanel } from '../components/ipfs-upload-panel';
 import { StorageProofCard } from '../components/storage-proof-card';
