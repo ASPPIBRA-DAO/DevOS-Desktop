@@ -3,7 +3,7 @@ import type { VaultStatus } from '../../../../platform/tauri';
 import React from 'react';
 
 import { colors } from 'src/theme';
-import { MetricBox } from '../../../../shared/components/MetricBox';
+import { MetricBox } from 'src/shared/components/data-display';
 
 export interface VaultStatusMetricProps {
   status: VaultStatus | null;
