@@ -42,6 +42,7 @@ export interface IpfsDownloadOptions {
   cid: string;
   target_path: string;
   expected_sha256?: string;
+  overwrite?: boolean;
 }
 
 export interface IpfsDownloadResult {
@@ -69,6 +70,7 @@ export interface IpfsUnpinRequest {
   cid: string;
   recursive?: boolean;
   force_external_unpin?: boolean;
+  confirm_shared_repo_unpin?: boolean;
 }
 
 export interface IpfsUnpinResult {
@@ -89,7 +91,8 @@ export type AvailabilityState =
   | 'UNVERIFIED'
   | 'PROVIDERS_FOUND'
   | 'RECOVERY_CONFIRMED'
-  | 'UNAVAILABLE';
+  | 'UNAVAILABLE'
+  | 'LOOKUP_FAILED';
 
 export interface IpfsCidCustodyStatus {
   cid: string;
