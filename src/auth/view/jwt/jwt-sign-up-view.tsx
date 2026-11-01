@@ -15,7 +15,7 @@ import IconButton from '@mui/material/IconButton';
 import { alpha, useTheme } from '@mui/material/styles';
 import InputAdornment from '@mui/material/InputAdornment';
 
-import { useBootstrap } from 'src/app/providers/app-bootstrap-provider';
+import { useBootstrap } from 'src/app/bootstrap';
 
 import { Iconify } from 'src/shared/components/iconify';
 import { Form, Field, schemaUtils } from 'src/shared/components/hook-form';
