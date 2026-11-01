@@ -3,8 +3,9 @@ import React from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 
-import { Card } from './card';
 import { colors } from 'src/theme';
+
+import { Card } from './card';
 
 export interface MetricBoxProps {
   label: string;
