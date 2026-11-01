@@ -100,7 +100,7 @@ pub fn is_managed_pin(cid: &str) -> bool {
 pub fn is_managed_pin_in_context(cid: &str, repo_context: &str) -> bool {
     let _lock = CATALOG_MUTEX.lock().unwrap_or_else(|p| p.into_inner());
     load_records_internal().iter().any(|r| {
-        r.cid == cid && (r.repo_context == repo_context || r.repo_context == "shared_or_external")
+        r.cid == cid && r.repo_context == repo_context
     })
 }
 
@@ -138,7 +138,8 @@ pub fn unregister_managed_pin(cid: &str) -> Result<bool, String> {
 ///    - Exige confirmação explícita (`confirm_shared_repo = true`) MESMO QUE o CID conste no catálogo.
 ///    - Se não for gerenciado pelo DevOS, a remoção é igualmente bloqueada sem confirmação.
 /// 2. Repositório Exclusivo:
-///    - Permite desfixação direta se o CID constar no catálogo gerenciado.
+///    - Permite desfixação direta se o CID pertencer comprovadamente ao contexto deste repositório.
+///    - CIDs cadastrados sob outros repositórios exigem confirmação expressa.
 pub async fn safe_unpin(
     client: &KuboClient,
     cid: &str,
@@ -166,9 +167,12 @@ pub async fn safe_unpin(
         }
     } else {
         // Em repositório exclusivo demonstrado
-        if !was_managed && !confirmed {
+        let current_context = DaemonManager::get_repo_context().await;
+        let is_managed_in_this_repo = is_managed_pin_in_context(cid, &current_context);
+
+        if !is_managed_in_this_repo && !confirmed {
             return Err(format!(
-                "O CID '{cid}' não pertence ao catálogo do DevOS. Remoção em repositório exclusivo requer confirmação explícita."
+                "O CID '{cid}' não pertence ao contexto do repositório ativo ('{current_context}'). Remoção em repositório exclusivo requer confirmação explícita."
             ));
         }
     }
