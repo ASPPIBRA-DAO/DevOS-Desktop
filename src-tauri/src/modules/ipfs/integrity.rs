@@ -51,19 +51,14 @@ pub async fn verify_cid_custody(
     };
 
     // 3. Teste de recuperação local em modo offline (/api/v0/cat?arg=<cid>&offline=true)
+    // Atribui estritamente a custódia local de blocos e extrai os bytes para cálculo de integridade.
     let mut recovered_sha256 = None;
     let mut local_recovery_ok = false;
+    let mut dev_null = std::io::sink();
+    let mut hasher = Sha256::new();
 
-    if let Ok(mut res) = client.cat_stream(cid, true).await {
-        let mut hasher = Sha256::new();
-        let mut read_bytes = 0u64;
-
-        while let Ok(Some(chunk)) = res.chunk().await {
-            hasher.update(&chunk);
-            read_bytes += chunk.len() as u64;
-        }
-
-        if read_bytes > 0 {
+    if let Ok(bytes) = client.cat_to_writer(cid, true, &mut dev_null, &mut hasher).await {
+        if bytes > 0 {
             let digest = hasher.finalize();
             recovered_sha256 = Some(format!("0x{}", hex::encode(digest)));
             local_recovery_ok = true;
@@ -88,16 +83,22 @@ pub async fn verify_cid_custody(
     };
 
     // 5. Consulta de disponibilidade na rede (/api/v0/routing/findprovs)
-    let providers = client.routing_findprovs(cid, 5).await.unwrap_or_default();
-    let providers_count = providers.len() as u32;
-
-    // 6. Avaliação do Indicador 3: Disponibilidade Descentralizada
-    let availability = if local_recovery_ok {
-        AvailabilityState::RecoveryConfirmed
-    } else if providers_count > 0 {
-        AvailabilityState::ProvidersFound
-    } else {
-        AvailabilityState::Unavailable
+    // Avalia disponibilidade descentralizada real na DHT sem confundir com a presença de blocos locais.
+    let providers_res = client.routing_findprovs(cid, 5).await;
+    let (availability, providers_count) = match providers_res {
+        Ok(providers) => {
+            let count = providers.len() as u32;
+            let state = if count > 0 {
+                AvailabilityState::ProvidersFound
+            } else {
+                AvailabilityState::Unavailable
+            };
+            (state, count)
+        }
+        Err(e) => {
+            log::warn!("[IPFS Integrity] Falha ao consultar provedores na DHT para {cid}: {e}");
+            (AvailabilityState::LookupFailed, 0)
+        }
     };
 
     Ok(IpfsCidCustodyStatus {
