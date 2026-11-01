@@ -128,5 +128,26 @@ export const IpfsBridge = {
   async listManagedPins(): Promise<ManagedPinRecord[]> {
     return invokeNative<ManagedPinRecord[]>('ipfs_list_managed_pins');
   },
+
+  /**
+   * Inicia o daemon Kubo pelo DevOS
+   */
+  async startDaemon(): Promise<IpfsDaemonStatus> {
+    return invokeNative<IpfsDaemonStatus>('ipfs_start_daemon');
+  },
+
+  /**
+   * Encerra o daemon gerenciado pelo DevOS
+   */
+  async stopDaemon(): Promise<IpfsDaemonStatus> {
+    return invokeNative<IpfsDaemonStatus>('ipfs_stop_daemon');
+  },
+
+  /**
+   * Reinicia o daemon gerenciado pelo DevOS
+   */
+  async restartDaemon(): Promise<IpfsDaemonStatus> {
+    return invokeNative<IpfsDaemonStatus>('ipfs_restart_daemon');
+  },
 };
 
