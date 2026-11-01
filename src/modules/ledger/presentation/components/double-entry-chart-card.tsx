@@ -12,7 +12,7 @@ import ButtonGroup from '@mui/material/ButtonGroup';
 import { alpha, useTheme } from '@mui/material/styles';
 
 import { Iconify } from 'src/shared/components/iconify';
-import { fCurrency } from 'src/shared/utils/format-number';
+import { fCurrency } from 'src/shared/utils';
 import { Chart, useChart } from 'src/shared/components/chart';
 
 import {
