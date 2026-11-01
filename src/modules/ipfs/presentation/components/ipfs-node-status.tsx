@@ -8,8 +8,9 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
 
-import { colors } from 'src/theme';
 import { Card, StatusBadge } from 'src/shared/components/data-display';
+
+import { colors } from 'src/theme';
 
 export interface IpfsNodeStatusProps {
   status: IpfsDaemonStatus | null;
