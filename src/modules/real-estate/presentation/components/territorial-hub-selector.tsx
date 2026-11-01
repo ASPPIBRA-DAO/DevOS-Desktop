@@ -15,7 +15,7 @@ import InputAdornment from '@mui/material/InputAdornment';
 
 import { colors } from 'src/theme';
 import { Iconify } from '../../../../shared/components/iconify';
-import { StatusBadge } from '../../../../shared/components/StatusBadge';
+import { StatusBadge } from 'src/shared/components/data-display';
 
 export interface CityTerritory {
   id: string;
