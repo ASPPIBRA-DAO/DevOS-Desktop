@@ -10,7 +10,7 @@ import { styled } from '@mui/material/styles';
 import Typography from '@mui/material/Typography';
 
 import { varFade, varContainer } from './variants';
-import { createClasses } from '../../theme/create-classes';
+import { createClasses } from 'src/theme/create-classes';
 
 // ----------------------------------------------------------------------
 
