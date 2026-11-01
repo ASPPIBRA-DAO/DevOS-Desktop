@@ -167,3 +167,10 @@ pub async fn ipfs_query_providers(cid: String) -> Result<IpfsProvidersResult, St
     Ok(IpfsProvidersResult { cid, providers })
 }
 
+/// Retorna a lista de conteúdos gerenciados pelo DevOS registrados no catálogo local `managed-pins.json`.
+#[tauri::command]
+pub async fn ipfs_list_managed_pins() -> Result<Vec<crate::modules::ipfs::ManagedPinRecord>, String> {
+    Ok(crate::modules::ipfs::list_managed_pins())
+}
+
+
