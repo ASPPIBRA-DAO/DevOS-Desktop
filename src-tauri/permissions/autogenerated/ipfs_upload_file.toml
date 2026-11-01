@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-ipfs-upload-file"
+description = "Enables the ipfs_upload_file command without any pre-configured scope."
+commands.allow = ["ipfs_upload_file"]
+
+[[permission]]
+identifier = "deny-ipfs-upload-file"
+description = "Denies the ipfs_upload_file command without any pre-configured scope."
+commands.deny = ["ipfs_upload_file"]
