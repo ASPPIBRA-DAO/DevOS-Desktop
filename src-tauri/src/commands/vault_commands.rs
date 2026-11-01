@@ -5,8 +5,8 @@ use tauri::State;
 use zeroize::{Zeroize, Zeroizing};
 
 use crate::storage::local_database::{LocalDatabase, StorageError};
-use crate::vault::access_control::{VaultHeader, VaultSession, VaultStatus};
-use crate::vault::encryption::VaultCrypto;
+use crate::modules::vault::access_control::{VaultHeader, VaultSession, VaultStatus};
+use crate::modules::vault::encryption::VaultCrypto;
 
 // ----------------------------------------------------------------------
 // Tratamento centralizado de erros
