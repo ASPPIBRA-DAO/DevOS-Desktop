@@ -22,7 +22,7 @@ import DialogContent from '@mui/material/DialogContent';
 import CircularProgress from '@mui/material/CircularProgress';
 import FormControlLabel from '@mui/material/FormControlLabel';
 
-import { colors } from '../../../../shared/theme/palette';
+import { colors } from 'src/theme';
 import { generateDocument } from '../../../../platform/tauri';
 import { toast } from '../../../../shared/components/snackbar';
 import { Iconify } from '../../../../shared/components/iconify';
