@@ -1,0 +1,46 @@
+import type { LinkProps } from '@mui/material/Link';
+
+import Link from '@mui/material/Link';
+
+import { Iconify } from 'src/shared/components/iconify';
+
+import { RouterLink } from 'src/routes/components';
+
+// ----------------------------------------------------------------------
+
+type FormReturnLinkProps = LinkProps & {
+  href: string;
+  icon?: React.ReactNode;
+  label?: React.ReactNode;
+};
+
+export function FormReturnLink({ sx, href, label, icon, children, ...other }: FormReturnLinkProps) {
+  return (
+    <Link
+      component={RouterLink}
+      href={href}
+      color="inherit"
+      variant="subtitle2"
+      sx={[
+        {
+          mt: 3,
+          gap: 0.5,
+          mx: 'auto',
+          alignItems: 'center',
+          display: 'inline-flex',
+          fontFamily: 'var(--font-orbitron), sans-serif',
+          fontWeight: 700,
+          color: 'info.main',
+          textDecoration: 'none',
+          '&:hover': { textDecoration: 'underline' },
+        },
+        ...(Array.isArray(sx) ? sx : [sx]),
+      ]}
+      {...other}
+    >
+      {icon || <Iconify width={16} icon="eva:arrow-ios-back-fill" />}
+      {label || 'Voltar para o acesso'}
+      {children}
+    </Link>
+  );
+}
