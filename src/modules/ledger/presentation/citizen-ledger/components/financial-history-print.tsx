@@ -6,8 +6,7 @@ import type {
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 
-import { fDate } from 'src/shared/utils/format-time';
-import { fNumber } from 'src/shared/utils/format-number';
+import { fDate, fNumber } from 'src/shared/utils';
 import { A4Page } from 'src/shared/components/abnt-document/a4-page';
 
 // ----------------------------------------------------------------------
