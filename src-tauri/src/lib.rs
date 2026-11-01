@@ -9,13 +9,16 @@ use tauri::Manager;
 
 pub mod commands;
 pub mod modules;
-pub mod monitoring;
 pub mod platform;
-pub mod real_estate;
-pub mod reports;
+pub mod shared;
 pub mod storage;
-pub mod vault;
-pub mod wallets;
+
+// Reexportações dos módulos consolidados sob src-tauri/src/modules/
+pub use modules::monitoring;
+pub use modules::real_estate;
+pub use modules::reports;
+pub use modules::vault;
+pub use modules::wallets;
 
 #[cfg(test)]
 mod tests;
