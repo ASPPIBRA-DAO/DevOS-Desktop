@@ -1,26 +1,13 @@
+import type {
+  IpfsDaemonStatus,
+  StorageProofChallenge,
+  StorageProofResponse,
+} from '../contracts/ipfs-contracts';
+
 import { invokeNative } from '../core/invoke';
 
-export interface IpfsDaemonStatus {
-  running: boolean;
-  peer_id?: string;
-  repo_size_bytes?: number;
-  peers_count?: number;
-  version?: string;
-}
-
-export interface StorageProofChallenge {
-  challenge_id: string;
-  cid: string;
-  server_nonce: string;
-  deadline_utc: string;
-}
-
-export interface StorageProofResponse {
-  challenge_id: string;
-  proof_hash: string;
-  signature: string;
-  node_operational_pubkey: string;
-}
+// Reexporta os tipos para garantir compatibilidade retroativa integral
+export type { IpfsDaemonStatus, StorageProofChallenge, StorageProofResponse };
 
 export const IpfsBridge = {
   /**
