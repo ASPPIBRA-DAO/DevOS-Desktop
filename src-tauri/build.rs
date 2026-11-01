@@ -28,6 +28,13 @@ const TAURI_APP_COMMANDS: &[&str] = &[
     // Armazenamento descentralizado e DePIN (IPFS / Kubo)
     "get_ipfs_daemon_status",
     "execute_storage_proof",
+    "ipfs_upload_file",
+    "ipfs_download_file",
+    "ipfs_pin_cid",
+    "ipfs_unpin_cid",
+    "ipfs_verify_cid_custody",
+    "ipfs_verify_all_pins",
+    "ipfs_query_providers",
     // Módulo imobiliário e importação de dados (Cockpit)
     "get_real_estate_stats",
     "preview_real_estate_import",
