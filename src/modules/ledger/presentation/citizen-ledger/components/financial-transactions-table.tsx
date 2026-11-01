@@ -21,7 +21,7 @@ import { Iconify } from 'src/shared/components/iconify';
 import { Scrollbar } from 'src/shared/components/scrollbar';
 import { TableHeadCustom } from 'src/shared/components/table';
 
-import { IdentityAvatar } from 'src/auth/components';
+import { IdentityAvatar } from 'src/modules/authentication';
 
 // ----------------------------------------------------------------------
 
