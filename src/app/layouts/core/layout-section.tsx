@@ -66,10 +66,18 @@ export function LayoutSection({
 
 // ----------------------------------------------------------------------
 
-const LayoutRoot = styled('div')``;
+const LayoutRoot = styled('div')({
+  display: 'flex',
+  flex: '1 1 auto',
+  flexDirection: 'column',
+  minHeight: '100%',
+  width: '100%',
+});
 
 const LayoutSidebarContainer = styled('div')(() => ({
   display: 'flex',
   flex: '1 1 auto',
   flexDirection: 'column',
+  minWidth: 0,
+  width: '100%',
 }));
