@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-ipfs-stop-daemon"
+description = "Enables the ipfs_stop_daemon command without any pre-configured scope."
+commands.allow = ["ipfs_stop_daemon"]
+
+[[permission]]
+identifier = "deny-ipfs-stop-daemon"
+description = "Denies the ipfs_stop_daemon command without any pre-configured scope."
+commands.deny = ["ipfs_stop_daemon"]
