@@ -1,6 +1,7 @@
 import type { EditionConfig } from './types';
 
 import { paths } from '../router/paths';
+import { IpfsView } from '../../modules/ipfs';
 import { LedgerView } from '../../modules/ledger';
 import { RealEstateView } from '../../modules/real-estate';
 import { CessaoPosseView } from '../../sections/cessao-de-posse';
@@ -17,6 +18,12 @@ export const currentEdition: EditionConfig = {
       label: 'Visão Geral',
       icon: 'solar:widget-5-bold-duotone',
       component: CockpitDashboardPage,
+    },
+    {
+      path: paths.devos.ipfs,
+      label: 'Armazenamento IPFS',
+      icon: 'solar:server-path-bold-duotone',
+      component: IpfsView,
     },
     {
       path: paths.devos.cadastre,
