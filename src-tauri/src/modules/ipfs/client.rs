@@ -6,6 +6,7 @@
 use std::time::Duration;
 use reqwest::multipart::{Form, Part};
 use reqwest::{Body, Client, Response};
+use sha2::Digest;
 
 use super::models::{
     IpfsAllPinsVerifyResult, IpfsDaemonStatus, IpfsPinType, IpfsProviderPeer,
@@ -173,9 +174,38 @@ impl KuboClient {
             return Err(format!("Kubo RPC (/add) retornou status {status}: {err_text}"));
         }
 
-        res.json::<KuboAddResponse>()
+        let response_text = res
+            .text()
             .await
-            .map_err(|e| format!("Falha ao decodificar resposta de upload do Kubo: {e}"))
+            .map_err(|e| format!("Falha ao ler stream de resposta de /add: {e}"))?;
+
+        let mut final_response: Option<KuboAddResponse> = None;
+
+        for line in response_text.lines() {
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+
+            let obj: KuboAddResponse = serde_json::from_str(trimmed)
+                .map_err(|e| format!("Falha ao decodificar linha JSON de /add ('{trimmed}'): {e}"))?;
+
+            // Se Kubo comunicar um erro terminal em qualquer linha da resposta
+            if obj.r#type.as_deref() == Some("error") || (obj.message.is_some() && obj.hash.is_none()) {
+                let msg = obj
+                    .message
+                    .unwrap_or_else(|| "Erro desconhecido informado pelo Kubo em /add".to_string());
+                return Err(format!("Kubo /api/v0/add encerrou com erro terminal: {msg}"));
+            }
+
+            if obj.hash.is_some() {
+                final_response = Some(obj);
+            }
+        }
+
+        final_response.ok_or_else(|| {
+            format!("Kubo /api/v0/add não retornou um CID válido na resposta: {response_text}")
+        })
     }
 
     /// Abre um stream de leitura de arquivo via `/api/v0/cat?arg=<cid>`.
@@ -203,6 +233,140 @@ impl KuboClient {
         }
 
         Ok(res)
+    }
+
+    /// Executa a leitura de arquivo via `/api/v0/cat?arg=<cid>` em streaming com leitura
+    /// direta de frames e captura estrita de erros terminais em trailers HTTP (ex: X-Stream-Error).
+    pub async fn cat_to_writer<W: std::io::Write>(
+        &self,
+        cid: &str,
+        offline: bool,
+        mut writer: W,
+        hasher: &mut sha2::Sha256,
+    ) -> Result<u64, String> {
+        use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+
+        let (host, port, base_path) = parse_http_target(&self.base_url)?;
+
+        let mut stream = tokio::time::timeout(
+            Duration::from_secs(STATUS_TIMEOUT_SECS * 5),
+            tokio::net::TcpStream::connect((host.as_str(), port)),
+        )
+        .await
+        .map_err(|_| "Timeout ao conectar ao daemon Kubo (/cat)".to_string())?
+        .map_err(|e| format!("Falha de conexão com Kubo em {host}:{port}: {e}"))?;
+
+        let query = if offline {
+            format!("{base_path}/cat?arg={cid}&offline=true")
+        } else {
+            format!("{base_path}/cat?arg={cid}")
+        };
+
+        let req = format!(
+            "POST {query} HTTP/1.1\r\n\
+             Host: {host}:{port}\r\n\
+             Connection: close\r\n\
+             Content-Length: 0\r\n\
+             \r\n"
+        );
+
+        stream
+            .write_all(req.as_bytes())
+            .await
+            .map_err(|e| format!("Falha ao enviar requisição /cat ao Kubo: {e}"))?;
+
+        let mut buf_reader = BufReader::new(stream);
+
+        // 1. Ler linha de status HTTP
+        let mut status_line = String::new();
+        buf_reader
+            .read_line(&mut status_line)
+            .await
+            .map_err(|e| format!("Falha ao ler status HTTP de /cat: {e}"))?;
+
+        if !status_line.contains("200") {
+            let mut remaining_headers = String::new();
+            while let Ok(n) = buf_reader.read_line(&mut remaining_headers).await {
+                if n == 0 || remaining_headers.ends_with("\r\n\r\n") || remaining_headers.ends_with("\n\n") {
+                    break;
+                }
+            }
+            let mut err_body = String::new();
+            let _ = tokio::io::AsyncReadExt::read_to_string(&mut buf_reader, &mut err_body).await;
+            return Err(format!(
+                "Kubo RPC (/cat) retornou erro: {} - {}",
+                status_line.trim(),
+                err_body.trim()
+            ));
+        }
+
+        // 2. Consumir cabeçalhos até a linha em branco (\r\n)
+        let mut is_chunked = false;
+        let mut content_length: Option<u64> = None;
+
+        loop {
+            let mut header_line = String::new();
+            let n = buf_reader
+                .read_line(&mut header_line)
+                .await
+                .map_err(|e| format!("Falha ao ler cabeçalhos HTTP: {e}"))?;
+
+            if n == 0 || header_line.trim().is_empty() {
+                break;
+            }
+
+            let lower = header_line.to_lowercase();
+            if lower.starts_with("transfer-encoding:") && lower.contains("chunked") {
+                is_chunked = true;
+            } else if lower.starts_with("content-length:") {
+                if let Some((_, val)) = header_line.split_once(':') {
+                    content_length = val.trim().parse::<u64>().ok();
+                }
+            }
+        }
+
+        // 3. Decodificar corpo
+        if is_chunked {
+            decode_chunked_response(buf_reader, &mut writer, hasher).await
+        } else if let Some(len) = content_length {
+            use tokio::io::AsyncReadExt;
+            let mut remaining = len;
+            let mut buf = vec![0u8; 65536];
+            while remaining > 0 {
+                let to_read = std::cmp::min(remaining, buf.len() as u64) as usize;
+                buf_reader
+                    .read_exact(&mut buf[..to_read])
+                    .await
+                    .map_err(|e| format!("Falha de transporte ao ler stream de dados: {e}"))?;
+
+                hasher.update(&buf[..to_read]);
+                writer
+                    .write_all(&buf[..to_read])
+                    .map_err(|e| format!("Falha ao gravar bloco: {e}"))?;
+
+                remaining -= to_read as u64;
+            }
+            Ok(len)
+        } else {
+            use tokio::io::AsyncReadExt;
+            let mut buf = vec![0u8; 65536];
+            let mut total = 0u64;
+            loop {
+                let n = buf_reader
+                    .read(&mut buf)
+                    .await
+                    .map_err(|e| format!("Falha de transporte ao ler stream: {e}"))?;
+                if n == 0 {
+                    break;
+                }
+                hasher.update(&buf[..n]);
+                writer
+                    .write_all(&buf[..n])
+                    .map_err(|e| format!("Falha ao gravar bloco: {e}"))?;
+                total += n as u64;
+            }
+            Ok(total)
+        }
     }
 
     /// Fixa um CID no repositório local via `/api/v0/pin/add`.
@@ -420,4 +584,110 @@ impl KuboClient {
 
         Ok(providers)
     }
+}
+
+/// Parse de URL local para extração de host, porta e path base
+pub fn parse_http_target(base_url: &str) -> Result<(String, u16, String), String> {
+    let url = base_url.trim();
+    let stripped = url
+        .strip_prefix("http://")
+        .ok_or_else(|| format!("URL Kubo não suportada (apenas http:// local): {url}"))?;
+    let mut parts = stripped.splitn(2, '/');
+    let host_port = parts.next().unwrap_or("127.0.0.1:5001");
+    let base_path = parts.next().map(|p| format!("/{p}")).unwrap_or_default();
+
+    let mut hp = host_port.splitn(2, ':');
+    let host = hp.next().unwrap_or("127.0.0.1").to_string();
+    let port = hp.next().and_then(|p| p.parse::<u16>().ok()).unwrap_or(5001);
+
+    Ok((host, port, base_path))
+}
+
+/// Decodifica um fluxo HTTP/1.1 chunked em streaming, gravando no writer e atualizando o hasher.
+/// Intercepta frames terminais de erro e trailers HTTP (ex: X-Stream-Error do Kubo).
+pub async fn decode_chunked_response<R, W>(
+    mut reader: R,
+    mut writer: W,
+    hasher: &mut sha2::Sha256,
+) -> Result<u64, String>
+where
+    R: tokio::io::AsyncBufRead + Unpin,
+    W: std::io::Write,
+{
+    use sha2::Digest;
+    use tokio::io::{AsyncBufReadExt, AsyncReadExt};
+
+    let mut total_bytes = 0u64;
+
+    loop {
+        let mut line = String::new();
+        let n = reader
+            .read_line(&mut line)
+            .await
+            .map_err(|e| format!("Falha de transporte ao ler tamanho de chunk HTTP: {e}"))?;
+
+        if n == 0 {
+            return Err("Conexão com Kubo encerrada prematuramente antes do término do stream chunked.".to_string());
+        }
+
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        // Chunk header: <hex_size>[;extensions]
+        let hex_part = trimmed.split(';').next().unwrap_or(trimmed).trim();
+        let chunk_size = usize::from_str_radix(hex_part, 16)
+            .map_err(|e| format!("Tamanho de chunk HTTP hexadecimal inválido ('{hex_part}'): {e}"))?;
+
+        if chunk_size == 0 {
+            // Último chunk recebido (0\r\n). Agora lemos os trailers HTTP até linha vazia.
+            loop {
+                let mut trailer_line = String::new();
+                let tn = reader
+                    .read_line(&mut trailer_line)
+                    .await
+                    .map_err(|e| format!("Falha ao ler trailer HTTP do Kubo: {e}"))?;
+
+                if tn == 0 || trailer_line.trim().is_empty() {
+                    break; // Fim dos trailers
+                }
+
+                let lower = trailer_line.to_lowercase();
+                if lower.starts_with("x-stream-error:") || lower.starts_with("x-ipfs-error:") {
+                    let err_msg = trailer_line
+                        .split_once(':')
+                        .map(|(_, msg)| msg.trim())
+                        .unwrap_or("erro desconhecido");
+                    return Err(format!(
+                        "Erro terminal do Kubo recebido via HTTP trailer (X-Stream-Error): {err_msg}"
+                    ));
+                }
+            }
+            break;
+        }
+
+        // Lê exatamente chunk_size bytes
+        let mut chunk_buf = vec![0u8; chunk_size];
+        reader
+            .read_exact(&mut chunk_buf)
+            .await
+            .map_err(|e| format!("Falha de transporte ao ler corpo do chunk HTTP: {e}"))?;
+
+        hasher.update(&chunk_buf);
+        writer
+            .write_all(&chunk_buf)
+            .map_err(|e| format!("Falha ao gravar bytes recebidos: {e}"))?;
+
+        total_bytes += chunk_size as u64;
+
+        // Consome o \r\n após o corpo do chunk
+        let mut crlf = [0u8; 2];
+        reader
+            .read_exact(&mut crlf)
+            .await
+            .map_err(|e| format!("Falha ao ler delimitador de chunk HTTP: {e}"))?;
+    }
+
+    Ok(total_bytes)
 }
