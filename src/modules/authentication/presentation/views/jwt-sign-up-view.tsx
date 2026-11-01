@@ -15,18 +15,17 @@ import IconButton from '@mui/material/IconButton';
 import { alpha, useTheme } from '@mui/material/styles';
 import InputAdornment from '@mui/material/InputAdornment';
 
+import { paths } from 'src/app/router/paths';
 import { useBootstrap } from 'src/app/bootstrap';
+import { useRouter } from 'src/app/router/hooks';
+import { RouterLink } from 'src/app/router/components';
 
 import { Iconify } from 'src/shared/components/iconify';
 import { Form, Field, schemaUtils } from 'src/shared/components/hook-form';
 
-import { paths } from 'src/app/router/paths';
-import { useRouter } from 'src/app/router/hooks';
-import { RouterLink } from 'src/app/router/components';
-
 import { signUp } from '../../context/jwt';
-import { useAuthContext } from '../../application/hooks';
 import { getErrorMessage } from '../../utils';
+import { useAuthContext } from '../../application/hooks';
 import { FormDivider, SignUpTerms } from '../components';
 
 // ----------------------------------------------------------------------
