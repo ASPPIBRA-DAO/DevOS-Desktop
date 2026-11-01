@@ -13,13 +13,6 @@ pub mod platform;
 pub mod shared;
 pub mod storage;
 
-// Reexportações dos módulos consolidados sob src-tauri/src/modules/
-pub use modules::monitoring;
-pub use modules::real_estate;
-pub use modules::reports;
-pub use modules::vault;
-pub use modules::wallets;
-
 #[cfg(test)]
 mod tests;
 
@@ -154,7 +147,7 @@ pub fn run() {
                 return Err(Box::new(error) as Box<dyn Error>);
             }
 
-            if !app.manage(vault::VaultSession::new()) {
+            if !app.manage(modules::vault::VaultSession::new()) {
                 let error = startup_error(
                     "Falha ao registrar a sessão do cofre",
                     "o estado VaultSession já estava registrado",
