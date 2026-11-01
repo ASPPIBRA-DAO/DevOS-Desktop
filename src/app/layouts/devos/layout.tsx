@@ -24,7 +24,7 @@ import { NavSectionMini, NavSectionVertical } from 'src/components/nav-section';
 
 import { MenuButton } from '../components/menu-button';
 import { NavToggleButton } from '../components/nav-toggle-button';
-import { useBootstrap } from '../../providers/app-bootstrap-provider';
+import { useBootstrap } from 'src/app/bootstrap';
 import { MainSection, layoutClasses, HeaderSection, LayoutSection } from '../core';
 
 // ----------------------------------------------------------------------
