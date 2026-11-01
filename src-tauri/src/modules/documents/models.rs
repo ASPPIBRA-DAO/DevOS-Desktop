@@ -140,10 +140,10 @@ pub struct DocumentOutput {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "payload", rename_all = "snake_case")]
 pub enum DocumentRequest {
-    CitizenLedger(crate::reports::models::CitizenLedgerPayload),
-    InvoiceBill(crate::reports::models::InvoiceReportPayload),
-    CessaoPosse(crate::reports::models::CessaoPossePayload),
-    RealEstateReconciliation(crate::reports::models::RealEstateReconciliationPayload),
+    CitizenLedger(crate::modules::reports::models::CitizenLedgerPayload),
+    InvoiceBill(crate::modules::reports::models::InvoiceReportPayload),
+    CessaoPosse(crate::modules::reports::models::CessaoPossePayload),
+    RealEstateReconciliation(crate::modules::reports::models::RealEstateReconciliationPayload),
 }
 
 impl DocumentRequest {
@@ -164,7 +164,7 @@ impl DocumentRequest {
 mod tests {
     use super::*;
 
-    use crate::reports::models::CitizenLedgerPayload;
+    use crate::modules::reports::models::CitizenLedgerPayload;
     use serde_json::json;
 
     #[test]
