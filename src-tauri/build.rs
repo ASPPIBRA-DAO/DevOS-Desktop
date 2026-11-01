@@ -36,6 +36,9 @@ const TAURI_APP_COMMANDS: &[&str] = &[
     "ipfs_verify_all_pins",
     "ipfs_query_providers",
     "ipfs_list_managed_pins",
+    "ipfs_start_daemon",
+    "ipfs_stop_daemon",
+    "ipfs_restart_daemon",
     // Módulo imobiliário e importação de dados (Cockpit)
     "get_real_estate_stats",
     "preview_real_estate_import",
