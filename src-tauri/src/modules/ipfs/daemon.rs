@@ -14,6 +14,15 @@ use super::models::IpfsDaemonStatus;
 
 static SPAWNED_DAEMON_CHILD: Mutex<Option<Child>> = Mutex::new(None);
 
+#[cfg(test)]
+static EXCLUSIVE_REPO_OVERRIDE: Mutex<Option<bool>> = Mutex::new(None);
+
+#[cfg(test)]
+pub fn set_exclusive_repo_override_for_test(val: Option<bool>) {
+    let mut g = EXCLUSIVE_REPO_OVERRIDE.lock().unwrap_or_else(|p| p.into_inner());
+    *g = val;
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DaemonOrigin {
     External,
@@ -95,6 +104,13 @@ impl DaemonManager {
     /// Em qualquer outro caso (daemon externo ou daemon utilizando o repositório padrão ~/.ipfs),
     /// o repositório é estritamente considerado compartilhado.
     pub async fn is_exclusive_devos_repo() -> bool {
+        #[cfg(test)]
+        {
+            if let Some(val) = *EXCLUSIVE_REPO_OVERRIDE.lock().unwrap_or_else(|p| p.into_inner()) {
+                return val;
+            }
+        }
+
         if Self::check_daemon_origin().await != DaemonOrigin::DevOsSpawned {
             return false;
         }
@@ -103,22 +119,43 @@ impl DaemonManager {
             let custom_path = std::path::PathBuf::from(ipfs_path_val);
             if let Some(data_dir) = dirs::data_dir() {
                 let devos_repo_dir = data_dir.join("devos").join("ipfs");
-                return custom_path.starts_with(devos_repo_dir);
+                let canon_custom = custom_path.canonicalize().unwrap_or(custom_path);
+                let canon_devos = devos_repo_dir.canonicalize().unwrap_or(devos_repo_dir);
+                return canon_custom.starts_with(canon_devos);
             }
         }
 
         false
     }
 
-    /// Obtém o identificador de contexto do repositório ativo (ex: PeerID ou 'shared_or_external').
+    /// Obtém o identificador estável de contexto do repositório ativo.
+    /// Combina o identificador canônico dedicado da instalação e o PeerID do nó.
+    /// Em nós externos ou repositórios compartilhados, retorna 'shared_or_external'.
     pub async fn get_repo_context() -> String {
-        let client = KuboClient::new();
-        if let Ok(node_id) = client.get_node_id().await {
-            if let Some(id) = node_id.id {
-                return format!("peer_{id}");
+        let is_exclusive = Self::is_exclusive_devos_repo().await;
+        if is_exclusive {
+            let path_fingerprint = std::env::var("IPFS_PATH")
+                .ok()
+                .map(|p| {
+                    use sha2::{Digest, Sha256};
+                    let canon = std::path::PathBuf::from(&p)
+                        .canonicalize()
+                        .unwrap_or_else(|_| std::path::PathBuf::from(&p));
+                    let hash = Sha256::digest(canon.to_string_lossy().as_bytes());
+                    hex::encode(&hash[0..6])
+                })
+                .unwrap_or_else(|| "devos_dedicated".to_string());
+
+            let client = KuboClient::new();
+            if let Ok(node_id) = client.get_node_id().await {
+                if let Some(id) = node_id.id {
+                    return format!("devos_repo_{path_fingerprint}_peer_{id}");
+                }
             }
+            format!("devos_repo_{path_fingerprint}")
+        } else {
+            "shared_or_external".to_string()
         }
-        "shared_or_external".to_string()
     }
 
     /// Encerra controladamente o daemon SOMENTE se ele tiver sido iniciado pelo DevOS.
