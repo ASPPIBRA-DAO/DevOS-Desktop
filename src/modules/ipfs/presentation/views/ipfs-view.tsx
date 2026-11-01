@@ -19,7 +19,16 @@ import { IpfsPinningStatus } from '../components/ipfs-pinning-status';
  * Compartilhada retrocompativelmente entre DevOS Node e DevOS Cockpit.
  */
 export function IpfsView() {
-  const { status, loading: daemonLoading, refresh: refreshDaemon, isOnline } = useIpfsDaemon();
+  const {
+    status,
+    loading: daemonLoading,
+    actionLoading: daemonActionLoading,
+    refresh: refreshDaemon,
+    startDaemon,
+    stopDaemon,
+    restartDaemon,
+    isOnline,
+  } = useIpfsDaemon();
   const {
     files,
     loadingFiles,
@@ -106,7 +115,15 @@ export function IpfsView() {
           mb: 3,
         }}
       >
-        <IpfsNodeStatus status={status} loading={daemonLoading} onRefresh={refreshDaemon} />
+        <IpfsNodeStatus
+          status={status}
+          loading={daemonLoading}
+          actionLoading={daemonActionLoading}
+          onRefresh={refreshDaemon}
+          onStartDaemon={startDaemon}
+          onStopDaemon={stopDaemon}
+          onRestartDaemon={restartDaemon}
+        />
         <StorageProofCard />
       </Box>
 
