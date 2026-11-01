@@ -22,7 +22,7 @@ import TableContainer from '@mui/material/TableContainer';
 import InputAdornment from '@mui/material/InputAdornment';
 import CircularProgress from '@mui/material/CircularProgress';
 
-import { colors } from '../../../../shared/theme/palette';
+import { colors } from 'src/theme';
 import { Iconify } from '../../../../shared/components/iconify';
 import {
   RealEstateBridge,
