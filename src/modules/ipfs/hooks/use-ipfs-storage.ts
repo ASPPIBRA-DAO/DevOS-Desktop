@@ -1,8 +1,8 @@
 import type {
-  IpfsCidCustodyStatus,
-  IpfsDownloadResult,
   IpfsUploadResult,
   ManagedPinRecord,
+  IpfsDownloadResult,
+  IpfsCidCustodyStatus,
 } from '../../../platform/tauri';
 
 import { useState, useEffect, useCallback } from 'react';
