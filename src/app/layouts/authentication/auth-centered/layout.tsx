@@ -16,8 +16,8 @@ import { WindowBridge } from 'src/platform/tauri/window/window-bridge';
 
 import { Logo } from 'src/shared/components/logo';
 
-import { paths } from 'src/routes/paths';
-import { RouterLink } from 'src/routes/components';
+import { paths } from 'src/app/router/paths';
+import { RouterLink } from 'src/app/router/components';
 
 import { AuthCenteredContent } from './content';
 import { SettingsButton } from '../../components/settings-button';
