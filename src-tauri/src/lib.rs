@@ -64,7 +64,8 @@ macro_rules! app_invoke_handler {
             commands::ipfs_unpin_cid,
             commands::ipfs_verify_cid_custody,
             commands::ipfs_verify_all_pins,
-            commands::ipfs_query_providers
+            commands::ipfs_query_providers,
+            commands::ipfs_list_managed_pins
             $(, $edition_command)*
         ]
     };
