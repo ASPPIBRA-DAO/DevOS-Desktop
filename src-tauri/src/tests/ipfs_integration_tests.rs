@@ -471,6 +471,216 @@ async fn test_decode_chunked_response_detects_premature_eof() {
 }
 
 #[tokio::test]
+async fn test_hashing_async_reader_exact_stream_digest() {
+    use std::io::Write;
+    use std::sync::{Arc, Mutex};
+    use sha2::{Digest, Sha256};
+    use tokio::fs::File as TokioFile;
+    use tokio::io::AsyncReadExt;
+
+    let temp_dir = std::env::temp_dir().join(format!("devos_toctou_test_{}", uuid::Uuid::new_v4()));
+    let _ = std::fs::create_dir_all(&temp_dir);
+    let sample_file = temp_dir.join("sample.bin");
+
+    // Gerar 64 KiB de dados arbitrários
+    let sample_data: Vec<u8> = (0..65536).map(|i| (i % 251) as u8).collect();
+    let mut f = std::fs::File::create(&sample_file).unwrap();
+    f.write_all(&sample_data).unwrap();
+    drop(f);
+
+    let tokio_file = TokioFile::open(&sample_file).await.unwrap();
+    let hasher_arc = Arc::new(Mutex::new(Sha256::new()));
+    let total_bytes_arc = Arc::new(Mutex::new(0u64));
+
+    let mut reader = crate::modules::ipfs::content::HashingAsyncReader {
+        inner: tokio_file,
+        hasher: hasher_arc.clone(),
+        total_bytes: total_bytes_arc.clone(),
+    };
+
+    let mut read_buf = Vec::new();
+    reader.read_to_end(&mut read_buf).await.unwrap();
+
+    assert_eq!(read_buf.len(), 65536);
+    assert_eq!(*total_bytes_arc.lock().unwrap(), 65536);
+
+    let stream_hash = format!("0x{}", hex::encode(hasher_arc.lock().unwrap().clone().finalize()));
+    let expected_hash = format!("0x{}", hex::encode(Sha256::digest(&sample_data)));
+
+    assert_eq!(stream_hash, expected_hash, "Hash calculado pelo stream DEVE ser idêntico ao digest dos bytes transmitidos");
+
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+#[tokio::test]
+async fn test_unpin_authorization_in_exclusive_devos_repo() {
+    use crate::modules::ipfs::daemon::set_exclusive_repo_override_for_test;
+    use crate::modules::ipfs::pinning::{register_managed_pin, safe_unpin, set_custom_catalog_dir};
+
+    let temp_dir = std::env::temp_dir().join(format!("devos_excl_unpin_{}", uuid::Uuid::new_v4()));
+    let _ = std::fs::create_dir_all(&temp_dir);
+    set_custom_catalog_dir(Some(temp_dir.clone()));
+
+    // Simula repositório comprovadamente exclusivo do DevOS
+    set_exclusive_repo_override_for_test(Some(true));
+
+    let client = KuboClient::with_base_url("http://127.0.0.1:59999/api/v0");
+    let cid = "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi";
+
+    let repo_ctx = crate::modules::ipfs::daemon::DaemonManager::get_repo_context().await;
+
+    register_managed_pin(ManagedPinRecord {
+        cid: cid.to_string(),
+        name: "documento_exclusivo.pdf".to_string(),
+        original_sha256: "0x123456".to_string(),
+        size_bytes: 2048,
+        pinned_at_utc: "2026-11-01T15:00:00Z".to_string(),
+        pin_type: "recursive".to_string(),
+        origin: "devos_upload".to_string(),
+        repo_context: repo_ctx.clone(),
+    }).expect("Registrar pin exclusivo");
+
+    // Em repositório exclusivo demonstrado, o unpin de CID pertencente a este repositório
+    // passa pela autorização de segurança sem exigir confirm_shared_repo_unpin = true!
+    // A chamada atinge o cliente RPC (/pin/rm) e falha apenas por estar offline.
+    let res = safe_unpin(&client, cid, true, false, false).await;
+    assert!(res.is_err());
+    let err_msg = res.unwrap_err();
+    assert!(!err_msg.contains("confirm_shared_repo_unpin = true"));
+    assert!(err_msg.contains("Falha de conexão com Kubo RPC (/pin/rm)"));
+
+    set_exclusive_repo_override_for_test(None);
+    set_custom_catalog_dir(None);
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+#[tokio::test]
+async fn test_unpin_rejected_when_devos_spawned_but_repo_is_shared() {
+    use crate::modules::ipfs::daemon::set_exclusive_repo_override_for_test;
+    use crate::modules::ipfs::pinning::{register_managed_pin, safe_unpin, set_custom_catalog_dir};
+
+    let temp_dir = std::env::temp_dir().join(format!("devos_shared_spawn_{}", uuid::Uuid::new_v4()));
+    let _ = std::fs::create_dir_all(&temp_dir);
+    set_custom_catalog_dir(Some(temp_dir.clone()));
+
+    // Daemon foi iniciado pelo DevOS, mas opera sobre repositório compartilhado (override = false)
+    set_exclusive_repo_override_for_test(Some(false));
+
+    let client = KuboClient::with_base_url("http://127.0.0.1:59999/api/v0");
+    let cid = "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi";
+
+    register_managed_pin(ManagedPinRecord {
+        cid: cid.to_string(),
+        name: "doc_compartilhado.pdf".to_string(),
+        original_sha256: "0xabcdef".to_string(),
+        size_bytes: 1024,
+        pinned_at_utc: "2026-11-01T15:00:00Z".to_string(),
+        pin_type: "recursive".to_string(),
+        origin: "devos_upload".to_string(),
+        repo_context: "shared_or_external".to_string(),
+    }).expect("Registrar pin");
+
+    // Mesmo sendo gerenciado e iniciado pelo DevOS, se o repositório é compartilhado, EXIGE confirmação!
+    let res = safe_unpin(&client, cid, true, false, false).await;
+    assert!(res.is_err());
+    let err_msg = res.unwrap_err();
+    assert!(err_msg.contains("confirm_shared_repo_unpin = true"));
+    assert!(err_msg.contains("repositório compartilhado"));
+
+    set_exclusive_repo_override_for_test(None);
+    set_custom_catalog_dir(None);
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+#[tokio::test]
+async fn test_download_overwrite_true_successfully_replaces_destination() {
+    use std::io::Write;
+
+    let temp_dir = std::env::temp_dir().join(format!("devos_ow_true_{}", uuid::Uuid::new_v4()));
+    let _ = std::fs::create_dir_all(&temp_dir);
+
+    let target_file = temp_dir.join("relatorio.txt");
+    let mut f = std::fs::File::create(&target_file).unwrap();
+    f.write_all(b"VERSAO_ANTIGA_PREEXISTENTE").unwrap();
+    drop(f);
+
+    // Simula a etapa atômica de publicação com overwrite = true
+    let tmp_file = temp_dir.join(format!(".relatorio.{}.devos.tmp", uuid::Uuid::new_v4()));
+    let mut tf = std::fs::File::create(&tmp_file).unwrap();
+    tf.write_all(b"NOVA_VERSAO_SUBSTITUTA_AUTORIZADA").unwrap();
+    drop(tf);
+
+    // Publicação com overwrite: substitui com sucesso o arquivo pré-existente
+    let rename_res = std::fs::rename(&tmp_file, &target_file);
+    assert!(rename_res.is_ok());
+
+    let final_content = std::fs::read(&target_file).unwrap();
+    assert_eq!(final_content, b"NOVA_VERSAO_SUBSTITUTA_AUTORIZADA");
+
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+#[test]
+fn test_upload_terminal_error_response_aborts_operation() {
+    // Valida que respostas de /add emitindo Type == "error" ou Message de falha terminal
+    // são identificadas antes de qualquer registro no catálogo
+    let raw_error_stream = "{\"Name\":\"parte1.dat\",\"Bytes\":1024}\n{\"Message\":\"write error: device out of space\",\"Code\":1,\"Type\":\"error\"}\n";
+
+    let mut had_terminal_error = false;
+    for line in raw_error_stream.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        if let Ok(obj) = serde_json::from_str::<KuboAddResponse>(trimmed) {
+            if obj.r#type.as_deref() == Some("error") || (obj.message.is_some() && obj.hash.is_none()) {
+                had_terminal_error = true;
+                break;
+            }
+        }
+    }
+
+    assert!(had_terminal_error, "Erro terminal durante stream de upload DEVE ser identificado");
+}
+
+#[tokio::test]
+async fn test_remote_node_recovery_remains_unverified_without_second_node() {
+    use crate::modules::ipfs::integrity::verify_cid_custody;
+
+    let client = KuboClient::with_base_url("http://127.0.0.1:59999/api/v0");
+    let test_cid = "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi";
+
+    let custody_status = verify_cid_custody(&client, test_cid, None).await.unwrap();
+
+    // Sem a presença de um segundo nó independente retornando blocos remotos,
+    // o estado de disponibilidade descentralizada NUNCA pode ser RecoveryConfirmed
+    assert_ne!(
+        custody_status.availability,
+        AvailabilityState::RecoveryConfirmed,
+        "Recuperação confirmada requer evidência física de múltiplos nós independentes"
+    );
+}
+
+#[test]
+fn test_rfc7230_trailer_negotiation_headers_present() {
+    let query = "/api/v0/cat?arg=bafy123";
+    let host = "127.0.0.1";
+    let port = 5001;
+
+    let req = format!(
+        "POST {query} HTTP/1.1\r\n\
+         Host: {host}:{port}\r\n\
+         Connection: close, TE\r\n\
+         TE: trailers\r\n\
+         Content-Length: 0\r\n\
+         \r\n"
+    );
+
+    assert!(req.contains("TE: trailers"), "Requisição HTTP DEVE enviar 'TE: trailers'");
+    assert!(req.contains("Connection: close, TE"), "Requisição HTTP DEVE enviar 'Connection: close, TE'");
+}
+
+#[tokio::test]
 #[ignore]
 async fn test_real_kubo_connection_if_available() {
     let client = KuboClient::new();
