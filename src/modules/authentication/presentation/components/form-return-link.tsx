@@ -2,9 +2,9 @@ import type { LinkProps } from '@mui/material/Link';
 
 import Link from '@mui/material/Link';
 
-import { Iconify } from 'src/shared/components/iconify';
-
 import { RouterLink } from 'src/app/router/components';
+
+import { Iconify } from 'src/shared/components/iconify';
 
 // ----------------------------------------------------------------------
 
