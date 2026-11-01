@@ -5,9 +5,10 @@ import IconButton from '@mui/material/IconButton';
 import { alpha, styled } from '@mui/material/styles';
 import ListItemText from '@mui/material/ListItemText';
 
+import { fData } from 'src/shared/utils';
+
 import { Iconify } from '../../iconify';
 import { uploadClasses } from '../classes';
-import { fData } from 'src/shared/utils';
 import { getFileMeta, FileThumbnail, useFilesPreview } from '../../file-thumbnail';
 
 // ----------------------------------------------------------------------
