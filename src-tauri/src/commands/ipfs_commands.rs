@@ -120,7 +120,14 @@ pub async fn ipfs_unpin_cid(request: IpfsUnpinRequest) -> Result<IpfsUnpinResult
     if !client.is_alive().await {
         return Err("Nó IPFS (Kubo) inativo. Não foi possível desfixar o conteúdo.".to_string());
     }
-    safe_unpin(&client, &request.cid, request.recursive, request.force_external_unpin).await
+    safe_unpin(
+        &client,
+        &request.cid,
+        request.recursive,
+        request.force_external_unpin,
+        request.confirm_shared_repo_unpin,
+    )
+    .await
 }
 
 /// Audita os três indicadores de armazenamento (Integridade, Custódia e Disponibilidade) para um CID específico.
