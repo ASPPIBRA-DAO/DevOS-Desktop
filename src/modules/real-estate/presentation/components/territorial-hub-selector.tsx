@@ -13,7 +13,7 @@ import Typography from '@mui/material/Typography';
 import CardActionArea from '@mui/material/CardActionArea';
 import InputAdornment from '@mui/material/InputAdornment';
 
-import { colors } from '../../../../shared/theme/palette';
+import { colors } from 'src/theme';
 import { Iconify } from '../../../../shared/components/iconify';
 import { StatusBadge } from '../../../../shared/components/StatusBadge';
 
