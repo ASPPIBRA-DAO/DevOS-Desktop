@@ -1,6 +1,6 @@
 use crate::commands::{GenerateDocumentPayload, generate_document};
 use crate::modules::documents::{DocumentKind, DocumentRequest};
-use crate::reports::models::{CitizenLedgerPayload, InvoiceReportItem, InvoiceReportPayload};
+use crate::modules::reports::models::{CitizenLedgerPayload, InvoiceReportItem, InvoiceReportPayload};
 use sha2::{Digest, Sha256};
 use serde_json::json;
 use std::fs;
