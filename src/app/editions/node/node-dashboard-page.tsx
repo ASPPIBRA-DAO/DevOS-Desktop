@@ -14,10 +14,9 @@ import CircularProgress from '@mui/material/CircularProgress';
 import { Card } from '../../../shared/components/Card';
 import { colors } from 'src/theme';
 import { VaultStatusMetric } from '../../../modules/wallets';
-// Componentes modulares de domínio
 import { HostIntegrityCard } from '../../../modules/identity';
 import { MetricBox } from '../../../shared/components/MetricBox';
-import { formatAsppbr } from '../../../shared/utils/format-number';
+import { formatAsppbr } from 'src/shared/utils';
 import { StatusBadge } from '../../../shared/components/StatusBadge';
 import { StorageProofCard, IpfsDaemonMetric } from '../../../modules/ipfs';
 import {
