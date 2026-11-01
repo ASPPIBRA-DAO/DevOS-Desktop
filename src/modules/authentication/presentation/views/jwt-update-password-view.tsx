@@ -11,14 +11,15 @@ import IconButton from '@mui/material/IconButton';
 import { alpha, useTheme } from '@mui/material/styles';
 import InputAdornment from '@mui/material/InputAdornment';
 
+import { paths } from 'src/app/router/paths';
+import { RouterLink } from 'src/app/router/components';
+import { useRouter, useSearchParams } from 'src/app/router/hooks';
+
 import { toast } from 'src/shared/components/snackbar';
 import { Iconify } from 'src/shared/components/iconify';
 import { Form, Field, schemaUtils } from 'src/shared/components/hook-form';
 
-import { paths } from 'src/app/router/paths';
 import { SentIcon } from 'src/assets/icons';
-import { RouterLink } from 'src/app/router/components';
-import { useRouter, useSearchParams } from 'src/app/router/hooks';
 
 import { getErrorMessage } from '../../utils/error-message';
 import { FormResendCode } from '../components/form-resend-code';
