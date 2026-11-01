@@ -5,3 +5,4 @@ export * from './wallet-contracts';
 export * from './document-contracts';
 export * from './monitoring-contracts';
 export * from './real-estate-contracts';
+export * from './ipfs-contracts';
