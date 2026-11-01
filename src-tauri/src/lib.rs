@@ -65,7 +65,10 @@ macro_rules! app_invoke_handler {
             commands::ipfs_verify_cid_custody,
             commands::ipfs_verify_all_pins,
             commands::ipfs_query_providers,
-            commands::ipfs_list_managed_pins
+            commands::ipfs_list_managed_pins,
+            commands::ipfs_start_daemon,
+            commands::ipfs_stop_daemon,
+            commands::ipfs_restart_daemon
             $(, $edition_command)*
         ]
     };
