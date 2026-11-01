@@ -10,8 +10,9 @@ import React from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 
-import { colors } from 'src/theme';
 import { Card, StatusBadge } from 'src/shared/components/data-display';
+
+import { colors } from 'src/theme';
 
 export interface IpfsPinningStatusProps {
   status?: IpfsCidCustodyStatus | null;
