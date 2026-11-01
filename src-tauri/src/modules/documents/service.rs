@@ -143,7 +143,7 @@ impl DocumentRenderer for DocumentsService {
 mod tests {
     use super::*;
 
-    use crate::reports::models::{
+    use crate::modules::reports::models::{
         CitizenLedgerPayload,
         InvoiceReportItem,
         InvoiceReportPayload,
@@ -298,7 +298,7 @@ mod tests {
     fn test_generate_cessao_posse_document() {
         let service = DocumentsService::new();
 
-        let payload = crate::reports::models::CessaoPossePayload {
+        let payload = crate::modules::reports::models::CessaoPossePayload {
             document_number: "2026-0001/CP".to_string(),
             auth_code: "2026-X7Y9".to_string(),
             data: serde_json::json!({
@@ -327,7 +327,7 @@ mod tests {
     fn test_generate_real_estate_reconciliation_document() {
         let service = DocumentsService::new();
 
-        let payload = crate::reports::models::RealEstateReconciliationPayload {
+        let payload = crate::modules::reports::models::RealEstateReconciliationPayload {
             data: serde_json::json!({
                 "generatedAt": "31/10/2026 13:00:00",
                 "stats": {
