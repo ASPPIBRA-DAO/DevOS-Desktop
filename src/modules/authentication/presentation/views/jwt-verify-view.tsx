@@ -9,10 +9,10 @@ import { alpha, useTheme } from '@mui/material/styles';
 import { toast } from 'src/shared/components/snackbar';
 import { Iconify } from 'src/shared/components/iconify';
 
-import { paths } from 'src/routes/paths';
+import { paths } from 'src/app/router/paths';
 import { EmailInboxIcon } from 'src/assets/icons';
-import { RouterLink } from 'src/routes/components';
-import { useSearchParams } from 'src/routes/hooks';
+import { RouterLink } from 'src/app/router/components';
+import { useSearchParams } from 'src/app/router/hooks';
 
 import { getErrorMessage } from '../../utils/error-message';
 import { FormResendCode } from '../components/form-resend-code';
