@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-ipfs-unpin-cid"
+description = "Enables the ipfs_unpin_cid command without any pre-configured scope."
+commands.allow = ["ipfs_unpin_cid"]
+
+[[permission]]
+identifier = "deny-ipfs-unpin-cid"
+description = "Denies the ipfs_unpin_cid command without any pre-configured scope."
+commands.deny = ["ipfs_unpin_cid"]
