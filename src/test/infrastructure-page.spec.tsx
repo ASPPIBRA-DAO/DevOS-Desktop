@@ -11,6 +11,10 @@ describe('DevOS Control Plane — InfrastructurePage (Rede de Nós & Recompensas
     expect(html).toContain('bchain-cube-viewport');
     expect(html).toContain('bchain-cube-stage');
     expect(html).toContain('DEPIN • PROOF-OF-STAKE • HOLDERS ATIVOS');
+    expect(html).toContain('BLOCO #1');
+    expect(html).toContain('(Genesis)');
+    expect(html).toContain('Nonce (Proof of Work):');
+    expect(html).toContain('MINERAR BLOCO');
     expect(html).toContain('REDE DE PINNING');
     expect(html).toContain('Todos os Nós Aptos a Recompensa');
   });
