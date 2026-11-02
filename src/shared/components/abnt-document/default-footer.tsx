@@ -7,97 +7,114 @@ import { useDocumentData } from './document-context';
 
 type DefaultFooterProps = {
   authCode?: string;
-  message?: React.ReactNode;
   qrCodeIcon?: string;
-  originIdentifier?: string;
+  pageNumber?: number;
+  totalPages?: number;
+  showQrCode?: boolean;
 };
 
 export function DefaultFooter({
   authCode,
-  message,
   qrCodeIcon = 'mdi:qrcode',
-  originIdentifier,
+  pageNumber = 1,
+  totalPages = 1,
+  showQrCode = true,
 }: DefaultFooterProps = {}) {
   const data = useDocumentData();
 
-  const finalAuthCode = authCode || (data?.authCode as string) || 'FFC-2026-X8Y9Z';
-  const finalOrigin = originIdentifier || (data?.originIdentifier as string) || 'FFC Oficial';
-
-  const finalMessage = message || (data?.message as React.ReactNode) || (
-    <>
-      Este documento foi gerado pelo sistema interno da associação e possui validade <br />
-      jurídica para fins de cadastro interno e prova de vínculo.
-    </>
-  );
+  const finalAuthCode =
+    authCode || (data?.authCode as string) || (data?.trackingNumber as string) || '2026-X7Y9';
 
   return (
     <Box
       sx={{
         position: 'relative',
-        pt: 2,
-        // Linha superior combinando com a elegância do cabeçalho
+        pt: 1.5,
         borderTop: '2px solid #111827',
         display: 'flex',
         justifyContent: 'space-between',
-        alignItems: 'flex-end',
-        gap: 2,
+        alignItems: 'center',
+        gap: 1.5,
         mt: 2,
-        minHeight: '2.2cm',
         boxSizing: 'border-box',
         '&::before': {
           content: '""',
           position: 'absolute',
-          top: -4,
+          top: -3,
           left: 0,
           right: 0,
           height: '1px',
-          bgcolor: '#D4AF37', // Detalhe dourado corporativo sutil combinando com o topo
+          bgcolor: '#D4AF37', // Filete dourado corporativo #D4AF37
         },
       }}
     >
-      {/* QR Code Lateral posicionado na margem esquerda */}
-      <Box
-        sx={{
-          position: 'absolute',
-          left: '-2.5cm',
-          top: 8,
-          width: '2.2cm',
-          height: '2.2cm',
-          border: '2px solid #D4AF37', // Borda Dourada
-          borderRadius: 1.5,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          bgcolor: '#FFFFFF',
-          boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
-        }}
-      >
-        <Iconify icon={qrCodeIcon as any} width={65} sx={{ color: '#0A3B18' }} />
-      </Box>
+      {/* Esquerda: QR Code Integrado + Texto Legal de Fé Pública */}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flex: 1.5 }}>
+        {showQrCode && (
+          <Box
+            sx={{
+              width: 32,
+              height: 32,
+              border: '1.5pt solid #D4AF37',
+              borderRadius: 0.75,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              bgcolor: '#FFFFFF',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+              flexShrink: 0,
+            }}
+          >
+            <Iconify icon={qrCodeIcon as any} width={24} sx={{ color: '#0A3B18' }} />
+          </Box>
+        )}
 
-      {/* Mensagem Institucional */}
-      <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flex: 1, pl: 0.5 }}>
         <Box sx={{ display: 'flex', flexDirection: 'column' }}>
           <Typography
             variant="caption"
             sx={{
-              fontWeight: 900,
+              fontWeight: 800,
               color: '#111827',
-              fontSize: '7.5pt',
-              mb: 0.5,
+              fontSize: '7pt',
               textTransform: 'uppercase',
-              letterSpacing: '0.5px',
+              letterSpacing: '0.4px',
+              lineHeight: 1.1,
             }}
           >
             Autenticação Digital
           </Typography>
-          <Typography variant="caption" sx={{ color: '#4B5563', fontSize: '7pt', lineHeight: 1.3 }}>
-            {finalMessage}
+          <Typography
+            variant="caption"
+            sx={{
+              color: '#4B5563',
+              fontSize: '6.5pt',
+              lineHeight: 1.2,
+              fontFamily: 'Arial, sans-serif',
+              mt: 0.2,
+            }}
+          >
+            Lei Federal 14.063/2020 • ICP-Brasil / DAO
           </Typography>
         </Box>
       </Box>
 
-      {/* Identificação de Origem e Código de Autenticação */}
+      {/* Centro: Numeração Dinâmica Oficial (Página X de Y) */}
+      <Box sx={{ display: 'flex', justifyContent: 'center', flex: 1, textAlign: 'center' }}>
+        <Typography
+          variant="caption"
+          sx={{
+            fontWeight: 800,
+            fontSize: '7.5pt',
+            color: '#0A3B18', // Verde institucional oficial
+            fontFamily: 'Arial, sans-serif',
+            letterSpacing: '0.2px',
+          }}
+        >
+          Página {pageNumber} de {totalPages}
+        </Typography>
+      </Box>
+
+      {/* Direita: Identificação e Código Criptográfico */}
       <Box
         sx={{
           display: 'flex',
@@ -105,19 +122,40 @@ export function DefaultFooter({
           alignItems: 'flex-end',
           justifyContent: 'center',
           textAlign: 'right',
+          flex: 1.5,
         }}
       >
         <Typography
           variant="caption"
-          sx={{ fontWeight: 900, color: '#D4AF37', fontSize: '8pt', mb: 0.5, letterSpacing: '0.3px' }}
+          sx={{
+            fontWeight: 800,
+            color: '#111827',
+            fontSize: '7pt',
+            letterSpacing: '0.3px',
+            lineHeight: 1.1,
+          }}
         >
-          {finalOrigin}
+          ASPPIBRA DAO
         </Typography>
         <Typography
           variant="caption"
-          sx={{ color: '#111827', fontSize: '7.5pt', fontFamily: 'monospace', fontWeight: 'bold' }}
+          sx={{
+            color: '#4B5563',
+            fontSize: '6.5pt',
+            mt: 0.2,
+          }}
         >
-          Autenticação: {finalAuthCode}
+          Cód:{' '}
+          <Box
+            component="span"
+            sx={{
+              color: '#111827',
+              fontFamily: 'monospace, "Arial", sans-serif',
+              fontWeight: 700,
+            }}
+          >
+            {finalAuthCode}
+          </Box>
         </Typography>
       </Box>
     </Box>

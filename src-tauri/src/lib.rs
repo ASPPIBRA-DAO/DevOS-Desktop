@@ -86,7 +86,6 @@ macro_rules! app_invoke_handler {
 /// antes da criação de threads e da inicialização do runtime Tauri.
 #[cfg(target_os = "linux")]
 fn configure_linux_environment() {
-    let set_dmabuf_default = std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none();
     let set_gdk_default = std::env::var_os("GDK_BACKEND").is_none();
 
     // SAFETY:
@@ -94,9 +93,6 @@ fn configure_linux_environment() {
     // O ponto de entrada do aplicativo deve invocar run() antes de
     // iniciar qualquer thread que possa acessar o ambiente do processo.
     unsafe {
-        if set_dmabuf_default {
-            std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
-        }
         if set_gdk_default {
             std::env::set_var("GDK_BACKEND", "x11");
         }

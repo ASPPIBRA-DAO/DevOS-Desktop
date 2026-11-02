@@ -169,8 +169,8 @@ export function getSectionTitle(pathname: string): string {
   if (pathname.startsWith(paths.devos.dao)) {
     return 'Tesouraria';
   }
-  if (pathname.startsWith(paths.devos.wallets)) {
-    return 'Carteiras';
+  if (pathname.startsWith(paths.devos.wallets) || pathname.startsWith('/banking')) {
+    return 'Carteiras & Banco Digital';
   }
   if (pathname.startsWith(paths.devos.ledger)) {
     return 'Livro-Razão';
@@ -252,20 +252,11 @@ const NavRoot = styled('div', {
   borderRadius: 14,
   overflow: 'visible',
 
-  // 💎 VIDROMORFISMO 3D (TRANSLUCÊNCIA CRISTALINA + APPLE RETINA BLUR)
-  background:
-    'linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(248, 250, 252, 0.70) 50%, rgba(241, 245, 249, 0.80) 100%)',
-  backdropFilter: 'blur(20px) saturate(180%)',
-  WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-  border: '1px solid rgba(255, 255, 255, 0.75)',
-  boxShadow: [
-    '0 20px 48px -10px rgba(15, 23, 42, 0.12)',
-    '0 8px 20px -4px rgba(15, 23, 42, 0.06)',
-    'inset 0 1.5px 0 rgba(255, 255, 255, 0.95)',
-    'inset 1.5px 0 0 rgba(255, 255, 255, 0.75)',
-    'inset 0 -1.5px 0 rgba(0, 0, 0, 0.04)',
-    'inset -1.5px 0 0 rgba(0, 0, 0, 0.03)',
-  ].join(', '),
+  // 💎 VIDROMORFISMO OBSIDIANA DE ALTA PERFORMANCE (ZERO CPU BLUR NO SCROLL)
+  background: 'rgba(255, 255, 255, 0.94)',
+  border: '1px solid rgba(145, 158, 171, 0.2)',
+  boxShadow: '0 8px 24px -4px rgba(15, 23, 42, 0.1)',
+  contain: 'paint',
 
   // ✨ REFLEXO GLOSSY DIAGONAL 3D (WET GLASS SHEEN)
   '&::before': {
@@ -282,20 +273,11 @@ const NavRoot = styled('div', {
     zIndex: 1,
   },
 
-  // 🌑 MODO DARK / CYBER (OBSIDIAN TRANSLÚCIDO FLUTUANTE COM CHANFRO DE LUZ)
+  // 🌑 MODO DARK / CYBER (OBSIDIAN TRANSLÚCIDO FLUTUANTE 60 FPS)
   ...theme.applyStyles('dark', {
-    background:
-      'linear-gradient(180deg, rgba(15, 23, 42, 0.78) 0%, rgba(2, 8, 23, 0.70) 50%, rgba(15, 23, 42, 0.82) 100%)',
-    backdropFilter: 'blur(24px) saturate(190%)',
-    WebkitBackdropFilter: 'blur(24px) saturate(190%)',
+    background: 'rgba(15, 23, 42, 0.94)',
     border: '1px solid rgba(255, 255, 255, 0.12)',
-    boxShadow: [
-      '0 24px 60px -12px rgba(0, 0, 0, 0.75)',
-      '0 10px 24px -4px rgba(0, 0, 0, 0.55)',
-      'inset 0 1.5px 0 rgba(255, 255, 255, 0.22)',
-      'inset 1px 0 0 rgba(255, 255, 255, 0.08)',
-      'inset 0 -1.5px 0 rgba(0, 0, 0, 0.5)',
-    ].join(', '),
+    boxShadow: '0 12px 32px -4px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.15)',
     '&::before': {
       background:
         'linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.02) 30%, transparent 60%)',
@@ -419,21 +401,12 @@ export function DevOSLayout({ children, navData: userNavData }: Props) {
           WebkitBackfaceVisibility: 'hidden',
           willChange: 'transform',
 
-          // 💎 VIDROMORFISMO 3D (PADRÃO DASHBOARD WEB)
-          background:
-            'linear-gradient(135deg, rgba(255, 255, 255, 0.82) 0%, rgba(248, 250, 252, 0.68) 50%, rgba(241, 245, 249, 0.78) 100%)',
-          backdropFilter: 'blur(20px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-          border: '1px solid rgba(255, 255, 255, 0.75)',
-          boxShadow: [
-            '0 20px 48px -10px rgba(15, 23, 42, 0.12)',
-            '0 8px 20px -4px rgba(15, 23, 42, 0.06)',
-            'inset 0 1.5px 0 rgba(255, 255, 255, 0.95)',
-            'inset 1.5px 0 0 rgba(255, 255, 255, 0.75)',
-            'inset 0 -1.5px 0 rgba(0, 0, 0, 0.04)',
-            'inset -1.5px 0 0 rgba(0, 0, 0, 0.03)',
-          ].join(', '),
+          // 💎 VIDROMORFISMO CABEÇALHO DE ALTA PERFORMANCE (ZERO CPU BLUR NO SCROLL)
+          background: 'rgba(255, 255, 255, 0.94)',
+          border: '1px solid rgba(145, 158, 171, 0.2)',
+          boxShadow: '0 4px 20px -2px rgba(15, 23, 42, 0.08)',
           zIndex: 'var(--layout-header-zIndex)',
+          contain: 'paint',
 
           '&::before': {
             content: '""',
@@ -463,18 +436,9 @@ export function DevOSLayout({ children, navData: userNavData }: Props) {
           },
 
           ...theme.applyStyles('dark', {
-            background:
-              'linear-gradient(135deg, rgba(15, 23, 42, 0.78) 0%, rgba(2, 8, 23, 0.70) 50%, rgba(15, 23, 42, 0.82) 100%)',
-            backdropFilter: 'blur(24px) saturate(190%)',
-            WebkitBackdropFilter: 'blur(24px) saturate(190%)',
+            background: 'rgba(15, 23, 42, 0.94)',
             border: '1px solid rgba(255, 255, 255, 0.12)',
-            boxShadow: [
-              '0 24px 60px -12px rgba(0, 0, 0, 0.75)',
-              '0 10px 24px -4px rgba(0, 0, 0, 0.55)',
-              'inset 0 1.5px 0 rgba(255, 255, 255, 0.22)',
-              'inset 1px 0 0 rgba(255, 255, 255, 0.08)',
-              'inset 0 -1.5px 0 rgba(0, 0, 0, 0.5)',
-            ].join(', '),
+            boxShadow: '0 8px 24px -2px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.15)',
             '&::before': {
               background:
                 'linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.02) 30%, transparent 60%)',
@@ -582,8 +546,6 @@ export function DevOSLayout({ children, navData: userNavData }: Props) {
                 margin: '8px 0',
                 border: '1px solid rgba(255, 255, 255, 0.3)',
                 boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.06)',
-                backdropFilter: 'blur(8px)',
-                WebkitBackdropFilter: 'blur(8px)',
                 ...theme.applyStyles('dark', {
                   background: 'rgba(255, 255, 255, 0.05)',
                   border: '1px solid rgba(255, 255, 255, 0.08)',
@@ -776,7 +738,7 @@ export function DevOSLayout({ children, navData: userNavData }: Props) {
         minWidth: 0,
         width: '100%',
         maxWidth: '100%',
-        overflowX: 'hidden',
+        overflowX: 'clip',
         '@media print': {
           p: '0 !important',
           m: '0 !important',
@@ -797,7 +759,7 @@ export function DevOSLayout({ children, navData: userNavData }: Props) {
           flexDirection: 'column',
           minWidth: 0,
           width: '100%',
-          overflowX: 'hidden',
+          overflowX: 'clip',
           '@media print': {
             p: '0 !important',
             m: '0 !important',
@@ -854,20 +816,10 @@ export function DevOSLayout({ children, navData: userNavData }: Props) {
       sx={[
         {
           minHeight: '100vh',
-          background: [
-            'radial-gradient(at 0% 0%, rgba(0, 167, 111, 0.05) 0px, transparent 45%)',
-            'radial-gradient(at 100% 0%, rgba(0, 210, 255, 0.05) 0px, transparent 45%)',
-            'radial-gradient(at 50% 50%, rgba(145, 158, 171, 0.04) 0px, transparent 60%)',
-            theme.vars.palette.background.neutral,
-          ].join(', '),
-          backgroundAttachment: 'fixed',
+          bgcolor: 'background.default',
           ...theme.applyStyles('dark', {
-            background: [
-              'radial-gradient(at 0% 0%, rgba(0, 255, 127, 0.06) 0px, transparent 50%)',
-              'radial-gradient(at 100% 0%, rgba(0, 210, 255, 0.05) 0px, transparent 50%)',
-              '#020817',
-            ].join(', '),
-            backgroundAttachment: 'fixed',
+            bgcolor: '#080c14',
+            backgroundImage: 'linear-gradient(180deg, #0b0f19 0%, #060911 100%)',
           }),
           [`& .${layoutClasses.sidebarContainer}`]: {
             minHeight: '100vh',
