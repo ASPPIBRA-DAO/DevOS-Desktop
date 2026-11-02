@@ -303,7 +303,7 @@ export function BlockchainCube({
               </Box>
 
               <Box sx={{ textAlign: 'center', my: 'auto' }}>
-                <Typography sx={{ fontSize: '0.58rem', color: 'text.secondary', fontWeight: 600 }}>
+                <Typography sx={{ fontSize: '0.58rem', color: '#94A3B8', fontWeight: 600 }}>
                   MERKLE ROOT
                 </Typography>
                 <Typography
@@ -319,7 +319,7 @@ export function BlockchainCube({
               </Box>
 
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography sx={{ fontSize: '0.58rem', color: 'text.secondary', fontWeight: 600 }}>
+                <Typography sx={{ fontSize: '0.58rem', color: '#94A3B8', fontWeight: 600 }}>
                   NONCE
                 </Typography>
                 <Typography
@@ -341,7 +341,7 @@ export function BlockchainCube({
             {/* 3. Face Frontal (Front): Validação & Hash */}
             <div className="bchain-cube-face front">
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography sx={{ fontSize: '0.58rem', color: 'text.secondary', fontWeight: 700 }}>
+                <Typography sx={{ fontSize: '0.58rem', color: '#94A3B8', fontWeight: 700 }}>
                   BLOCK NODE
                 </Typography>
                 <Box
@@ -356,7 +356,7 @@ export function BlockchainCube({
               </Box>
 
               <Box sx={{ textAlign: 'center', my: 'auto' }}>
-                <Typography sx={{ fontSize: '0.62rem', color: 'text.secondary', fontWeight: 600 }}>
+                <Typography sx={{ fontSize: '0.62rem', color: '#94A3B8', fontWeight: 600 }}>
                   STATUS
                 </Typography>
                 <Typography
@@ -374,7 +374,7 @@ export function BlockchainCube({
               <Typography
                 sx={{
                   fontSize: '0.56rem',
-                  color: 'text.secondary',
+                  color: '#94A3B8',
                   textAlign: 'center',
                   fontFamily: 'monospace',
                 }}
@@ -385,7 +385,7 @@ export function BlockchainCube({
 
             {/* 4. Face Traseira (Back): Rede P2P & Consenso */}
             <div className="bchain-cube-face back">
-              <Typography sx={{ fontSize: '0.58rem', color: 'text.secondary', fontWeight: 700 }}>
+              <Typography sx={{ fontSize: '0.58rem', color: '#94A3B8', fontWeight: 700 }}>
                 NETWORK
               </Typography>
 
@@ -399,7 +399,7 @@ export function BlockchainCube({
                 >
                   {network}
                 </Typography>
-                <Typography sx={{ fontSize: '0.58rem', color: 'text.secondary', fontWeight: 600 }}>
+                <Typography sx={{ fontSize: '0.58rem', color: '#94A3B8', fontWeight: 600 }}>
                   {`NODES: ${nodeCount}`}
                 </Typography>
               </Box>
@@ -407,7 +407,7 @@ export function BlockchainCube({
               <Typography
                 sx={{
                   fontSize: '0.56rem',
-                  color: 'text.secondary',
+                  color: '#94A3B8',
                   textAlign: 'right',
                   fontWeight: 600,
                 }}
@@ -418,7 +418,7 @@ export function BlockchainCube({
 
             {/* 5. Face Esquerda (Left): Transações */}
             <div className="bchain-cube-face left">
-              <Typography sx={{ fontSize: '0.58rem', color: 'text.secondary', fontWeight: 700 }}>
+              <Typography sx={{ fontSize: '0.58rem', color: '#94A3B8', fontWeight: 700 }}>
                 TRANSAÇÕES
               </Typography>
 
@@ -433,7 +433,7 @@ export function BlockchainCube({
                 >
                   {txCount}
                 </Typography>
-                <Typography sx={{ fontSize: '0.56rem', color: 'text.secondary', fontWeight: 600 }}>
+                <Typography sx={{ fontSize: '0.56rem', color: '#94A3B8', fontWeight: 600 }}>
                   {`TX/SEC: ${tps}`}
                 </Typography>
               </Box>
@@ -451,12 +451,12 @@ export function BlockchainCube({
 
             {/* 6. Face Direita (Right): IPFS CID & Merkle DAG */}
             <div className="bchain-cube-face right">
-              <Typography sx={{ fontSize: '0.58rem', color: 'text.secondary', fontWeight: 700 }}>
+              <Typography sx={{ fontSize: '0.58rem', color: '#94A3B8', fontWeight: 700 }}>
                 DESCENTRALIZED
               </Typography>
 
               <Box sx={{ my: 'auto', textAlign: 'center' }}>
-                <Typography sx={{ fontSize: '0.58rem', color: 'text.secondary', fontWeight: 600 }}>
+                <Typography sx={{ fontSize: '0.58rem', color: '#94A3B8', fontWeight: 600 }}>
                   IPFS CID
                 </Typography>
                 <Typography
@@ -474,7 +474,7 @@ export function BlockchainCube({
               <Typography
                 sx={{
                   fontSize: '0.56rem',
-                  color: 'text.primary',
+                  color: '#F8FAFC',
                   fontWeight: 600,
                 }}
               >
