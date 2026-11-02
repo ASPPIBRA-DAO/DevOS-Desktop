@@ -21,25 +21,26 @@ export * from './scrollbar';
 export * from './hook-form';
 export * from './cyber-card';
 export * from './globe-wire';
-
 export * from './nav-section';
+
 // Categorias Oficiais
 export * from './data-display';
 export * from './cyber-button';
 export * from './edger-lights';
 export * from './progress-bar';
-
 export * from './number-input';
+
 export * from './illustrations';
 export * from './custom-dialog';
-
 export * from './empty-content';
+
 export * from './abnt-document';
 export * from './loading-screen';
 export * from './custom-popover';
 export * from './filters-result';
-
 export * from './file-thumbnail';
+
+export * from './blockchain-cube';
 export * from './search-not-found';
 export * from './custom-breadcrumbs';
 export * from './window-mode-toggle';
