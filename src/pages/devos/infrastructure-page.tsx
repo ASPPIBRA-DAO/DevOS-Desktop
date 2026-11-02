@@ -7,6 +7,7 @@ import Typography from '@mui/material/Typography';
 
 import { IpfsCube } from 'src/shared/components/ipfs-cube';
 import { BlockchainCube } from 'src/shared/components/blockchain-cube';
+import { BlockMiningCard } from 'src/shared/components/block-mining-card';
 
 import { colors } from 'src/theme';
 import { CONFIG } from 'src/global-config';
@@ -121,14 +122,16 @@ export function InfrastructurePage() {
           width: '100%',
         }}
       >
-        {/* Hero 3D Blockchain Cube & Badge DePIN */}
+        {/* Hero 3D Blockchain Cube & Card de Mineração Lado a Lado */}
         <Box
           sx={{
             width: '100%',
             display: 'flex',
+            flexDirection: { xs: 'column', md: 'row' },
             alignItems: 'center',
-            justifyContent: 'center',
-            py: { xs: 2, sm: 3 },
+            justifyContent: 'space-around',
+            gap: { xs: 3, md: 4 },
+            p: { xs: 2.5, sm: 3.5, md: 4 },
             mb: 3,
             borderRadius: 2.5,
             bgcolor: 'rgba(255, 255, 255, 0.45)',
@@ -139,30 +142,6 @@ export function InfrastructurePage() {
             overflow: 'hidden',
           }}
         >
-          {/* Dica de Interação 3D Flutuante */}
-          <Box
-            sx={{
-              position: 'absolute',
-              top: 16,
-              left: 16,
-              zIndex: 10,
-              display: { xs: 'none', sm: 'flex' },
-              alignItems: 'center',
-              gap: 1,
-              bgcolor: 'rgba(0, 0, 0, 0.4)',
-              backdropFilter: 'blur(8px)',
-              px: 1.5,
-              py: 0.6,
-              borderRadius: 1.5,
-              border: '1px solid rgba(0, 167, 111, 0.25)',
-            }}
-          >
-            <Iconify icon="solar:cursor-bold" width={14} sx={{ color: colors.primary.main }} />
-            <Typography sx={{ fontSize: '0.72rem', color: 'text.secondary', fontWeight: 600 }}>
-              Arraste para girar em 3D
-            </Typography>
-          </Box>
-
           {/* Badge DePIN */}
           <Chip
             label="DEPIN • PROOF-OF-STAKE • HOLDERS ATIVOS"
@@ -183,25 +162,59 @@ export function InfrastructurePage() {
             }}
           />
 
-          <BlockchainCube
-            size={135}
-            stageSize={300}
-            themeVariant="emerald"
-            blockNumber="GENESIS #0001"
-            merkleRoot="0x9f8a...e14c"
-            nonce="910482"
-            status="VALIDADO"
-            hash="0x4a8c...f709"
-            network="ASPPIBRA DEPIN"
-            nodeCount="4 NÓS ATIVOS"
-            consensusType="PoS / DePIN"
-            txCount="18,02 GB"
-            tps="99.98%"
-            cid="bafybeich3...3x4y5z"
-            protocol="IPFS MESH"
-            interactive
-            autoRotate
-            levitate
+          {/* Lado Esquerdo: Motor 3D do Cubo Blockchain */}
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              py: { xs: 1, md: 2 },
+            }}
+          >
+            <BlockchainCube
+              size={135}
+              stageSize={300}
+              themeVariant="emerald"
+              blockNumber="GENESIS #0001"
+              merkleRoot="0x9f8a...e14c"
+              nonce="910482"
+              status="VALIDADO"
+              hash="0x4a8c...f709"
+              network="ASPPIBRA DEPIN"
+              nodeCount="4 NÓS ATIVOS"
+              consensusType="PoS / DePIN"
+              txCount="18,02 GB"
+              tps="99.98%"
+              cid="bafybeich3...3x4y5z"
+              protocol="IPFS MESH"
+              interactive={false}
+              autoRotate
+              levitate
+              glowMultiplier={0.7}
+              showParticles={false}
+              showWaves={false}
+              showGrid={false}
+              showHalo={false}
+              showShadow={false}
+            />
+          </Box>
+
+          {/* Lado Direito: Card de Mineração & Inspeção de Bloco */}
+          <BlockMiningCard
+            blockNumber={1}
+            blockTag="(Genesis)"
+            timestamp="01/01/2026 10:00:00"
+            initialData="Bloco Genesis: Bem-vindo à rede Blockchain!"
+            initialNonce={2841}
+            previousHash="0000000000000000000000000000000000000000000000000000000000000000"
+            initialHash="369752b4c827283a21c984f3640da637d7e45a2ccda73711a53b8f6cc4332332"
+            isInitiallyValid={false}
+            sx={{
+              width: { xs: '100%', sm: 380, md: 400, lg: 420 },
+              maxWidth: 420,
+              zIndex: 1,
+            }}
           />
         </Box>
 
