@@ -42,5 +42,6 @@ export * from './file-thumbnail';
 
 export * from './blockchain-cube';
 export * from './search-not-found';
+export * from './block-mining-card';
 export * from './custom-breadcrumbs';
 export * from './window-mode-toggle';
