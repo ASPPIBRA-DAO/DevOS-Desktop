@@ -78,6 +78,8 @@ export type NavSubListProps = Omit<NavListProps, 'data'> & {
 export type NavGroupProps = Omit<NavListProps, 'data' | 'depth'> & {
   subheader?: string;
   items: NavItemDataProps[];
+  open?: boolean;
+  onToggle?: () => void;
 };
 
 /**
@@ -86,6 +88,7 @@ export type NavGroupProps = Omit<NavListProps, 'data' | 'depth'> & {
 export type NavSectionProps = React.ComponentProps<'nav'> &
   Omit<NavListProps, 'data' | 'depth'> & {
     sx?: SxProps<Theme>;
+    accordion?: boolean;
     data: {
       subheader?: string;
       items: NavItemDataProps[];
