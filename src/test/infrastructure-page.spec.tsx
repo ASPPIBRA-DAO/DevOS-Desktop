@@ -43,5 +43,6 @@ describe('DevOS Control Plane — InfrastructurePage (Rede de Nós & Recompensas
     expect(html).toContain('CDN Global');
     expect(html).toContain('bafybeich3...3x4y5z');
     expect(html).toContain('4,80 GB (Quota: 24%)');
+    expect(html).toContain('ipfs-cube-loader');
   });
 });
