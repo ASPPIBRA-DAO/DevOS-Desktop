@@ -6,6 +6,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 
 import { IpfsCube } from 'src/shared/components/ipfs-cube';
+import { BlockchainCube } from 'src/shared/components/blockchain-cube';
 
 import { colors } from 'src/theme';
 import { CONFIG } from 'src/global-config';
@@ -120,72 +121,87 @@ export function InfrastructurePage() {
           width: '100%',
         }}
       >
-        {/* Cabeçalho Institucional & Badge DePIN */}
+        {/* Hero 3D Blockchain Cube & Badge DePIN */}
         <Box
           sx={{
+            width: '100%',
             display: 'flex',
-            flexDirection: { xs: 'column', md: 'row' },
-            alignItems: { xs: 'flex-start', md: 'center' },
-            justifyContent: 'space-between',
-            gap: 2,
+            alignItems: 'center',
+            justifyContent: 'center',
+            py: { xs: 2, sm: 3 },
             mb: 3,
-            pb: 2.5,
+            borderRadius: 2.5,
+            bgcolor: 'rgba(255, 255, 255, 0.45)',
+            border: '1px solid rgba(0, 167, 111, 0.22)',
+            backdropFilter: 'blur(12px)',
+            boxShadow: '0 8px 32px -4px rgba(0, 167, 111, 0.08)',
+            position: 'relative',
+            overflow: 'hidden',
           }}
         >
-          <Box sx={{ maxWidth: 880 }}>
-            <Typography
-              variant="h4"
-              sx={{
-                fontWeight: 800,
-                letterSpacing: '-0.02em',
-                color: 'text.primary',
-                mb: 0.5,
-                fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2.1rem' },
-              }}
-            >
-              Rede de Nós &amp; Recompensas por Participação
-            </Typography>
-
-            <Typography
-              variant="caption"
-              sx={{
-                display: 'block',
-                fontWeight: 600,
-                color: 'text.secondary',
-                mb: 1.25,
-                fontSize: '0.8125rem',
-              }}
-            >
-              DevOS • Infraestrutura
-            </Typography>
-
-            <Typography
-              variant="body2"
-              sx={{
-                color: 'text.secondary',
-                lineHeight: 1.6,
-                fontSize: '0.875rem',
-              }}
-            >
-              Infraestrutura descentralizada mantida por Holders da ASPPIBRA. Cada nó opera sob garantia em stake (ASPP) e recebe rendimentos automáticos pela disponibilidade e integridade da rede.
+          {/* Dica de Interação 3D Flutuante */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 16,
+              left: 16,
+              zIndex: 10,
+              display: { xs: 'none', sm: 'flex' },
+              alignItems: 'center',
+              gap: 1,
+              bgcolor: 'rgba(0, 0, 0, 0.4)',
+              backdropFilter: 'blur(8px)',
+              px: 1.5,
+              py: 0.6,
+              borderRadius: 1.5,
+              border: '1px solid rgba(0, 167, 111, 0.25)',
+            }}
+          >
+            <Iconify icon="solar:cursor-bold" width={14} sx={{ color: colors.primary.main }} />
+            <Typography sx={{ fontSize: '0.72rem', color: 'text.secondary', fontWeight: 600 }}>
+              Arraste para girar em 3D
             </Typography>
           </Box>
 
+          {/* Badge DePIN */}
           <Chip
             label="DEPIN • PROOF-OF-STAKE • HOLDERS ATIVOS"
             size="small"
             sx={{
-              height: 28,
-              fontSize: '0.68rem',
+              position: 'absolute',
+              top: 16,
+              right: 16,
+              zIndex: 10,
+              height: 26,
+              fontSize: '0.65rem',
               fontWeight: 800,
               letterSpacing: '0.04em',
               bgcolor: 'rgba(0, 167, 111, 0.12)',
               color: colors.primary.main,
               border: '1px solid rgba(0, 167, 111, 0.3)',
               borderRadius: 1,
-              alignSelf: { xs: 'flex-start', md: 'flex-start' },
-              mt: { xs: 0, md: 0.5 },
             }}
+          />
+
+          <BlockchainCube
+            size={135}
+            stageSize={300}
+            themeVariant="emerald"
+            blockNumber="GENESIS #0001"
+            merkleRoot="0x9f8a...e14c"
+            nonce="910482"
+            status="VALIDADO"
+            hash="0x4a8c...f709"
+            network="ASPPIBRA DEPIN"
+            nodeCount="4 NÓS ATIVOS"
+            consensusType="PoS / DePIN"
+            txCount="18,02 GB"
+            tps="99.98%"
+            cid="bafybeich3...3x4y5z"
+            protocol="IPFS MESH"
+            interactive
+            autoRotate
+            levitate
           />
         </Box>
 
