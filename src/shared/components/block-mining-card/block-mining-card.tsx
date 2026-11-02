@@ -148,15 +148,15 @@ export function BlockMiningCard({
       sx={[
         {
           width: '100%',
-          maxWidth: 420,
-          borderRadius: 2.75,
+          maxWidth: 350,
+          borderRadius: 2,
           bgcolor: '#090E1F',
           border: `1.5px solid ${statusBorder}`,
           boxShadow: glowShadow,
-          p: { xs: 2.25, sm: 2.75 },
+          p: { xs: 1.75, sm: 2 },
           display: 'flex',
           flexDirection: 'column',
-          gap: 2,
+          gap: 1.15,
           color: '#F8FAFC',
           fontFamily: 'sans-serif',
           transition: 'all 0.3s ease',
@@ -167,12 +167,12 @@ export function BlockMiningCard({
     >
       {/* 1. Cabeçalho com Ícone, Título e Badge de Status */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
-        <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
+        <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
           <Box
             sx={{
-              width: 32,
-              height: 32,
-              borderRadius: 1,
+              width: 26,
+              height: 26,
+              borderRadius: 0.75,
               bgcolor: 'rgba(0, 255, 240, 0.14)',
               color: '#00FFF0',
               display: 'flex',
@@ -180,14 +180,14 @@ export function BlockMiningCard({
               justifyContent: 'center',
             }}
           >
-            <Iconify icon="solar:box-bold" width={18} />
+            <Iconify icon="solar:box-bold" width={15} />
           </Box>
 
-          <Stack direction="row" spacing={0.75} sx={{ alignItems: 'baseline' }}>
+          <Stack direction="row" spacing={0.6} sx={{ alignItems: 'baseline' }}>
             <Typography
               sx={{
                 fontWeight: 800,
-                fontSize: '1.05rem',
+                fontSize: '0.9rem',
                 color: '#FFFFFF',
                 letterSpacing: '-0.01em',
               }}
@@ -198,7 +198,7 @@ export function BlockMiningCard({
             <Typography
               sx={{
                 fontWeight: 700,
-                fontSize: '0.75rem',
+                fontSize: '0.7rem',
                 color: '#EAB308',
               }}
             >
@@ -212,21 +212,21 @@ export function BlockMiningCard({
           icon={
             <Iconify
               icon={isValid ? 'solar:check-circle-bold' : 'solar:danger-triangle-bold'}
-              width={14}
+              width={12}
               sx={{ color: `${statusColor} !important` }}
             />
           }
           label={isValid ? 'VÁLIDO' : 'INVÁLIDO'}
           size="small"
           sx={{
-            height: 24,
-            fontSize: '0.65rem',
+            height: 20,
+            fontSize: '0.6rem',
             fontWeight: 800,
             letterSpacing: '0.04em',
             bgcolor: statusBg,
             color: statusColor,
             border: `1px solid ${statusBorder}`,
-            borderRadius: 1,
+            borderRadius: 0.75,
             px: 0.5,
           }}
         />
@@ -238,17 +238,17 @@ export function BlockMiningCard({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          fontSize: '0.72rem',
+          fontSize: '0.68rem',
           borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-          pb: 1.5,
+          pb: 0.75,
         }}
       >
-        <Typography sx={{ fontSize: '0.72rem', color: '#64748B', fontWeight: 600 }}>
+        <Typography sx={{ fontSize: '0.68rem', color: '#64748B', fontWeight: 600 }}>
           Timestamp:
         </Typography>
         <Typography
           sx={{
-            fontSize: '0.72rem',
+            fontSize: '0.68rem',
             color: '#38BDF8',
             fontFamily: 'monospace',
             fontWeight: 700,
@@ -259,25 +259,26 @@ export function BlockMiningCard({
       </Box>
 
       {/* 3. Campo: Data (Conteúdo) */}
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
-        <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
-          <Iconify icon="solar:database-bold" width={14} sx={{ color: '#64748B' }} />
-          <Typography sx={{ fontSize: '0.72rem', color: '#94A3B8', fontWeight: 600 }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.4 }}>
+        <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+          <Iconify icon="solar:database-bold" width={12} sx={{ color: '#64748B' }} />
+          <Typography sx={{ fontSize: '0.68rem', color: '#94A3B8', fontWeight: 600 }}>
             Data (Conteúdo):
           </Typography>
         </Stack>
 
         <Box
           sx={{
-            p: 1.25,
-            borderRadius: 1.25,
+            px: 1,
+            py: 0.65,
+            borderRadius: 1,
             bgcolor: '#040711',
             border: '1px solid rgba(255, 255, 255, 0.08)',
             color: '#E2E8F0',
             fontFamily: 'monospace',
-            fontSize: '0.75rem',
-            lineHeight: 1.5,
-            minHeight: 46,
+            fontSize: '0.7rem',
+            lineHeight: 1.35,
+            minHeight: 32,
             wordBreak: 'break-word',
           }}
         >
@@ -286,24 +287,24 @@ export function BlockMiningCard({
       </Box>
 
       {/* 4. Campo: Nonce (Proof of Work) */}
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
-        <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
-          <Typography sx={{ fontSize: '0.72rem', color: '#64748B', fontWeight: 800 }}>#</Typography>
-          <Typography sx={{ fontSize: '0.72rem', color: '#94A3B8', fontWeight: 600 }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.4 }}>
+        <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+          <Typography sx={{ fontSize: '0.68rem', color: '#64748B', fontWeight: 800 }}>#</Typography>
+          <Typography sx={{ fontSize: '0.68rem', color: '#94A3B8', fontWeight: 600 }}>
             Nonce (Proof of Work):
           </Typography>
         </Stack>
 
         <Box
           sx={{
-            px: 1.25,
-            py: 0.9,
-            borderRadius: 1.25,
+            px: 1,
+            py: 0.5,
+            borderRadius: 1,
             bgcolor: '#040711',
             border: '1px solid rgba(255, 255, 255, 0.08)',
             color: '#EAB308',
             fontFamily: 'monospace',
-            fontSize: '0.8125rem',
+            fontSize: '0.75rem',
             fontWeight: 800,
           }}
         >
@@ -312,26 +313,26 @@ export function BlockMiningCard({
       </Box>
 
       {/* 5. Campo: Previous Hash */}
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
-        <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
-          <Iconify icon="solar:link-bold" width={14} sx={{ color: '#64748B' }} />
-          <Typography sx={{ fontSize: '0.72rem', color: '#94A3B8', fontWeight: 600 }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.4 }}>
+        <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+          <Iconify icon="solar:link-bold" width={12} sx={{ color: '#64748B' }} />
+          <Typography sx={{ fontSize: '0.68rem', color: '#94A3B8', fontWeight: 600 }}>
             Previous Hash:
           </Typography>
         </Stack>
 
         <Box
           sx={{
-            px: 1.25,
-            py: 0.9,
-            borderRadius: 1.25,
+            px: 1,
+            py: 0.5,
+            borderRadius: 1,
             bgcolor: '#040711',
             border: '1px solid rgba(255, 255, 255, 0.08)',
             color: '#475569',
             fontFamily: 'monospace',
-            fontSize: '0.68rem',
+            fontSize: '0.62rem',
             wordBreak: 'break-all',
-            lineHeight: 1.4,
+            lineHeight: 1.25,
           }}
         >
           {previousHash}
@@ -339,27 +340,27 @@ export function BlockMiningCard({
       </Box>
 
       {/* 6. Campo: Hash Atual */}
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
-        <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
-          <Iconify icon="solar:key-bold" width={14} sx={{ color: '#64748B' }} />
-          <Typography sx={{ fontSize: '0.72rem', color: '#94A3B8', fontWeight: 600 }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.4 }}>
+        <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+          <Iconify icon="solar:key-bold" width={12} sx={{ color: '#64748B' }} />
+          <Typography sx={{ fontSize: '0.68rem', color: '#94A3B8', fontWeight: 600 }}>
             Hash Atual:
           </Typography>
         </Stack>
 
         <Box
           sx={{
-            px: 1.25,
-            py: 1,
-            borderRadius: 1.25,
+            px: 1,
+            py: 0.55,
+            borderRadius: 1,
             bgcolor: '#040711',
             border: `1.5px solid ${statusBorder}`,
             color: statusColor,
             fontFamily: 'monospace',
-            fontSize: '0.68rem',
+            fontSize: '0.62rem',
             fontWeight: 700,
             wordBreak: 'break-all',
-            lineHeight: 1.45,
+            lineHeight: 1.3,
             transition: 'all 0.3s ease',
           }}
         >
@@ -374,26 +375,26 @@ export function BlockMiningCard({
         disabled={isMining}
         onClick={handleMineBlock}
         sx={{
-          mt: 0.5,
-          py: 1.3,
-          borderRadius: 1.5,
+          mt: 0.25,
+          py: 0.85,
+          borderRadius: 1.25,
           bgcolor: isValid ? '#00A76F' : '#EAB308',
           color: isValid ? '#FFFFFF' : '#0B132B',
           fontWeight: 900,
-          fontSize: '0.8125rem',
+          fontSize: '0.75rem',
           letterSpacing: '0.04em',
           textTransform: 'uppercase',
           boxShadow: isValid
-            ? '0 4px 16px rgba(0, 167, 111, 0.35)'
-            : '0 4px 16px rgba(234, 179, 8, 0.35)',
+            ? '0 3px 12px rgba(0, 167, 111, 0.35)'
+            : '0 3px 12px rgba(234, 179, 8, 0.35)',
           '&:hover': {
             bgcolor: isValid ? '#007867' : '#CA8A04',
           },
         }}
       >
         {isMining ? (
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-            <CircularProgress size={16} sx={{ color: 'inherit' }} />
+          <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
+            <CircularProgress size={14} sx={{ color: 'inherit' }} />
             <span>MINERANDO BLOCO...</span>
           </Stack>
         ) : (
