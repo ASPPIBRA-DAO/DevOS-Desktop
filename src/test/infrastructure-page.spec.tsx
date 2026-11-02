@@ -5,12 +5,12 @@ import { renderToString } from 'react-dom/server';
 import { InfrastructurePage } from '../pages/devos/infrastructure-page';
 
 describe('DevOS Control Plane — InfrastructurePage (Rede de Nós & Recompensas)', () => {
-  it('deve renderizar o cabeçalho institucional e badge DePIN Proof-of-Stake', () => {
+  it('deve renderizar o hero 3D do BlockchainCube e badge DePIN Proof-of-Stake', () => {
     const html = renderToString(<InfrastructurePage />);
 
-    expect(html).toContain('Rede de Nós &amp; Recompensas por Participação');
+    expect(html).toContain('bchain-cube-viewport');
+    expect(html).toContain('bchain-cube-stage');
     expect(html).toContain('DEPIN • PROOF-OF-STAKE • HOLDERS ATIVOS');
-    expect(html).toContain('DevOS • Infraestrutura');
     expect(html).toContain('REDE DE PINNING');
     expect(html).toContain('Todos os Nós Aptos a Recompensa');
   });
