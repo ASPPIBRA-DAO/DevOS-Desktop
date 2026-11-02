@@ -110,9 +110,9 @@
   border-radius: 50%;
   border: 1.5px dashed var(--bchain-secondary);
   transform: translateZ(-85px);
-  opacity: 0.45;
+  opacity: 0.3;
   animation: bchain-spin-halo 18s linear infinite;
-  box-shadow: 0 0 calc(20px * var(--bchain-glow-mult)) var(--bchain-secondary);
+  box-shadow: 0 0 10px rgba(0, 255, 240, 0.2);
   pointer-events: none;
   will-change: transform;
 }
@@ -168,10 +168,10 @@
   height: var(--bchain-cube-size);
   margin-top: calc(-1 * var(--bchain-cube-half));
   margin-left: calc(-1 * var(--bchain-cube-half));
-  background: rgba(0, 0, 0, 0.85);
-  filter: blur(16px);
-  border-radius: 20px;
-  transform: translateZ(-85px) scale(1.1);
+  background: rgba(0, 0, 0, 0.16);
+  filter: blur(10px);
+  border-radius: 50%;
+  transform: translateZ(-85px) scale(0.75);
   transition: transform 0.3s ease;
   pointer-events: none;
 }
@@ -267,8 +267,10 @@
 
 .bchain-cube-3d {
   position: absolute;
-  width: 100%;
-  height: 100%;
+  width: var(--bchain-cube-size);
+  height: var(--bchain-cube-size);
+  left: 0;
+  top: 0;
   transform-style: preserve-3d;
   transition: all 0.3s ease;
 }
@@ -277,13 +279,13 @@
   position: absolute;
   width: var(--bchain-cube-size);
   height: var(--bchain-cube-size);
-  background: linear-gradient(145deg, rgba(14, 23, 48, 0.96) 0%, rgba(6, 10, 24, 0.98) 100%);
+  left: 0;
+  top: 0;
+  background: linear-gradient(145deg, #091322 0%, #040813 100%);
   border: 2px solid var(--bchain-primary);
   box-shadow:
-    inset 0 0 calc(20px * var(--bchain-glow-mult)) rgba(0, 167, 111, 0.25),
-    0 0 calc(18px * var(--bchain-glow-mult)) var(--bchain-primary);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+    inset 0 0 10px rgba(0, 167, 111, 0.2),
+    0 0 8px rgba(0, 167, 111, 0.35);
   border-radius: 12px;
   display: flex;
   flex-direction: column;
@@ -292,7 +294,9 @@
   box-sizing: border-box;
   overflow: hidden;
   user-select: none;
-  backface-visibility: visible;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform-style: preserve-3d;
 }
 
 /* Reflexo Especular nas Arestas das Faces */
@@ -300,37 +304,38 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0%, transparent 60%);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, transparent 50%);
   pointer-events: none;
+  border-radius: inherit;
 }
 
-/* Posicionamento 3D das 6 Faces */
+/* Posicionamento 3D das 6 Faces — Caixa Cúbica Sólida Perfeita */
+.bchain-cube-face.front {
+  transform: rotateZ(180deg) translateZ(var(--bchain-cube-half));
+  filter: brightness(1.15);
+}
+
+.bchain-cube-face.back {
+  transform: rotateY(180deg) rotateZ(180deg) translateZ(var(--bchain-cube-half));
+  filter: brightness(0.7);
+}
+
+.bchain-cube-face.left {
+  transform: rotateY(-90deg) rotateZ(180deg) translateZ(var(--bchain-cube-half));
+  filter: brightness(0.9);
+}
+
+.bchain-cube-face.right {
+  transform: rotateY(90deg) rotateZ(180deg) translateZ(var(--bchain-cube-half));
+  filter: brightness(1.25);
+}
+
 .bchain-cube-face.top {
-  transform: rotateX(90deg) translateZ(var(--bchain-cube-half));
+  transform: rotateX(90deg) rotateZ(180deg) translateZ(var(--bchain-cube-half));
   filter: brightness(1.35);
 }
 
 .bchain-cube-face.bottom {
   transform: rotateX(-90deg) translateZ(var(--bchain-cube-half));
   filter: brightness(0.4);
-}
-
-.bchain-cube-face.front {
-  transform: translateZ(var(--bchain-cube-half));
-  filter: brightness(1.15);
-}
-
-.bchain-cube-face.back {
-  transform: rotateY(180deg) translateZ(var(--bchain-cube-half));
-  filter: brightness(0.65);
-}
-
-.bchain-cube-face.left {
-  transform: rotateY(-90deg) translateZ(var(--bchain-cube-half));
-  filter: brightness(0.85);
-}
-
-.bchain-cube-face.right {
-  transform: rotateY(90deg) translateZ(var(--bchain-cube-half));
-  filter: brightness(1.25);
 }
