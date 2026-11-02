@@ -1,0 +1,336 @@
+/* ==========================================================================
+   DevOS Blockchain Cube 3D — Isométrica & Motor CSS 3D
+   Aceleração por Composição de Hardware (GPU) • 60 FPS
+   ========================================================================== */
+
+:root {
+  --bchain-cube-size: 140px;
+  --bchain-cube-half: 70px;
+  --bchain-glow-mult: 1.4;
+  --bchain-anim-speed: 4s;
+  --bchain-primary: #00a76f;
+  --bchain-secondary: #00fff0;
+  --bchain-accent: #5be49b;
+}
+
+/* ----------------------------------------------------------------------
+   Temas Visuais Criptográficos
+   ---------------------------------------------------------------------- */
+
+.bchain-theme-emerald {
+  --bchain-primary: #00a76f;
+  --bchain-secondary: #00fff0;
+  --bchain-accent: #5be49b;
+}
+
+.bchain-theme-teal {
+  --bchain-primary: #00fff0;
+  --bchain-secondary: #3af3b7;
+  --bchain-accent: #00a76f;
+}
+
+.bchain-theme-gold {
+  --bchain-primary: #ffb800;
+  --bchain-secondary: #00fff0;
+  --bchain-accent: #a855f7;
+}
+
+.bchain-theme-quartz {
+  --bchain-primary: #e2e8f0;
+  --bchain-secondary: #38bdf8;
+  --bchain-accent: #818cf8;
+}
+
+/* ----------------------------------------------------------------------
+   Viewport 3D e Palco Isométrico
+   ---------------------------------------------------------------------- */
+
+.bchain-cube-viewport {
+  perspective: 1200px;
+  transform-style: preserve-3d;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  user-select: none;
+}
+
+.bchain-cube-stage {
+  width: 320px;
+  height: 320px;
+  position: relative;
+  transform-style: preserve-3d;
+  transform: rotateX(60deg) rotateZ(-45deg);
+  transition: transform 0.05s linear;
+  cursor: grab;
+  will-change: transform;
+}
+
+.bchain-cube-stage.is-dragging {
+  cursor: grabbing;
+}
+
+.bchain-cube-stage.non-interactive {
+  cursor: default;
+}
+
+/* ----------------------------------------------------------------------
+   Chão Isométrico & Grid Cibernético
+   ---------------------------------------------------------------------- */
+
+.bchain-cube-floor-grid {
+  position: absolute;
+  inset: -120px;
+  background-size: 40px 40px;
+  background-image:
+    linear-gradient(to right, rgba(0, 255, 240, 0.1) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 255, 240, 0.1) 1px, transparent 1px);
+  transform: translateZ(-90px);
+  border-radius: 50%;
+  pointer-events: none;
+  mask-image: radial-gradient(circle at center, rgba(0, 0, 0, 1) 35%, rgba(0, 0, 0, 0) 80%);
+  -webkit-mask-image: radial-gradient(circle at center, rgba(0, 0, 0, 1) 35%, rgba(0, 0, 0, 0) 80%);
+}
+
+/* ----------------------------------------------------------------------
+   Halo Holográfico Giratório Central
+   ---------------------------------------------------------------------- */
+
+.bchain-cube-floor-halo {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 260px;
+  height: 260px;
+  margin-top: -130px;
+  margin-left: -130px;
+  border-radius: 50%;
+  border: 1.5px dashed var(--bchain-secondary);
+  transform: translateZ(-85px);
+  opacity: 0.45;
+  animation: bchain-spin-halo 18s linear infinite;
+  box-shadow: 0 0 calc(20px * var(--bchain-glow-mult)) var(--bchain-secondary);
+  pointer-events: none;
+  will-change: transform;
+}
+
+@keyframes bchain-spin-halo {
+  0% {
+    transform: translateZ(-85px) rotate(0deg);
+  }
+  100% {
+    transform: translateZ(-85px) rotate(360deg);
+  }
+}
+
+/* ----------------------------------------------------------------------
+   Container do Bloco e Levitação
+   ---------------------------------------------------------------------- */
+
+.bchain-cube-container {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--bchain-cube-size);
+  height: var(--bchain-cube-size);
+  margin-top: calc(-1 * var(--bchain-cube-half));
+  margin-left: calc(-1 * var(--bchain-cube-half));
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.bchain-cube-container.levitate {
+  animation: bchain-levitate var(--bchain-anim-speed) ease-in-out infinite;
+}
+
+@keyframes bchain-levitate {
+  0%,
+  100% {
+    transform: translateZ(0px) rotateX(0deg);
+  }
+  50% {
+    transform: translateZ(24px) rotateX(3deg) rotateY(-3deg);
+  }
+}
+
+/* ----------------------------------------------------------------------
+   Sombra Projetada Dinâmica
+   ---------------------------------------------------------------------- */
+
+.bchain-cube-shadow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--bchain-cube-size);
+  height: var(--bchain-cube-size);
+  margin-top: calc(-1 * var(--bchain-cube-half));
+  margin-left: calc(-1 * var(--bchain-cube-half));
+  background: rgba(0, 0, 0, 0.85);
+  filter: blur(16px);
+  border-radius: 20px;
+  transform: translateZ(-85px) scale(1.1);
+  transition: transform 0.3s ease;
+  pointer-events: none;
+}
+
+/* ----------------------------------------------------------------------
+   Ondas de Consenso Holográficas
+   ---------------------------------------------------------------------- */
+
+.bchain-cube-wave {
+  position: absolute;
+  inset: -30px;
+  border-radius: 20px;
+  border: 2px solid var(--bchain-secondary);
+  transform-style: preserve-3d;
+  opacity: 0;
+  pointer-events: none;
+  animation: bchain-wave var(--bchain-anim-speed) cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
+  will-change: transform, opacity;
+}
+
+.bchain-cube-wave.w2 {
+  animation-delay: 0.25s;
+  border-color: var(--bchain-primary);
+}
+
+@keyframes bchain-wave {
+  0% {
+    transform: translateZ(-20px) scale(0.8);
+    opacity: 0;
+  }
+  50% {
+    transform: translateZ(30px) scale(1.3);
+    opacity: 0.9;
+    box-shadow: 0 0 calc(35px * var(--bchain-glow-mult)) var(--bchain-secondary);
+  }
+  100% {
+    transform: translateZ(80px) scale(1.7);
+    opacity: 0;
+  }
+}
+
+/* ----------------------------------------------------------------------
+   Partículas em Órbita 3D
+   ---------------------------------------------------------------------- */
+
+.bchain-cube-orbit {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow:
+    0 0 14px var(--bchain-secondary),
+    0 0 6px #ffffff;
+  top: 50%;
+  left: 50%;
+  margin-top: -5px;
+  margin-left: -5px;
+  transform-style: preserve-3d;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.bchain-cube-orbit.p1 {
+  animation: bchain-orbit-1 6s linear infinite;
+}
+
+.bchain-cube-orbit.p2 {
+  animation: bchain-orbit-2 8s linear infinite;
+}
+
+@keyframes bchain-orbit-1 {
+  0% {
+    transform: rotateZ(0deg) translateX(110px) rotateZ(0deg) translateZ(10px);
+  }
+  100% {
+    transform: rotateZ(360deg) translateX(110px) rotateZ(-360deg) translateZ(10px);
+  }
+}
+
+@keyframes bchain-orbit-2 {
+  0% {
+    transform: rotateZ(360deg) translateY(130px) rotateZ(-360deg) translateZ(-10px);
+  }
+  100% {
+    transform: rotateZ(0deg) translateY(130px) rotateZ(0deg) translateZ(-10px);
+  }
+}
+
+/* ----------------------------------------------------------------------
+   Estrutura do Bloco 3D & Faces
+   ---------------------------------------------------------------------- */
+
+.bchain-cube-3d {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: all 0.3s ease;
+}
+
+.bchain-cube-face {
+  position: absolute;
+  width: var(--bchain-cube-size);
+  height: var(--bchain-cube-size);
+  background: linear-gradient(145deg, rgba(14, 23, 48, 0.96) 0%, rgba(6, 10, 24, 0.98) 100%);
+  border: 2px solid var(--bchain-primary);
+  box-shadow:
+    inset 0 0 calc(20px * var(--bchain-glow-mult)) rgba(0, 167, 111, 0.25),
+    0 0 calc(18px * var(--bchain-glow-mult)) var(--bchain-primary);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 12px;
+  box-sizing: border-box;
+  overflow: hidden;
+  user-select: none;
+  backface-visibility: visible;
+}
+
+/* Reflexo Especular nas Arestas das Faces */
+.bchain-cube-face::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+/* Posicionamento 3D das 6 Faces */
+.bchain-cube-face.top {
+  transform: rotateX(90deg) translateZ(var(--bchain-cube-half));
+  filter: brightness(1.35);
+}
+
+.bchain-cube-face.bottom {
+  transform: rotateX(-90deg) translateZ(var(--bchain-cube-half));
+  filter: brightness(0.4);
+}
+
+.bchain-cube-face.front {
+  transform: translateZ(var(--bchain-cube-half));
+  filter: brightness(1.15);
+}
+
+.bchain-cube-face.back {
+  transform: rotateY(180deg) translateZ(var(--bchain-cube-half));
+  filter: brightness(0.65);
+}
+
+.bchain-cube-face.left {
+  transform: rotateY(-90deg) translateZ(var(--bchain-cube-half));
+  filter: brightness(0.85);
+}
+
+.bchain-cube-face.right {
+  transform: rotateY(90deg) translateZ(var(--bchain-cube-half));
+  filter: brightness(1.25);
+}
