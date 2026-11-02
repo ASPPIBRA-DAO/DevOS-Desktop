@@ -122,100 +122,106 @@ export function InfrastructurePage() {
           width: '100%',
         }}
       >
-        {/* Hero 3D Blockchain Cube & Card de Mineração Lado a Lado */}
+        {/* Container Centralizado de Destaque: Badge + Cubo + Card de Mineração */}
         <Box
           sx={{
             width: '100%',
-            display: 'flex',
-            flexDirection: { xs: 'column', md: 'row' },
-            alignItems: 'center',
-            justifyContent: 'space-around',
-            gap: { xs: 3, md: 4 },
-            p: { xs: 2.5, sm: 3.5, md: 4 },
-            mb: 3,
-            borderRadius: 2.5,
-            bgcolor: 'rgba(255, 255, 255, 0.45)',
-            border: '1px solid rgba(0, 167, 111, 0.22)',
-            backdropFilter: 'blur(12px)',
-            boxShadow: '0 8px 32px -4px rgba(0, 167, 111, 0.08)',
-            position: 'relative',
-            overflow: 'hidden',
+            maxWidth: 760,
+            mx: 'auto',
+            mb: 4.5,
           }}
         >
-          {/* Badge DePIN */}
-          <Chip
-            label="DEPIN • PROOF-OF-STAKE • HOLDERS ATIVOS"
-            size="small"
-            sx={{
-              position: 'absolute',
-              top: 16,
-              right: 16,
-              zIndex: 10,
-              height: 26,
-              fontSize: '0.65rem',
-              fontWeight: 800,
-              letterSpacing: '0.04em',
-              bgcolor: 'rgba(0, 167, 111, 0.12)',
-              color: colors.primary.main,
-              border: '1px solid rgba(0, 167, 111, 0.3)',
-              borderRadius: 1,
-            }}
-          />
-
-          {/* Lado Esquerdo: Motor 3D do Cubo Blockchain */}
+          {/* Badge DePIN alinhado com o topo do cluster */}
           <Box
             sx={{
               display: 'flex',
-              flexDirection: 'column',
               alignItems: 'center',
-              justifyContent: 'center',
-              py: { xs: 1, md: 2 },
+              justifyContent: 'flex-end',
+              mb: 1.5,
+              px: { xs: 1, sm: 0 },
             }}
           >
-            <BlockchainCube
-              size={135}
-              stageSize={300}
-              themeVariant="emerald"
-              blockNumber="GENESIS #0001"
-              merkleRoot="0x9f8a...e14c"
-              nonce="910482"
-              status="VALIDADO"
-              hash="0x4a8c...f709"
-              network="ASPPIBRA DEPIN"
-              nodeCount="4 NÓS ATIVOS"
-              consensusType="PoS / DePIN"
-              txCount="18,02 GB"
-              tps="99.98%"
-              cid="bafybeich3...3x4y5z"
-              protocol="IPFS MESH"
-              interactive={false}
-              autoRotate
-              levitate
-              glowMultiplier={0.7}
-              showParticles={false}
-              showWaves={false}
-              showGrid={false}
-              showHalo={false}
-              showShadow={false}
+            <Chip
+              label="DEPIN • PROOF-OF-STAKE • HOLDERS ATIVOS"
+              size="small"
+              sx={{
+                height: 24,
+                fontSize: '0.65rem',
+                fontWeight: 800,
+                letterSpacing: '0.04em',
+                bgcolor: 'rgba(0, 167, 111, 0.12)',
+                color: colors.primary.main,
+                border: '1px solid rgba(0, 167, 111, 0.3)',
+                borderRadius: 1,
+              }}
             />
           </Box>
 
-          {/* Lado Direito: Card de Mineração & Inspeção de Bloco */}
-          <BlockMiningCard
-            blockNumber={1}
-            blockTag="(Genesis)"
-            timestamp="01/01/2026 10:00:00"
-            initialData="Bloco Genesis: Bem-vindo à rede Blockchain!"
-            initialNonce={2841}
-            previousHash="0000000000000000000000000000000000000000000000000000000000000000"
-            initialHash="369752b4c827283a21c984f3640da637d7e45a2ccda73711a53b8f6cc4332332"
-            isInitiallyValid={false}
+          {/* Hero 3D Blockchain Cube & Card de Mineração Lado a Lado */}
+          <Box
             sx={{
-              width: { xs: '100%', sm: 380, md: 400, lg: 420 },
-              maxWidth: 420,
-              zIndex: 1,
+              width: '100%',
+              display: 'flex',
+              flexDirection: { xs: 'column', md: 'row' },
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: { xs: 3, md: 4 },
             }}
-          />
+          >
+            {/* Lado Esquerdo: Motor 3D do Cubo Blockchain */}
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <BlockchainCube
+                size={150}
+                stageSize={320}
+                themeVariant="emerald"
+                blockNumber="GENESIS #0001"
+                merkleRoot="0x9f8a...e14c"
+                nonce="910482"
+                status="VALIDADO"
+                hash="0x4a8c...f709"
+                network="ASPPIBRA DEPIN"
+                nodeCount="4 NÓS ATIVOS"
+                consensusType="PoS / DePIN"
+                txCount="18,02 GB"
+                tps="99.98%"
+                cid="bafybeich3...3x4y5z"
+                protocol="IPFS MESH"
+                interactive={false}
+                autoRotate
+                levitate
+                glowMultiplier={0.7}
+                showParticles={false}
+                showWaves={false}
+                showGrid={false}
+                showHalo={false}
+                showShadow={false}
+              />
+            </Box>
+
+            {/* Lado Direito: Card de Mineração & Inspeção de Bloco */}
+            <BlockMiningCard
+              blockNumber={1}
+              blockTag="(Genesis)"
+              timestamp="01/01/2026 10:00:00"
+              initialData="Bloco Genesis: Bem-vindo à rede Blockchain!"
+              initialNonce={2841}
+              previousHash="0000000000000000000000000000000000000000000000000000000000000000"
+              initialHash="369752b4c827283a21c984f3640da637d7e45a2ccda73711a53b8f6cc4332332"
+              isInitiallyValid={false}
+              sx={{
+                width: { xs: '100%', sm: 340, md: 340, lg: 350 },
+                maxWidth: 350,
+                flexShrink: 0,
+              }}
+            />
+          </Box>
         </Box>
 
         {/* Subheader da Seção: Rede de Pinning */}
