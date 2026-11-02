@@ -4,6 +4,7 @@ import { paths } from '../router/paths';
 import { IpfsView } from '../../modules/ipfs';
 import { RealEstateView } from '../../modules/real-estate';
 import { NodeDashboardPage } from './node/node-dashboard-page';
+import { InfrastructurePage } from '../../pages/devos/infrastructure-page';
 
 export const currentEdition: EditionConfig = {
   editionId: 'node',
@@ -40,6 +41,12 @@ export const currentEdition: EditionConfig = {
       label: 'Cadastro Imobiliário (Legado)',
       icon: 'solar:bill-list-bold',
       component: RealEstateView,
+    },
+    {
+      path: paths.devos.infrastructure,
+      label: 'Infraestrutura',
+      icon: 'solar:server-square-bold',
+      component: InfrastructurePage,
     },
   ],
 };
