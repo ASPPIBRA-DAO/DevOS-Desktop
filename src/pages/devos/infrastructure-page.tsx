@@ -5,6 +5,8 @@ import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 
+import { IpfsCube } from 'src/shared/components/ipfs-cube';
+
 import { colors } from 'src/theme';
 import { CONFIG } from 'src/global-config';
 import { Iconify } from 'src/components/iconify';
@@ -507,22 +509,19 @@ export function InfrastructurePage() {
                   },
                 }}
               >
-                {/* Lado Esquerdo: Ícone Cubo + Nome + CID */}
+                {/* Lado Esquerdo: Animação 3D IpfsCube + Nome + CID */}
                 <Stack direction="row" spacing={1.75} sx={{ alignItems: 'center' }}>
-                  <Box
+                  <IpfsCube
+                    size={42}
+                    color={colors.primary.main}
+                    colorLight={colors.primary.light}
+                    animated
                     sx={{
-                      width: 38,
-                      height: 38,
-                      borderRadius: 1.5,
-                      bgcolor: 'rgba(0, 167, 111, 0.14)',
-                      color: colors.primary.main,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
+                      bgcolor: 'rgba(0, 167, 111, 0.12)',
+                      border: '1px solid rgba(0, 167, 111, 0.25)',
+                      boxShadow: 'inset 0 0 10px rgba(0, 167, 111, 0.08)',
                     }}
-                  >
-                    <Iconify icon="solar:box-bold" width={22} />
-                  </Box>
+                  />
 
                   <Box>
                     <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap', gap: 0.75 }}>
