@@ -1,13 +1,11 @@
-use crate::modules::documents::{DocumentRequest, DocumentsService};
 use super::models::{CitizenLedgerPayload, InvoiceReportPayload};
+use crate::modules::documents::{default_documents_service, DocumentRequest};
 
 /// Compila o PDF do Livro-Razão do Cidadão em memória.
 ///
 /// Mantém a interface legada e delega a geração ao DocumentsService.
 /// Não realiza operações explícitas de escrita em disco.
-pub fn compile_citizen_ledger_pdf(
-    payload: &CitizenLedgerPayload,
-) -> Result<Vec<u8>, String> {
+pub fn compile_citizen_ledger_pdf(payload: &CitizenLedgerPayload) -> Result<Vec<u8>, String> {
     let request = DocumentRequest::CitizenLedger(payload.clone());
     compile_document_pdf(request)
 }
@@ -16,9 +14,7 @@ pub fn compile_citizen_ledger_pdf(
 ///
 /// Mantém a interface legada e delega a geração ao DocumentsService.
 /// Não realiza operações explícitas de escrita em disco.
-pub fn compile_invoice_pdf(
-    payload: &InvoiceReportPayload,
-) -> Result<Vec<u8>, String> {
+pub fn compile_invoice_pdf(payload: &InvoiceReportPayload) -> Result<Vec<u8>, String> {
     let request = DocumentRequest::InvoiceBill(payload.clone());
     compile_document_pdf(request)
 }
@@ -27,7 +23,7 @@ pub fn compile_invoice_pdf(
 ///
 /// A conversão para String é mantida para preservar a API existente.
 fn compile_document_pdf(request: DocumentRequest) -> Result<Vec<u8>, String> {
-    DocumentsService::new()
+    default_documents_service()
         .generate_document(request)
         .map(|output| output.pdf_bytes)
         .map_err(|error| error.to_string())
@@ -131,4 +127,3 @@ mod tests {
         assert_valid_pdf(&bytes, "Fatura Associativa");
     }
 }
-

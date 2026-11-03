@@ -15,6 +15,7 @@
 pub mod models;
 pub mod ports;
 pub mod service;
+pub mod typst_renderer;
 
 // Mantém os modelos disponíveis diretamente na raiz do módulo.
 pub use models::*;
@@ -24,3 +25,14 @@ pub use ports::*;
 
 // Mantém os serviços disponíveis diretamente na raiz do módulo.
 pub use service::*;
+
+// Mantém o renderizador Typst disponível na raiz do módulo.
+pub use typst_renderer::*;
+
+/// Cria uma instância do `DocumentsService` configurada com o renderizador institucional Typst.
+///
+/// Atua como ponto canônico de composição (Composition Root) para consumidores que
+/// requerem a pilha documental padrão da aplicação.
+pub fn default_documents_service() -> DocumentsService {
+    DocumentsService::new(std::sync::Arc::new(TypstDocumentRenderer::new()))
+}

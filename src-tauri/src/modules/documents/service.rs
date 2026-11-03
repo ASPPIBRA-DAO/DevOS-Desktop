@@ -1,122 +1,104 @@
 use chrono::Utc;
 use sha2::{Digest, Sha256};
-use std::collections::HashMap;
+use std::sync::Arc;
 
 use crate::modules::documents::models::{
-    DocumentError, DocumentKind, DocumentMetadata, DocumentOutput, DocumentRequest,
+    DocumentError, DocumentKind, DocumentMetadata, DocumentOutput, DocumentRequest, DocumentScope,
 };
-use crate::modules::documents::ports::DocumentRenderer;
-use crate::platform::typst_engine::{compile_typst_document, TypstCompileOptions};
+use crate::modules::documents::ports::{DocumentRenderer, RenderedDocument};
 
-static CITIZEN_TEMPLATE: &str = include_str!("../../../templates/extrato_citizen_ledger.typ");
-
-static INVOICE_TEMPLATE: &str = include_str!("../../../templates/invoice_bill.typ");
-
-static CONTRATO_CESSAO_TEMPLATE: &str =
-    include_str!("../../../templates/contrato_cessao_posse.typ");
-
-static RECONCILIATION_TEMPLATE: &str =
-    include_str!("../../../templates/real_estate_reconciliation.typ");
-
-static ASPPIBRA_LAYOUT: &str = include_str!("../../../templates/asppibra_layout.typ");
-
-static ROBOTO_REGULAR: &[u8] = include_bytes!("../../../assets/fonts/Roboto-Regular.ttf");
-
-static ROBOTO_BOLD: &[u8] = include_bytes!("../../../assets/fonts/Roboto-Bold.ttf");
-
-#[derive(Default, Clone)]
-pub struct DocumentsService;
+/// Serviço orquestrador para geração, autorização, validação e integridade de documentos canônicos.
+///
+/// Atua como camada de coordenação e domínio:
+/// 1. Valida o payload de entrada contra regras estruturais e de integridade (`request.validate()`).
+/// 2. Valida a autorização de escopo contra o contexto confiável do backend (`self.validate_scope()`).
+/// 3. Verifica se o renderizador injetado suporta o tipo documental solicitado (`self.renderer.supports()`).
+/// 4. Delega a compilação física ao adaptador de renderização (`self.renderer.render()`).
+/// 5. Garante a integridade documental calculando o hash SHA-256 canônico,
+///    o tamanho em bytes, o carimbo de data/hora UTC e os metadados de emissão.
+#[derive(Clone)]
+pub struct DocumentsService {
+    renderer: Arc<dyn DocumentRenderer>,
+    system_scope: DocumentScope,
+}
 
 impl DocumentsService {
-    pub fn new() -> Self {
-        Self
+    /// Inicializa o serviço com um renderizador injetado via `Arc` no escopo padrão Universal.
+    pub fn new(renderer: Arc<dyn DocumentRenderer>) -> Self {
+        Self {
+            renderer,
+            system_scope: DocumentScope::Universal,
+        }
     }
 
-    /// Ponto de entrada padrão para orquestração documental.
+    /// Alias semântico para inicialização com renderizador injetado via `Arc`.
+    pub fn with_renderer(renderer: Arc<dyn DocumentRenderer>) -> Self {
+        Self::new(renderer)
+    }
+
+    /// Inicializa o serviço com qualquer implementação concreta de `DocumentRenderer`.
+    pub fn new_with_renderer<R: DocumentRenderer + 'static>(renderer: R) -> Self {
+        Self::new(Arc::new(renderer))
+    }
+
+    /// Inicializa o serviço com um renderizador e um escopo de sistema autorizado específico.
+    pub fn with_scope(renderer: Arc<dyn DocumentRenderer>, system_scope: DocumentScope) -> Self {
+        Self {
+            renderer,
+            system_scope,
+        }
+    }
+
+    /// Retorna o escopo de sistema atualmente configurado no serviço.
+    pub fn system_scope(&self) -> DocumentScope {
+        self.system_scope
+    }
+
+    /// Valida se o escopo exigido é autorizado pelo contexto do sistema.
+    pub fn validate_scope_for(&self, required: DocumentScope) -> Result<(), DocumentError> {
+        match (required, self.system_scope) {
+            (DocumentScope::Universal, _) => Ok(()),
+            (DocumentScope::CockpitOnly, DocumentScope::CockpitOnly) => Ok(()),
+            (DocumentScope::NodeOnly, DocumentScope::NodeOnly) => Ok(()),
+            _ => Err(DocumentError::UnauthorizedScope(format!(
+                "Emissão não autorizada: o escopo exigido {required:?} é incompatível com o contexto ativo {:?}",
+                self.system_scope
+            ))),
+        }
+    }
+
+    /// Verifica se o escopo exigido pelo tipo documental é autorizado pelo contexto do sistema.
+    fn validate_scope(&self, kind: DocumentKind) -> Result<(), DocumentError> {
+        self.validate_scope_for(kind.required_scope())
+    }
+
+    /// Ponto de entrada padrão para geração, autorização, validação e integridade documental.
     pub fn generate_document(
         &self,
         request: DocumentRequest,
     ) -> Result<DocumentOutput, DocumentError> {
-        self.render(request)
-    }
-}
-
-impl DocumentRenderer for DocumentsService {
-    fn supports(&self, kind: DocumentKind) -> bool {
-        matches!(
-            kind,
-            DocumentKind::CitizenLedger
-                | DocumentKind::InvoiceBill
-                | DocumentKind::CessaoPosse
-                | DocumentKind::RealEstateReconciliation
-        )
-    }
-
-    fn render(&self, request: DocumentRequest) -> Result<DocumentOutput, DocumentError> {
+        // 1. Validação estrita das regras de domínio e integridade do payload
         request.validate()?;
 
         let kind = request.kind();
 
-        let (template_source, json_payload) = match request {
-            DocumentRequest::CitizenLedger(payload) => {
-                let json_str = serde_json::to_string(&payload.data)
-                    .map_err(|error| DocumentError::SerializationError(error.to_string()))?;
+        // 2. Validação obrigatória de autorização de escopo
+        self.validate_scope(kind)?;
 
-                (CITIZEN_TEMPLATE, json_str)
-            }
+        // 3. Verificação se o motor injetado suporta o tipo requisitado
+        if !self.renderer.supports(kind) {
+            return Err(DocumentError::UnsupportedDocumentType(format!(
+                "O renderizador documental configurado não oferece suporte ao tipo {kind:?}"
+            )));
+        }
 
-            DocumentRequest::InvoiceBill(payload) => {
-                let json_value = serde_json::json!({
-                    "invoice": payload
-                });
+        // 4. Delegação da renderização física ao motor especializado
+        let rendered = self.renderer.render(request)?;
 
-                let json_str = serde_json::to_string(&json_value)
-                    .map_err(|error| DocumentError::SerializationError(error.to_string()))?;
-
-                (INVOICE_TEMPLATE, json_str)
-            }
-
-            DocumentRequest::CessaoPosse(payload) => {
-                let json_str = serde_json::to_string(&payload)
-                    .map_err(|error| DocumentError::SerializationError(error.to_string()))?;
-
-                (CONTRATO_CESSAO_TEMPLATE, json_str)
-            }
-
-            DocumentRequest::RealEstateReconciliation(payload) => {
-                let json_str = serde_json::to_string(&payload.data)
-                    .map_err(|error| DocumentError::SerializationError(error.to_string()))?;
-
-                (RECONCILIATION_TEMPLATE, json_str)
-            }
-        };
-
-        let mut string_inputs = HashMap::new();
-        string_inputs.insert("data", json_payload);
-
-        let merged_template;
-        let final_template_source = if matches!(kind, DocumentKind::CessaoPosse) {
-            merged_template = format!("{ASPPIBRA_LAYOUT}\n{template_source}");
-            &merged_template
-        } else {
-            template_source
-        };
-
-        let options = TypstCompileOptions {
-            template_source: final_template_source,
-            fonts: &[ROBOTO_REGULAR, ROBOTO_BOLD],
-            string_inputs,
-        };
-
-        let pdf_bytes = compile_typst_document(options)
-            .map_err(|error| DocumentError::CompilationError(error.to_string()))?;
-
-        // O campo sha256_checksum deve conter SHA-256 dos bytes
-        // efetivamente retornados, e não Keccak-256.
-        let checksum = Sha256::digest(&pdf_bytes);
+        // 5. Centralização da integridade documental e montagem canônica dos metadados
+        let checksum = Sha256::digest(&rendered.pdf_bytes);
         let sha256_checksum = hex::encode(checksum);
-
-        let byte_size = pdf_bytes.len();
+        let byte_size = rendered.pdf_bytes.len();
         let generated_at_utc = Utc::now().to_rfc3339();
 
         let metadata = DocumentMetadata {
@@ -128,7 +110,7 @@ impl DocumentRenderer for DocumentsService {
         };
 
         Ok(DocumentOutput {
-            pdf_bytes,
+            pdf_bytes: rendered.pdf_bytes,
             metadata,
         })
     }
@@ -137,12 +119,18 @@ impl DocumentRenderer for DocumentsService {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sha2::{Digest, Sha256};
 
+    use crate::modules::documents::typst_renderer::TypstDocumentRenderer;
     use crate::modules::reports::models::{
         CitizenLedgerPayload, InvoiceReportItem, InvoiceReportPayload,
     };
 
     use serde_json::json;
+
+    fn create_test_service() -> DocumentsService {
+        DocumentsService::new_with_renderer(TypstDocumentRenderer::new())
+    }
 
     fn assert_valid_document_output(output: &DocumentOutput, expected_kind: DocumentKind) {
         assert!(
@@ -193,7 +181,7 @@ mod tests {
 
     #[test]
     fn test_documents_service_generates_citizen_ledger() {
-        let service = DocumentsService::new();
+        let service = create_test_service();
 
         let payload = CitizenLedgerPayload {
             associate_id: Some("MEMBER-123".to_string()),
@@ -232,7 +220,7 @@ mod tests {
 
     #[test]
     fn test_documents_service_generates_invoice_bill() {
-        let service = DocumentsService::new();
+        let service = create_test_service();
 
         let payload = InvoiceReportPayload {
             id: "INV-2026-999".to_string(),
@@ -271,7 +259,7 @@ mod tests {
 
     #[test]
     fn test_generate_cessao_posse_document() {
-        let service = DocumentsService::new();
+        let service = create_test_service();
 
         let payload = crate::modules::reports::models::CessaoPossePayload {
             document_number: "2026-0001/CP".to_string(),
@@ -295,7 +283,7 @@ mod tests {
 
     #[test]
     fn test_generate_real_estate_reconciliation_document() {
-        let service = DocumentsService::new();
+        let service = create_test_service();
 
         let payload = crate::modules::reports::models::RealEstateReconciliationPayload {
             data: serde_json::json!({
@@ -354,7 +342,7 @@ mod tests {
 
     #[test]
     fn test_documents_service_rejects_invalid_cessao_posse_payload() {
-        let service = DocumentsService::new();
+        let service = create_test_service();
         let invalid_payload = crate::modules::documents::models::CessaoPossePayload {
             document_number: "   ".to_string(),
             auth_code: "2026-X7Y9".to_string(),
@@ -368,7 +356,7 @@ mod tests {
 
     #[test]
     fn test_documents_service_rejects_invalid_invoice_bill_payload() {
-        let service = DocumentsService::new();
+        let service = create_test_service();
         let invalid_payload = InvoiceReportPayload {
             id: "".to_string(),
             member_name: "Cliente".to_string(),
@@ -391,5 +379,210 @@ mod tests {
 
         let result = service.generate_document(request);
         assert!(matches!(result, Err(DocumentError::ValidationError(_))));
+    }
+
+    struct MockRenderer {
+        supported_kinds: Vec<DocumentKind>,
+        render_invocations: std::sync::atomic::AtomicUsize,
+    }
+
+    impl MockRenderer {
+        fn new(supported_kinds: Vec<DocumentKind>) -> Self {
+            Self {
+                supported_kinds,
+                render_invocations: std::sync::atomic::AtomicUsize::new(0),
+            }
+        }
+
+        fn invocations(&self) -> usize {
+            self.render_invocations
+                .load(std::sync::atomic::Ordering::SeqCst)
+        }
+    }
+
+    impl DocumentRenderer for MockRenderer {
+        fn supports(&self, kind: DocumentKind) -> bool {
+            self.supported_kinds.contains(&kind)
+        }
+
+        fn render(&self, _request: DocumentRequest) -> Result<RenderedDocument, DocumentError> {
+            self.render_invocations
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Ok(RenderedDocument::new(b"%PDF-1.7 mock output".to_vec()))
+        }
+    }
+
+    #[test]
+    fn test_documents_service_delegates_to_injected_renderer_and_centralizes_integrity() {
+        let mock = std::sync::Arc::new(MockRenderer::new(vec![DocumentKind::InvoiceBill]));
+        let service = DocumentsService::with_renderer(mock.clone());
+
+        let payload = InvoiceReportPayload {
+            id: "FAT-MOCK-001".to_string(),
+            member_name: "Mock Member".to_string(),
+            member_doc: "000.000.000-00".to_string(),
+            member_email: None,
+            member_address: None,
+            description: "Mock Description".to_string(),
+            reference_month: "2026-10".to_string(),
+            amount: 100.0,
+            due_date: "2026-10-31".to_string(),
+            settled_date: None,
+            payment_method: "Pix".to_string(),
+            status: "pending".to_string(),
+            items: vec![InvoiceReportItem {
+                id: "item-1".to_string(),
+                description: "Item 1".to_string(),
+                service: None,
+                quantity: 1.0,
+                price: 100.0,
+                total: 100.0,
+            }],
+            taxes: None,
+            discount: None,
+            d1_protocol: None,
+        };
+
+        let output = service
+            .generate_document(DocumentRequest::InvoiceBill(payload))
+            .expect("Mock deve renderizar com sucesso");
+
+        assert_eq!(mock.invocations(), 1);
+        assert_eq!(output.pdf_bytes, b"%PDF-1.7 mock output");
+        assert_eq!(output.metadata.document_kind, DocumentKind::InvoiceBill);
+        assert_eq!(output.metadata.byte_size, 20);
+        let expected_sha = hex::encode(Sha256::digest(b"%PDF-1.7 mock output"));
+        assert_eq!(output.metadata.sha256_checksum, expected_sha);
+    }
+
+    #[test]
+    fn test_documents_service_rejects_unsupported_document_kind_from_renderer() {
+        let mock = std::sync::Arc::new(MockRenderer::new(vec![DocumentKind::CessaoPosse]));
+        let service = DocumentsService::with_renderer(mock.clone());
+
+        let payload = InvoiceReportPayload {
+            id: "FAT-MOCK-002".to_string(),
+            member_name: "Mock Member".to_string(),
+            member_doc: "000.000.000-00".to_string(),
+            member_email: None,
+            member_address: None,
+            description: "Mock Description".to_string(),
+            reference_month: "2026-10".to_string(),
+            amount: 100.0,
+            due_date: "2026-10-31".to_string(),
+            settled_date: None,
+            payment_method: "Pix".to_string(),
+            status: "pending".to_string(),
+            items: vec![InvoiceReportItem {
+                id: "item-1".to_string(),
+                description: "Item 1".to_string(),
+                service: None,
+                quantity: 1.0,
+                price: 100.0,
+                total: 100.0,
+            }],
+            taxes: None,
+            discount: None,
+            d1_protocol: None,
+        };
+
+        let result = service.generate_document(DocumentRequest::InvoiceBill(payload));
+        assert!(matches!(
+            result,
+            Err(DocumentError::UnsupportedDocumentType(_))
+        ));
+        assert_eq!(mock.invocations(), 0);
+    }
+
+    #[test]
+    fn test_documents_service_validates_before_delegating_to_renderer() {
+        let mock = std::sync::Arc::new(MockRenderer::new(vec![DocumentKind::InvoiceBill]));
+        let service = DocumentsService::with_renderer(mock.clone());
+
+        let invalid_payload = InvoiceReportPayload {
+            id: "".to_string(),
+            member_name: "Mock Member".to_string(),
+            member_doc: "000.000.000-00".to_string(),
+            member_email: None,
+            member_address: None,
+            description: "Mock Description".to_string(),
+            reference_month: "2026-10".to_string(),
+            amount: 100.0,
+            due_date: "2026-10-31".to_string(),
+            settled_date: None,
+            payment_method: "Pix".to_string(),
+            status: "pending".to_string(),
+            items: vec![],
+            taxes: None,
+            discount: None,
+            d1_protocol: None,
+        };
+
+        let result = service.generate_document(DocumentRequest::InvoiceBill(invalid_payload));
+        assert!(matches!(result, Err(DocumentError::ValidationError(_))));
+        assert_eq!(mock.invocations(), 0);
+    }
+
+    #[test]
+    fn test_documents_service_authorizes_scope_matching() {
+        let mock = std::sync::Arc::new(MockRenderer::new(vec![DocumentKind::InvoiceBill]));
+        // Serviço configurado com escopo universal explícito
+        let service = DocumentsService::with_scope(mock.clone(), DocumentScope::Universal);
+
+        let payload = InvoiceReportPayload {
+            id: "FAT-SCOPE-001".to_string(),
+            member_name: "Mock Member".to_string(),
+            member_doc: "000.000.000-00".to_string(),
+            member_email: None,
+            member_address: None,
+            description: "Mock Description".to_string(),
+            reference_month: "2026-10".to_string(),
+            amount: 100.0,
+            due_date: "2026-10-31".to_string(),
+            settled_date: None,
+            payment_method: "Pix".to_string(),
+            status: "pending".to_string(),
+            items: vec![InvoiceReportItem {
+                id: "item-1".to_string(),
+                description: "Item 1".to_string(),
+                service: None,
+                quantity: 1.0,
+                price: 100.0,
+                total: 100.0,
+            }],
+            taxes: None,
+            discount: None,
+            d1_protocol: None,
+        };
+
+        let result = service.generate_document(DocumentRequest::InvoiceBill(payload));
+        assert!(result.is_ok());
+        assert_eq!(mock.invocations(), 1);
+    }
+
+    #[test]
+    fn test_documents_service_rejects_unauthorized_scope() {
+        let mock = std::sync::Arc::new(MockRenderer::new(vec![DocumentKind::InvoiceBill]));
+        // Serviço configurado com escopo restrito a NodeOnly
+        let node_service = DocumentsService::with_scope(mock.clone(), DocumentScope::NodeOnly);
+
+        // Tentativa de emissão exigindo CockpitOnly é rejeitada com UnauthorizedScope
+        let auth_res = node_service.validate_scope_for(DocumentScope::CockpitOnly);
+        assert!(matches!(auth_res, Err(DocumentError::UnauthorizedScope(_))));
+
+        // Serviço Universal também rejeita escopos restritos a Cockpit ou Node
+        let universal_service =
+            DocumentsService::with_scope(mock.clone(), DocumentScope::Universal);
+        assert!(matches!(
+            universal_service.validate_scope_for(DocumentScope::CockpitOnly),
+            Err(DocumentError::UnauthorizedScope(_))
+        ));
+        assert!(matches!(
+            universal_service.validate_scope_for(DocumentScope::NodeOnly),
+            Err(DocumentError::UnauthorizedScope(_))
+        ));
+
+        // Renderizador nunca é invocado em caso de violação de autorização
+        assert_eq!(mock.invocations(), 0);
     }
 }

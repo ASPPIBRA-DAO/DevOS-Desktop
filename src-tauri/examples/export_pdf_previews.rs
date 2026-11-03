@@ -1,5 +1,7 @@
 use app_lib::modules::reports::engine::{compile_citizen_ledger_pdf, compile_invoice_pdf};
-use app_lib::modules::reports::models::{CitizenLedgerPayload, InvoiceReportItem, InvoiceReportPayload};
+use app_lib::modules::reports::models::{
+    CitizenLedgerPayload, InvoiceReportItem, InvoiceReportPayload,
+};
 use serde_json::json;
 use std::fs;
 
@@ -68,7 +70,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Compilando Extrato do Cidadão via Typst...");
     let citizen_pdf_bytes = compile_citizen_ledger_pdf(&citizen_payload)
         .map_err(|e| format!("Erro ao compilar extrato: {e}"))?;
-    
+
     let citizen_pdf_path = output_dir.join("extrato_citizen_ledger_preview.pdf");
     fs::write(&citizen_pdf_path, &citizen_pdf_bytes)?;
     println!("Extrato salvo em: {}", citizen_pdf_path.display());
@@ -80,7 +82,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         member_doc: "000.000.000-00".to_string(),
         member_email: Some("associado@example.invalid".to_string()),
         member_address: Some("Av. Brasil Central, 4500 - Rio de Janeiro, RJ".to_string()),
-        description: "Mensalidade e Custódia de Ativos Descentralizados - Ciclo 2026-10".to_string(),
+        description: "Mensalidade e Custódia de Ativos Descentralizados - Ciclo 2026-10"
+            .to_string(),
         reference_month: "2026-10".to_string(),
         amount: 8750.0,
         due_date: "2026-11-10".to_string(),
@@ -107,13 +110,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ],
         taxes: Some(0.0),
         discount: Some(0.0),
-        d1_protocol: Some("0x89abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567::FAT-2026-ASP-0042".to_string()),
+        d1_protocol: Some(
+            "0x89abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567::FAT-2026-ASP-0042"
+                .to_string(),
+        ),
     };
 
     println!("Compilando Fatura / Cobrança via Typst...");
     let invoice_pdf_bytes = compile_invoice_pdf(&invoice_payload)
         .map_err(|e| format!("Erro ao compilar fatura: {e}"))?;
-    
+
     let invoice_pdf_path = output_dir.join("fatura_associativa_preview.pdf");
     fs::write(&invoice_pdf_path, &invoice_pdf_bytes)?;
     println!("Fatura salva em: {}", invoice_pdf_path.display());
@@ -130,8 +136,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "imovelQuadra": "B"
         }),
     };
-    let service = app_lib::modules::documents::DocumentsService::new();
-    let res = service.generate_document(app_lib::modules::documents::DocumentRequest::CessaoPosse(cessao_payload));
+    let service = app_lib::modules::documents::default_documents_service();
+    let res = service.generate_document(app_lib::modules::documents::DocumentRequest::CessaoPosse(
+        cessao_payload,
+    ));
     match res {
         Ok(out) => {
             let path = output_dir.join("contrato_cessao_preview.pdf");

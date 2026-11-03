@@ -5,7 +5,7 @@ use std::path::{Component, Path, PathBuf};
 
 use crate::modules::documents::models::DocumentError;
 use crate::modules::documents::{
-    DocumentKind, DocumentMetadata, DocumentRequest, DocumentScope, DocumentsService,
+    default_documents_service, DocumentKind, DocumentMetadata, DocumentRequest, DocumentScope,
 };
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -67,7 +67,7 @@ fn generate_document_in_directory(
         None => default_file_name(kind),
     };
 
-    let service = DocumentsService::new();
+    let service = default_documents_service();
 
     let output = service
         .generate_document(request)
