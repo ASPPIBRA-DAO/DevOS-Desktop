@@ -6,13 +6,11 @@ use crate::modules::documents::models::{
     DocumentError, DocumentKind, DocumentMetadata, DocumentOutput, DocumentRequest,
 };
 use crate::modules::documents::ports::DocumentRenderer;
-use crate::platform::typst_engine::{TypstCompileOptions, compile_typst_document};
+use crate::platform::typst_engine::{compile_typst_document, TypstCompileOptions};
 
-static CITIZEN_TEMPLATE: &str =
-    include_str!("../../../templates/extrato_citizen_ledger.typ");
+static CITIZEN_TEMPLATE: &str = include_str!("../../../templates/extrato_citizen_ledger.typ");
 
-static INVOICE_TEMPLATE: &str =
-    include_str!("../../../templates/invoice_bill.typ");
+static INVOICE_TEMPLATE: &str = include_str!("../../../templates/invoice_bill.typ");
 
 static CONTRATO_CESSAO_TEMPLATE: &str =
     include_str!("../../../templates/contrato_cessao_posse.typ");
@@ -20,14 +18,11 @@ static CONTRATO_CESSAO_TEMPLATE: &str =
 static RECONCILIATION_TEMPLATE: &str =
     include_str!("../../../templates/real_estate_reconciliation.typ");
 
-static ASPPIBRA_LAYOUT: &str =
-    include_str!("../../../templates/asppibra_layout.typ");
+static ASPPIBRA_LAYOUT: &str = include_str!("../../../templates/asppibra_layout.typ");
 
-static ROBOTO_REGULAR: &[u8] =
-    include_bytes!("../../../assets/fonts/Roboto-Regular.ttf");
+static ROBOTO_REGULAR: &[u8] = include_bytes!("../../../assets/fonts/Roboto-Regular.ttf");
 
-static ROBOTO_BOLD: &[u8] =
-    include_bytes!("../../../assets/fonts/Roboto-Bold.ttf");
+static ROBOTO_BOLD: &[u8] = include_bytes!("../../../assets/fonts/Roboto-Bold.ttf");
 
 #[derive(Default, Clone)]
 pub struct DocumentsService;
@@ -57,18 +52,15 @@ impl DocumentRenderer for DocumentsService {
         )
     }
 
-    fn render(
-        &self,
-        request: DocumentRequest,
-    ) -> Result<DocumentOutput, DocumentError> {
+    fn render(&self, request: DocumentRequest) -> Result<DocumentOutput, DocumentError> {
+        request.validate()?;
+
         let kind = request.kind();
 
         let (template_source, json_payload) = match request {
             DocumentRequest::CitizenLedger(payload) => {
                 let json_str = serde_json::to_string(&payload.data)
-                    .map_err(|error| {
-                        DocumentError::SerializationError(error.to_string())
-                    })?;
+                    .map_err(|error| DocumentError::SerializationError(error.to_string()))?;
 
                 (CITIZEN_TEMPLATE, json_str)
             }
@@ -79,27 +71,21 @@ impl DocumentRenderer for DocumentsService {
                 });
 
                 let json_str = serde_json::to_string(&json_value)
-                    .map_err(|error| {
-                        DocumentError::SerializationError(error.to_string())
-                    })?;
+                    .map_err(|error| DocumentError::SerializationError(error.to_string()))?;
 
                 (INVOICE_TEMPLATE, json_str)
             }
 
             DocumentRequest::CessaoPosse(payload) => {
                 let json_str = serde_json::to_string(&payload)
-                    .map_err(|error| {
-                        DocumentError::SerializationError(error.to_string())
-                    })?;
+                    .map_err(|error| DocumentError::SerializationError(error.to_string()))?;
 
                 (CONTRATO_CESSAO_TEMPLATE, json_str)
             }
 
             DocumentRequest::RealEstateReconciliation(payload) => {
                 let json_str = serde_json::to_string(&payload.data)
-                    .map_err(|error| {
-                        DocumentError::SerializationError(error.to_string())
-                    })?;
+                    .map_err(|error| DocumentError::SerializationError(error.to_string()))?;
 
                 (RECONCILIATION_TEMPLATE, json_str)
             }
@@ -123,9 +109,7 @@ impl DocumentRenderer for DocumentsService {
         };
 
         let pdf_bytes = compile_typst_document(options)
-            .map_err(|error| {
-                DocumentError::CompilationError(error.to_string())
-            })?;
+            .map_err(|error| DocumentError::CompilationError(error.to_string()))?;
 
         // O campo sha256_checksum deve conter SHA-256 dos bytes
         // efetivamente retornados, e não Keccak-256.
@@ -155,17 +139,12 @@ mod tests {
     use super::*;
 
     use crate::modules::reports::models::{
-        CitizenLedgerPayload,
-        InvoiceReportItem,
-        InvoiceReportPayload,
+        CitizenLedgerPayload, InvoiceReportItem, InvoiceReportPayload,
     };
 
     use serde_json::json;
 
-    fn assert_valid_document_output(
-        output: &DocumentOutput,
-        expected_kind: DocumentKind,
-    ) {
+    fn assert_valid_document_output(output: &DocumentOutput, expected_kind: DocumentKind) {
         assert!(
             !output.pdf_bytes.is_empty(),
             "O PDF gerado não deve estar vazio"
@@ -177,8 +156,7 @@ mod tests {
         );
 
         assert_eq!(
-            output.metadata.document_kind,
-            expected_kind,
+            output.metadata.document_kind, expected_kind,
             "O tipo documental dos metadados está incorreto"
         );
 
@@ -188,12 +166,10 @@ mod tests {
             "O tamanho registrado deve corresponder aos bytes do PDF"
         );
 
-        let expected_checksum =
-            hex::encode(Sha256::digest(&output.pdf_bytes));
+        let expected_checksum = hex::encode(Sha256::digest(&output.pdf_bytes));
 
         assert_eq!(
-            output.metadata.sha256_checksum,
-            expected_checksum,
+            output.metadata.sha256_checksum, expected_checksum,
             "O hash SHA-256 deve corresponder aos bytes do PDF"
         );
 
@@ -249,16 +225,9 @@ mod tests {
 
         let output = service
             .generate_document(request)
-            .unwrap_or_else(|error| {
-                panic!(
-                    "Falha ao gerar documento de extrato: {error:?}"
-                )
-            });
+            .unwrap_or_else(|error| panic!("Falha ao gerar documento de extrato: {error:?}"));
 
-        assert_valid_document_output(
-            &output,
-            DocumentKind::CitizenLedger,
-        );
+        assert_valid_document_output(&output, DocumentKind::CitizenLedger);
     }
 
     #[test]
@@ -295,14 +264,9 @@ mod tests {
 
         let output = service
             .generate_document(request)
-            .unwrap_or_else(|error| {
-                panic!("Falha ao gerar fatura: {error:?}")
-            });
+            .unwrap_or_else(|error| panic!("Falha ao gerar fatura: {error:?}"));
 
-        assert_valid_document_output(
-            &output,
-            DocumentKind::InvoiceBill,
-        );
+        assert_valid_document_output(&output, DocumentKind::InvoiceBill);
     }
 
     #[test]
@@ -324,14 +288,9 @@ mod tests {
 
         let output = service
             .generate_document(request)
-            .unwrap_or_else(|error| {
-                panic!("Falha ao gerar contrato de cessão: {error:?}")
-            });
+            .unwrap_or_else(|error| panic!("Falha ao gerar contrato de cessão: {error:?}"));
 
-        assert_valid_document_output(
-            &output,
-            DocumentKind::CessaoPosse,
-        );
+        assert_valid_document_output(&output, DocumentKind::CessaoPosse);
     }
 
     #[test]
@@ -388,13 +347,49 @@ mod tests {
 
         let output = service
             .generate_document(request)
-            .unwrap_or_else(|error| {
-                panic!("Falha ao gerar relatório de reconciliação: {error:?}")
-            });
+            .unwrap_or_else(|error| panic!("Falha ao gerar relatório de reconciliação: {error:?}"));
 
-        assert_valid_document_output(
-            &output,
-            DocumentKind::RealEstateReconciliation,
-        );
+        assert_valid_document_output(&output, DocumentKind::RealEstateReconciliation);
+    }
+
+    #[test]
+    fn test_documents_service_rejects_invalid_cessao_posse_payload() {
+        let service = DocumentsService::new();
+        let invalid_payload = crate::modules::documents::models::CessaoPossePayload {
+            document_number: "   ".to_string(),
+            auth_code: "2026-X7Y9".to_string(),
+            data: serde_json::json!({}),
+        };
+        let request = DocumentRequest::CessaoPosse(invalid_payload);
+
+        let result = service.generate_document(request);
+        assert!(matches!(result, Err(DocumentError::ValidationError(_))));
+    }
+
+    #[test]
+    fn test_documents_service_rejects_invalid_invoice_bill_payload() {
+        let service = DocumentsService::new();
+        let invalid_payload = InvoiceReportPayload {
+            id: "".to_string(),
+            member_name: "Cliente".to_string(),
+            member_doc: "000".to_string(),
+            member_email: None,
+            member_address: None,
+            description: "Desc".to_string(),
+            reference_month: "2026-10".to_string(),
+            amount: 100.0,
+            due_date: "2026-10-31".to_string(),
+            settled_date: None,
+            payment_method: "Pix".to_string(),
+            status: "paid".to_string(),
+            items: vec![],
+            taxes: None,
+            discount: None,
+            d1_protocol: None,
+        };
+        let request = DocumentRequest::InvoiceBill(invalid_payload);
+
+        let result = service.generate_document(request);
+        assert!(matches!(result, Err(DocumentError::ValidationError(_))));
     }
 }

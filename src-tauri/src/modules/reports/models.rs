@@ -1,130 +1,13 @@
-use serde::{Deserialize, Serialize};
-
-/// Dados de entrada para a geração do Extrato do Cidadão.
+/// Módulo de Compatibilidade de Modelos de Relatórios e Documentos.
 ///
-/// `data` mantém a flexibilidade do contrato JSON atual. A estrutura e os
-/// campos esperados pelo template devem ser validados na camada de serviço.
-///
-/// `associate_id` é opcional e não substitui verificações de autorização.
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct CitizenLedgerPayload {
-    pub associate_id: Option<String>,
-    pub data: serde_json::Value,
-}
-
-/// Item individual de uma fatura associativa.
-///
-/// Os valores numéricos preservam o contrato atual baseado em `f64`.
-/// A consistência entre quantidade, preço e total deve ser verificada
-/// pela camada responsável pelas regras financeiras.
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct InvoiceReportItem {
-    /// Identificador do item.
-    pub id: String,
-
-    /// Descrição apresentada no documento.
-    pub description: String,
-
-    /// Serviço associado ao item, quando aplicável.
-    pub service: Option<String>,
-
-    /// Quantidade informada para o item.
-    pub quantity: f64,
-
-    /// Preço unitário informado para o item.
-    pub price: f64,
-
-    /// Total do item segundo os dados de origem.
-    pub total: f64,
-}
-
-/// Dados de entrada para a geração de uma fatura associativa.
-///
-/// Este DTO define o contrato de transporte, mas não calcula nem valida
-/// autonomamente os totais, tributos ou descontos.
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct InvoiceReportPayload {
-    /// Identificador da fatura.
-    pub id: String,
-
-    /// Nome do associado.
-    pub member_name: String,
-
-    /// Documento de identificação conforme o contrato atual.
-    pub member_doc: String,
-
-    /// E-mail do associado, quando disponível.
-    pub member_email: Option<String>,
-
-    /// Endereço do associado, quando disponível.
-    pub member_address: Option<String>,
-
-    /// Descrição geral da fatura.
-    pub description: String,
-
-    /// Período de referência conforme o formato aceito pelo sistema.
-    pub reference_month: String,
-
-    /// Valor total informado para a fatura.
-    ///
-    /// A validação monetária e a política de arredondamento pertencem
-    /// à camada responsável pelas regras financeiras.
-    pub amount: f64,
-
-    /// Data de vencimento.
-    pub due_date: String,
-
-    /// Data de liquidação, quando aplicável.
-    pub settled_date: Option<String>,
-
-    /// Método de pagamento informado.
-    pub payment_method: String,
-
-    /// Estado da fatura conforme o contrato atual.
-    pub status: String,
-
-    /// Itens incluídos na fatura.
-    pub items: Vec<InvoiceReportItem>,
-
-    /// Tributos, quando aplicáveis.
-    pub taxes: Option<f64>,
-
-    /// Desconto, quando aplicável.
-    pub discount: Option<f64>,
-
-    /// Protocolo D1 associado à fatura, quando disponível.
-    pub d1_protocol: Option<String>,
-}
-
-/// Dados de entrada para a geração do Contrato de Cessão de Posse.
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct CessaoPossePayload {
-    /// Número de controle ou registro do documento.
-    #[serde(default = "default_contract_doc_number")]
-    pub document_number: String,
-
-    /// Código de autenticação / rastreio institucional.
-    #[serde(default = "default_contract_auth_code")]
-    pub auth_code: String,
-
-    /// Dados estruturados ou dinâmicos do contrato (partes, imóvel, valores, etc.).
-    #[serde(default)]
-    pub data: serde_json::Value,
-}
-
-fn default_contract_doc_number() -> String {
-    "2026-0001/CP".to_string()
-}
-
-fn default_contract_auth_code() -> String {
-    "2026-X7Y9".to_string()
-}
-
-/// Dados de entrada para a geração do Relatório Analítico de Reconciliação Imobiliária.
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct RealEstateReconciliationPayload {
-    pub data: serde_json::Value,
-}
+/// Todos os modelos documentais canônicos estão centralizados no domínio
+/// `crate::modules::documents::models`. Este módulo reexporta publicamente
+/// esses tipos para preservar total compatibilidade retroativa com os
+/// componentes e consumidores existentes.
+pub use crate::modules::documents::models::{
+    CessaoPossePayload, CitizenLedgerPayload, InvoiceReportItem, InvoiceReportPayload,
+    RealEstateReconciliationPayload,
+};
 
 #[cfg(test)]
 mod tests {
@@ -171,19 +54,12 @@ mod tests {
             }
         });
 
-        let payload: CitizenLedgerPayload =
-            serde_json::from_value(value)
-                .expect("CitizenLedgerPayload deve aceitar o contrato válido");
+        let payload: CitizenLedgerPayload = serde_json::from_value(value)
+            .expect("CitizenLedgerPayload deve aceitar o contrato válido");
 
-        assert_eq!(
-            payload.associate_id.as_deref(),
-            Some("ASSOC123")
-        );
+        assert_eq!(payload.associate_id.as_deref(), Some("ASSOC123"));
 
-        assert_eq!(
-            payload.data["meta"]["reference_period"],
-            "2026-10"
-        );
+        assert_eq!(payload.data["meta"]["reference_period"], "2026-10");
     }
 
     #[test]
@@ -197,17 +73,15 @@ mod tests {
         });
 
         let payload: CitizenLedgerPayload =
-            serde_json::from_value(value)
-                .expect("associate_id deve poder estar ausente");
+            serde_json::from_value(value).expect("associate_id deve poder estar ausente");
 
         assert_eq!(payload.associate_id, None);
     }
 
     #[test]
     fn test_invoice_report_payload_deserialization() {
-        let payload: InvoiceReportPayload =
-            serde_json::from_value(sample_invoice_payload_json())
-                .expect("InvoiceReportPayload deve aceitar o contrato válido");
+        let payload: InvoiceReportPayload = serde_json::from_value(sample_invoice_payload_json())
+            .expect("InvoiceReportPayload deve aceitar o contrato válido");
 
         assert_eq!(payload.id, "INV-2023-001");
         assert_eq!(payload.items.len(), 1);
@@ -219,10 +93,7 @@ mod tests {
             Some("andressa.ferreira@asppibra.org.br")
         );
 
-        assert_eq!(
-            payload.member_address,
-            None
-        );
+        assert_eq!(payload.member_address, None);
     }
 
     #[test]
@@ -241,8 +112,7 @@ mod tests {
         object.remove("d1_protocol");
 
         let payload: InvoiceReportPayload =
-            serde_json::from_value(value)
-                .expect("Campos opcionais podem estar ausentes");
+            serde_json::from_value(value).expect("Campos opcionais podem estar ausentes");
 
         assert_eq!(payload.member_email, None);
         assert_eq!(payload.member_address, None);
@@ -258,8 +128,7 @@ mod tests {
             "id": "INV-2023-001"
         });
 
-        let result =
-            serde_json::from_value::<InvoiceReportPayload>(value);
+        let result = serde_json::from_value::<InvoiceReportPayload>(value);
 
         assert!(
             result.is_err(),
@@ -269,12 +138,11 @@ mod tests {
 
     #[test]
     fn test_invoice_report_payload_preserves_serialized_contract() {
-        let payload: InvoiceReportPayload =
-            serde_json::from_value(sample_invoice_payload_json())
-                .expect("Fixture deve ser desserializado");
+        let payload: InvoiceReportPayload = serde_json::from_value(sample_invoice_payload_json())
+            .expect("Fixture deve ser desserializado");
 
-        let serialized = serde_json::to_value(&payload)
-            .expect("InvoiceReportPayload deve ser serializável");
+        let serialized =
+            serde_json::to_value(&payload).expect("InvoiceReportPayload deve ser serializável");
 
         assert_eq!(serialized["id"], "INV-2023-001");
         assert_eq!(serialized["amount"], 5000.0);

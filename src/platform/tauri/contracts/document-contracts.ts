@@ -83,8 +83,8 @@ export interface InvoiceReportPayload {
 }
 
 export interface CessaoPossePayload {
-  document_number?: string;
-  auth_code?: string;
+  document_number: string;
+  auth_code: string;
   data?: Record<string, unknown>;
 }
 

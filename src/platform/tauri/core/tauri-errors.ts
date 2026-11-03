@@ -25,8 +25,13 @@ export class TauriErrorMapper {
 
     const rawMessage = TauriErrorMapper.extractMessage(error);
     const code = TauriErrorMapper.classifyErrorCode(rawMessage);
+    const userMessage = TauriErrorMapper.resolveUserMessage(
+      rawMessage,
+      code,
+      command
+    );
 
-    return new IpcError(rawMessage, code, command);
+    return new IpcError(rawMessage, code, command, userMessage);
   }
 
   /**
@@ -89,7 +94,16 @@ export class TauriErrorMapper {
       terms.some((term) => normalized.includes(term));
 
     if (
-      containsAny('validation', 'validacao', 'invalid', 'invalido', 'invalida') ||
+      containsAny(
+        'validation',
+        'validacao',
+        'invalid',
+        'invalido',
+        'invalida',
+        'missing field',
+        'campo ausente',
+        'campo obrigatorio'
+      ) ||
       TauriErrorMapper.isLengthValidationError(normalized)
     ) {
       return 'VALIDATION_ERROR';
@@ -163,5 +177,112 @@ export class TauriErrorMapper {
     }
 
     return 'BUSINESS_ERROR';
+  }
+
+  /**
+   * Converte erros técnicos do backend e do IPC em mensagens institucionais
+   * compreensíveis para o usuário final, separando o diagnóstico técnico
+   * da apresentação na interface.
+   */
+  public static resolveUserMessage(
+    rawMessage: string,
+    code: IpcErrorCode,
+    command?: string
+  ): string {
+    const normalized = TauriErrorMapper.normalizeMessage(rawMessage);
+
+    if (normalized.includes('ambiente nao suportado')) {
+      return rawMessage;
+    }
+
+    // Tratamento especializado para geração e validação documental
+    if (command === 'generate_document' || normalized.includes('documento')) {
+      if (
+        normalized.includes('missing field `document_number`') ||
+        normalized.includes("missing field 'document_number'") ||
+        normalized.includes('missing field document_number')
+      ) {
+        return 'O número do documento não foi informado. Revise os dados obrigatórios.';
+      }
+
+      if (
+        normalized.includes('missing field `auth_code`') ||
+        normalized.includes("missing field 'auth_code'") ||
+        normalized.includes('missing field auth_code')
+      ) {
+        return 'O código de autenticação não foi informado.';
+      }
+
+      if (
+        normalized.includes('document_number') &&
+        (normalized.includes('vazio') ||
+          normalized.includes('empty') ||
+          normalized.includes('obrigatorio'))
+      ) {
+        return 'O número do documento não pode ficar vazio.';
+      }
+
+      if (
+        normalized.includes('auth_code') &&
+        (normalized.includes('vazio') ||
+          normalized.includes('empty') ||
+          normalized.includes('obrigatorio'))
+      ) {
+        return 'O código de autenticação não pode ficar vazio.';
+      }
+
+      if (
+        normalized.includes('amount') ||
+        normalized.includes('valor total da fatura')
+      ) {
+        return 'O valor total da fatura deve ser um número válido e não negativo.';
+      }
+
+      if (normalized.includes('taxes') || normalized.includes('tributos')) {
+        return 'O valor de tributos da fatura é inválido.';
+      }
+
+      if (normalized.includes('discount') || normalized.includes('desconto')) {
+        return 'O valor de desconto da fatura é inválido.';
+      }
+
+      if (
+        normalized.includes('quantidade') ||
+        normalized.includes('preco unitario') ||
+        normalized.includes('valor total')
+      ) {
+        return 'Os itens da fatura possuem valores numéricos inválidos. Revise quantidades e preços.';
+      }
+
+      if (code === 'VALIDATION_ERROR') {
+        return 'Os dados fornecidos para gerar o documento são inválidos. Revise as informações e tente novamente.';
+      }
+    }
+
+    // Tratamento de campos ausentes em outros comandos
+    const missingFieldMatch = rawMessage.match(
+      /missing field [`'"]?([a-zA-Z0-9_]+)[`'"]?/
+    );
+    if (missingFieldMatch) {
+      return `O campo obrigatório '${missingFieldMatch[1]}' não foi informado.`;
+    }
+
+    // Categorias padronizadas
+    switch (code) {
+      case 'VALIDATION_ERROR':
+        return 'Os dados informados são inválidos. Revise as informações e tente novamente.';
+      case 'PERMISSION_DENIED_ERROR':
+        return 'Permissão negada para executar esta operação.';
+      case 'NOT_FOUND_ERROR':
+        return 'O registro solicitado não foi encontrado.';
+      case 'STORAGE_ERROR':
+        return 'Falha na persistência local de dados.';
+      case 'CRYPTO_ERROR':
+        return 'Falha na operação de segurança criptográfica.';
+      case 'IPC_TRANSPORT_ERROR':
+        return 'Falha de comunicação entre o aplicativo e o sistema nativo.';
+      default:
+        return 'Ocorreu um erro ao processar a solicitação.';
+    }
   }
 }

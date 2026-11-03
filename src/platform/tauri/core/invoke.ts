@@ -1,6 +1,7 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
 
 import { TauriErrorMapper } from './tauri-errors';
+import { IpcError } from '../contracts/ipc-errors';
 
 /**
  * ASPPIBRA DevOS — Native IPC Invoker (Tauri v2).
@@ -153,6 +154,12 @@ export async function invokeNative<T>(
     }
 
     const normalized = TauriErrorMapper.normalize(err, cmd);
-    throw new Error(`[Rust Core IPC Error] (${cmd}): ${normalized.message}`);
+    const technicalMessage = `[Rust Core IPC Error] (${cmd}): ${normalized.technicalMessage}`;
+    throw new IpcError(
+      technicalMessage,
+      normalized.code,
+      cmd,
+      normalized.userMessage
+    );
   }
 }

@@ -66,6 +66,48 @@ describe('Onda 5 — IPC Contracts & Bridges Test Suite', () => {
         'list_audit_findings'
       );
       expect(unauthorizedErr.code).toBe('PERMISSION_DENIED_ERROR');
+
+      const serdeMissingFieldErr = TauriErrorMapper.normalize(
+        'invalid args `payload`: missing field `document_number` at line 1 column 40',
+        'generate_document'
+      );
+      expect(serdeMissingFieldErr.code).toBe('VALIDATION_ERROR');
+      expect(serdeMissingFieldErr.command).toBe('generate_document');
+      expect(serdeMissingFieldErr.userMessage).toBe(
+        'O número do documento não foi informado. Revise os dados obrigatórios.'
+      );
+      expect(serdeMissingFieldErr.technicalMessage).toContain('missing field `document_number`');
+
+      const serdeAuthCodeErr = TauriErrorMapper.normalize(
+        'missing field `auth_code`',
+        'generate_document'
+      );
+      expect(serdeAuthCodeErr.code).toBe('VALIDATION_ERROR');
+      expect(serdeAuthCodeErr.userMessage).toBe('O código de autenticação não foi informado.');
+
+      const emptyDocErr = TauriErrorMapper.normalize(
+        'Os dados fornecidos para o documento são inválidos: O número do documento (document_number) não pode ser vazio.',
+        'generate_document'
+      );
+      expect(emptyDocErr.code).toBe('VALIDATION_ERROR');
+      expect(emptyDocErr.userMessage).toBe('O número do documento não pode ficar vazio.');
+      expect(emptyDocErr.technicalMessage).toContain('document_number');
+
+      const emptyAuthErr = TauriErrorMapper.normalize(
+        'Os dados fornecidos para o documento são inválidos: O código de autenticação (auth_code) não pode ser vazio.',
+        'generate_document'
+      );
+      expect(emptyAuthErr.code).toBe('VALIDATION_ERROR');
+      expect(emptyAuthErr.userMessage).toBe('O código de autenticação não pode ficar vazio.');
+
+      const genericDocErr = TauriErrorMapper.normalize(
+        'Os dados fornecidos para o documento são inválidos: Estrutura inválida.',
+        'generate_document'
+      );
+      expect(genericDocErr.code).toBe('VALIDATION_ERROR');
+      expect(genericDocErr.userMessage).toBe(
+        'Os dados fornecidos para gerar o documento são inválidos. Revise as informações e tente novamente.'
+      );
     });
 
     it('deve normalizar acentos e termos em portugues no TauriErrorMapper', () => {

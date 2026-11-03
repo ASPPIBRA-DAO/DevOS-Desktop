@@ -74,9 +74,7 @@ fn generate_document_in_directory(
         .map_err(public_document_error)?;
 
     fs::create_dir_all(download_dir)
-        .map_err(|_| {
-            "Não foi possível preparar o diretório de destino do PDF.".to_string()
-        })?;
+        .map_err(|_| "Não foi possível preparar o diretório de destino do PDF.".to_string())?;
 
     let target_path = download_dir.join(&file_name);
 
@@ -105,7 +103,12 @@ fn generate_document_in_directory(
 /// Retorna mensagens apropriadas para a fronteira IPC sem expor detalhes
 /// internos de serialização, compilação ou sistema de arquivos.
 fn public_document_error(error: DocumentError) -> String {
-    error.public_message().to_string()
+    match &error {
+        DocumentError::ValidationError(detail) => {
+            format!("Os dados fornecidos para o documento são inválidos: {detail}")
+        }
+        _ => error.public_message().to_string(),
+    }
 }
 
 /// Atualmente, apenas os documentos universais são aceitos.
@@ -154,14 +157,10 @@ fn normalize_pdf_file_name(file_name: &str) -> Result<String, String> {
         || file_name == ".."
         || file_name
             .chars()
-            .any(|character| {
-                character.is_control()
-                    || matches!(character, '/' | '\\' | ':')
-            })
+            .any(|character| character.is_control() || matches!(character, '/' | '\\' | ':'))
     {
         return Err(
-            "O nome do arquivo é inválido. Informe apenas um nome de arquivo PDF."
-                .to_string(),
+            "O nome do arquivo é inválido. Informe apenas um nome de arquivo PDF.".to_string(),
         );
     }
 
@@ -169,22 +168,13 @@ fn normalize_pdf_file_name(file_name: &str) -> Result<String, String> {
 
     let mut components = path.components();
 
-    if !matches!(components.next(), Some(Component::Normal(_)))
-        || components.next().is_some()
-    {
-        return Err(
-            "O nome do arquivo deve ser um único componente, sem diretórios."
-                .to_string(),
-        );
+    if !matches!(components.next(), Some(Component::Normal(_))) || components.next().is_some() {
+        return Err("O nome do arquivo deve ser um único componente, sem diretórios.".to_string());
     }
 
     match path.extension().and_then(|extension| extension.to_str()) {
-        Some(extension) if extension.eq_ignore_ascii_case("pdf") => {
-            Ok(file_name.to_string())
-        }
-        Some(_) => Err(
-            "A extensão do arquivo deve ser .pdf.".to_string(),
-        ),
+        Some(extension) if extension.eq_ignore_ascii_case("pdf") => Ok(file_name.to_string()),
+        Some(_) => Err("A extensão do arquivo deve ser .pdf.".to_string()),
         None => Ok(format!("{file_name}.pdf")),
     }
 }
@@ -193,10 +183,7 @@ fn normalize_pdf_file_name(file_name: &str) -> Result<String, String> {
 ///
 /// Se a escrita falhar, tenta remover o arquivo parcial criado por esta
 /// operação, sem expor o caminho do sistema de arquivos pela fronteira IPC.
-fn write_pdf_without_overwrite(
-    target_path: &Path,
-    pdf_bytes: &[u8],
-) -> Result<(), String> {
+fn write_pdf_without_overwrite(target_path: &Path, pdf_bytes: &[u8]) -> Result<(), String> {
     let mut file = OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -205,8 +192,7 @@ fn write_pdf_without_overwrite(
             if error.kind() == std::io::ErrorKind::AlreadyExists {
                 "Já existe um arquivo com esse nome. Escolha outro nome.".to_string()
             } else {
-                "Não foi possível criar o arquivo PDF no diretório de destino."
-                    .to_string()
+                "Não foi possível criar o arquivo PDF no diretório de destino.".to_string()
             }
         })?;
 
@@ -214,9 +200,7 @@ fn write_pdf_without_overwrite(
         drop(file);
         let _ = fs::remove_file(target_path);
 
-        return Err(
-            "Ocorreu uma falha ao gravar o conteúdo do PDF.".to_string(),
-        );
+        return Err("Ocorreu uma falha ao gravar o conteúdo do PDF.".to_string());
     }
 
     Ok(())
@@ -227,9 +211,7 @@ mod tests {
     use super::*;
 
     use crate::modules::reports::models::{
-        CitizenLedgerPayload,
-        InvoiceReportItem,
-        InvoiceReportPayload,
+        CitizenLedgerPayload, InvoiceReportItem, InvoiceReportPayload,
     };
 
     use serde_json::json;
@@ -254,15 +236,11 @@ mod tests {
 
                 match fs::create_dir(&path) {
                     Ok(()) => return Self { path },
-                    Err(error)
-                        if error.kind() == std::io::ErrorKind::AlreadyExists =>
-                    {
+                    Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
                         continue;
                     }
                     Err(error) => {
-                        panic!(
-                            "Não foi possível criar o diretório de teste: {error}"
-                        );
+                        panic!("Não foi possível criar o diretório de teste: {error}");
                     }
                 }
             }
@@ -298,8 +276,7 @@ mod tests {
             Some(result.file_name.as_str())
         );
 
-        let bytes = fs::read(path)
-            .expect("Não foi possível ler o PDF gerado");
+        let bytes = fs::read(path).expect("Não foi possível ler o PDF gerado");
 
         assert!(
             bytes.starts_with(b"%PDF-"),
@@ -357,15 +334,11 @@ mod tests {
         fs::write(&target, b"conteudo-original")
             .expect("Não foi possível preparar o arquivo de teste");
 
-        let result = write_pdf_without_overwrite(
-            &target,
-            b"%PDF-1.7\nconteudo-novo",
-        );
+        let result = write_pdf_without_overwrite(&target, b"%PDF-1.7\nconteudo-novo");
 
         assert!(result.is_err());
 
-        let original = fs::read(&target)
-            .expect("O arquivo original deveria continuar disponível");
+        let original = fs::read(&target).expect("O arquivo original deveria continuar disponível");
 
         assert_eq!(original, b"conteudo-original");
     }
@@ -405,18 +378,11 @@ mod tests {
             target_file_name: Some(unique_name.clone()),
         };
 
-        let result = generate_document_in_directory(
-            payload,
-            directory.path(),
-        )
-        .expect("Falha ao gerar o extrato");
+        let result = generate_document_in_directory(payload, directory.path())
+            .expect("Falha ao gerar o extrato");
 
         assert_eq!(result.file_name, unique_name);
-        assert_valid_result(
-            &result,
-            DocumentKind::CitizenLedger,
-            directory.path(),
-        );
+        assert_valid_result(&result, DocumentKind::CitizenLedger, directory.path());
     }
 
     #[test]
@@ -454,17 +420,127 @@ mod tests {
             target_file_name: Some(unique_name.clone()),
         };
 
-        let result = generate_document_in_directory(
-            payload,
-            directory.path(),
-        )
-        .expect("Falha ao gerar a fatura");
+        let result = generate_document_in_directory(payload, directory.path())
+            .expect("Falha ao gerar a fatura");
 
         assert_eq!(result.file_name, unique_name);
-        assert_valid_result(
-            &result,
-            DocumentKind::InvoiceBill,
-            directory.path(),
-        );
+        assert_valid_result(&result, DocumentKind::InvoiceBill, directory.path());
+    }
+
+    #[test]
+    fn test_generate_document_command_rejects_empty_document_number() {
+        let directory = TestDirectory::new();
+
+        // 1. String vazia
+        let payload_empty = GenerateDocumentPayload {
+            request: DocumentRequest::CessaoPosse(
+                crate::modules::documents::models::CessaoPossePayload {
+                    document_number: "".to_string(),
+                    auth_code: "2026-X7Y9".to_string(),
+                    data: serde_json::json!({}),
+                },
+            ),
+            open_after_export: Some(false),
+            target_file_name: None,
+        };
+
+        let result = generate_document_in_directory(payload_empty, directory.path());
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err();
+        assert!(err_msg.contains("Os dados fornecidos para o documento são inválidos"));
+        assert!(err_msg.contains("document_number"));
+
+        // 2. Whitespace
+        let payload_whitespace = GenerateDocumentPayload {
+            request: DocumentRequest::CessaoPosse(
+                crate::modules::documents::models::CessaoPossePayload {
+                    document_number: "   \t\n".to_string(),
+                    auth_code: "2026-X7Y9".to_string(),
+                    data: serde_json::json!({}),
+                },
+            ),
+            open_after_export: Some(false),
+            target_file_name: None,
+        };
+
+        let res_ws = generate_document_in_directory(payload_whitespace, directory.path());
+        assert!(res_ws.is_err());
+        assert!(res_ws.unwrap_err().contains("document_number"));
+    }
+
+    #[test]
+    fn test_generate_document_command_rejects_empty_auth_code() {
+        let directory = TestDirectory::new();
+
+        // 1. Whitespace
+        let payload_ws = GenerateDocumentPayload {
+            request: DocumentRequest::CessaoPosse(
+                crate::modules::documents::models::CessaoPossePayload {
+                    document_number: "2026-0001/CP".to_string(),
+                    auth_code: "   ".to_string(),
+                    data: serde_json::json!({}),
+                },
+            ),
+            open_after_export: Some(false),
+            target_file_name: None,
+        };
+
+        let result = generate_document_in_directory(payload_ws, directory.path());
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err();
+        assert!(err_msg.contains("Os dados fornecidos para o documento são inválidos"));
+        assert!(err_msg.contains("auth_code"));
+
+        // 2. String vazia
+        let payload_empty = GenerateDocumentPayload {
+            request: DocumentRequest::CessaoPosse(
+                crate::modules::documents::models::CessaoPossePayload {
+                    document_number: "2026-0001/CP".to_string(),
+                    auth_code: "".to_string(),
+                    data: serde_json::json!({}),
+                },
+            ),
+            open_after_export: Some(false),
+            target_file_name: None,
+        };
+
+        let res_empty = generate_document_in_directory(payload_empty, directory.path());
+        assert!(res_empty.is_err());
+        assert!(res_empty.unwrap_err().contains("auth_code"));
+    }
+
+    #[test]
+    fn test_ipc_payload_deserialization_rejects_missing_fields() {
+        // 1. document_number ausente
+        let missing_doc_num = serde_json::json!({
+            "request": {
+                "kind": "cessao_posse",
+                "payload": {
+                    "auth_code": "2026-X7Y9"
+                }
+            }
+        });
+        let res1 = serde_json::from_value::<GenerateDocumentPayload>(missing_doc_num);
+        assert!(res1.is_err());
+        assert!(res1
+            .unwrap_err()
+            .to_string()
+            .contains("missing field `document_number`"));
+
+        // 2. auth_code ausente
+        let missing_auth = serde_json::json!({
+            "request": {
+                "kind": "cessao_posse",
+                "payload": {
+                    "document_number": "2026-0001/CP"
+                }
+            }
+        });
+        let res2 = serde_json::from_value::<GenerateDocumentPayload>(missing_auth);
+        assert!(res2.is_err());
+        assert!(res2
+            .unwrap_err()
+            .to_string()
+            .contains("missing field `auth_code`"));
     }
 }

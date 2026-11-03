@@ -5,6 +5,7 @@ import { isTauri } from '@tauri-apps/api/core';
 
 import {
   generateDocument,
+  DocumentBridgeError,
   type DocumentRequest,
   type GenerateDocumentPayload,
 } from 'src/platform/tauri';
@@ -142,7 +143,7 @@ describe('DocumentBridge — Native Typst Engine IPC Contract', () => {
     expect(result.metadata.sha256_checksum).toBe('mockinvoicehash456');
   });
 
-  it('deve formatar mensagens de erro retornadas pelo Tauri IPC', async () => {
+  it('deve formatar mensagens de erro retornadas pelo Tauri IPC separando mensagem de interface do diagnóstico técnico', async () => {
     mockIpcError('generate_document', 'Permissão negada pela ACL do Tauri');
 
     const payload: GenerateDocumentPayload = {
@@ -167,8 +168,227 @@ describe('DocumentBridge — Native Typst Engine IPC Contract', () => {
       },
     };
 
-    await expect(generateDocument(payload)).rejects.toThrow(
-      '[Rust Core IPC Error] (generate_document): Permissão negada pela ACL do Tauri'
+    try {
+      await generateDocument(payload);
+      expect.unreachable('Deveria ter lançado erro');
+    } catch (err: unknown) {
+      expect(err).toBeInstanceOf(DocumentBridgeError);
+      const bridgeErr = err as DocumentBridgeError;
+      expect(bridgeErr.code).toBe('PERMISSION_DENIED_ERROR');
+      expect(bridgeErr.userMessage).toBe('Permissão negada para executar esta operação.');
+      expect(bridgeErr.message).toBe('Permissão negada para executar esta operação.');
+      expect(bridgeErr.technicalMessage).toContain('Permissão negada pela ACL do Tauri');
+    }
+  });
+
+  it('deve invocar generate_document no Tauri com payload de cessao_posse', async () => {
+    const mockOutput = {
+      success: true,
+      file_path: '/path/contrato_cessao.pdf',
+      file_name: 'contrato_cessao.pdf',
+      message: 'Documento gerado e autenticado com sucesso',
+      metadata: {
+        document_kind: 'cessao_posse' as const,
+        generated_at_utc: '2026-10-25T14:00:00Z',
+        sha256_checksum: 'cessaohash789',
+        byte_size: 16384,
+        template_id: 'contrato_cessao_posse.typ',
+      },
+    };
+
+    mockIpcResponse('generate_document', mockOutput);
+
+    const payload: GenerateDocumentPayload = {
+      request: {
+        kind: 'cessao_posse',
+        payload: {
+          document_number: '2026-0001/CP',
+          auth_code: '2026-X7Y9',
+          data: {
+            cedenteNome: 'João da Silva',
+            cessionarioNome: 'Maria Santos',
+          },
+        },
+      },
+      open_after_export: false,
+    };
+
+    const result = await generateDocument(payload);
+
+    expect(result.metadata.document_kind).toBe('cessao_posse');
+    expect(result.metadata.template_id).toBe('contrato_cessao_posse.typ');
+    expect(result.metadata.sha256_checksum).toBe('cessaohash789');
+  });
+
+  it('deve propagar erro amigável ao usuário quando document_number for vazio, preservando diagnóstico técnico', async () => {
+    mockIpcError(
+      'generate_document',
+      'Os dados fornecidos para o documento são inválidos: O número do documento (document_number) não pode ser vazio.'
     );
+
+    const payload: GenerateDocumentPayload = {
+      request: {
+        kind: 'cessao_posse',
+        payload: {
+          document_number: '',
+          auth_code: '2026-X7Y9',
+        },
+      },
+    };
+
+    try {
+      await generateDocument(payload);
+      expect.unreachable('Deveria ter lançado erro');
+    } catch (err: unknown) {
+      expect(err).toBeInstanceOf(DocumentBridgeError);
+      const bridgeErr = err as DocumentBridgeError;
+      expect(bridgeErr.code).toBe('VALIDATION_ERROR');
+      expect(bridgeErr.userMessage).toBe('O número do documento não pode ficar vazio.');
+      expect(bridgeErr.message).toBe('O número do documento não pode ficar vazio.');
+      expect(bridgeErr.technicalMessage).toContain('O número do documento (document_number) não pode ser vazio.');
+    }
+  });
+
+  it('deve propagar erro amigável ao usuário quando auth_code for vazio, preservando diagnóstico técnico', async () => {
+    mockIpcError(
+      'generate_document',
+      'Os dados fornecidos para o documento são inválidos: O código de autenticação (auth_code) não pode ser vazio.'
+    );
+
+    const payload: GenerateDocumentPayload = {
+      request: {
+        kind: 'cessao_posse',
+        payload: {
+          document_number: '2026-0001/CP',
+          auth_code: '   ',
+        },
+      },
+    };
+
+    try {
+      await generateDocument(payload);
+      expect.unreachable('Deveria ter lançado erro');
+    } catch (err: unknown) {
+      expect(err).toBeInstanceOf(DocumentBridgeError);
+      const bridgeErr = err as DocumentBridgeError;
+      expect(bridgeErr.code).toBe('VALIDATION_ERROR');
+      expect(bridgeErr.userMessage).toBe('O código de autenticação não pode ficar vazio.');
+      expect(bridgeErr.message).toBe('O código de autenticação não pode ficar vazio.');
+      expect(bridgeErr.technicalMessage).toContain('O código de autenticação (auth_code) não pode ser vazio.');
+    }
+  });
+
+  it('deve propagar erro amigável ao usuário quando document_number for apenas espaços em branco', async () => {
+    mockIpcError(
+      'generate_document',
+      'Os dados fornecidos para o documento são inválidos: O número do documento (document_number) não pode ser vazio.'
+    );
+
+    const payload: GenerateDocumentPayload = {
+      request: {
+        kind: 'cessao_posse',
+        payload: {
+          document_number: '   \t  ',
+          auth_code: '2026-X7Y9',
+        },
+      },
+    };
+
+    try {
+      await generateDocument(payload);
+      expect.unreachable('Deveria ter lançado erro');
+    } catch (err: unknown) {
+      expect(err).toBeInstanceOf(DocumentBridgeError);
+      const bridgeErr = err as DocumentBridgeError;
+      expect(bridgeErr.code).toBe('VALIDATION_ERROR');
+      expect(bridgeErr.userMessage).toBe('O número do documento não pode ficar vazio.');
+      expect(bridgeErr.message).toBe('O número do documento não pode ficar vazio.');
+      expect(bridgeErr.technicalMessage).toContain('document_number');
+    }
+  });
+
+  it('deve propagar erro amigável ao usuário quando auth_code for string vazia', async () => {
+    mockIpcError(
+      'generate_document',
+      'Os dados fornecidos para o documento são inválidos: O código de autenticação (auth_code) não pode ser vazio.'
+    );
+
+    const payload: GenerateDocumentPayload = {
+      request: {
+        kind: 'cessao_posse',
+        payload: {
+          document_number: '2026-0001/CP',
+          auth_code: '',
+        },
+      },
+    };
+
+    try {
+      await generateDocument(payload);
+      expect.unreachable('Deveria ter lançado erro');
+    } catch (err: unknown) {
+      expect(err).toBeInstanceOf(DocumentBridgeError);
+      const bridgeErr = err as DocumentBridgeError;
+      expect(bridgeErr.code).toBe('VALIDATION_ERROR');
+      expect(bridgeErr.userMessage).toBe('O código de autenticação não pode ficar vazio.');
+      expect(bridgeErr.message).toBe('O código de autenticação não pode ficar vazio.');
+      expect(bridgeErr.technicalMessage).toContain('auth_code');
+    }
+  });
+
+  it('deve propagar erro amigável ao usuário quando document_number estiver ausente no payload', async () => {
+    mockIpcError(
+      'generate_document',
+      "invalid args `payload`: missing field `document_number` at line 1 column 40"
+    );
+
+    const payload = {
+      request: {
+        kind: 'cessao_posse',
+        payload: {
+          auth_code: '2026-X7Y9',
+        },
+      },
+    } as unknown as GenerateDocumentPayload;
+
+    try {
+      await generateDocument(payload);
+      expect.unreachable('Deveria ter lançado erro');
+    } catch (err: unknown) {
+      expect(err).toBeInstanceOf(DocumentBridgeError);
+      const bridgeErr = err as DocumentBridgeError;
+      expect(bridgeErr.code).toBe('VALIDATION_ERROR');
+      expect(bridgeErr.userMessage).toBe('O número do documento não foi informado. Revise os dados obrigatórios.');
+      expect(bridgeErr.message).toBe('O número do documento não foi informado. Revise os dados obrigatórios.');
+      expect(bridgeErr.technicalMessage).toContain('missing field `document_number`');
+    }
+  });
+
+  it('deve propagar erro amigável ao usuário quando auth_code estiver ausente no payload', async () => {
+    mockIpcError(
+      'generate_document',
+      "invalid args `payload`: missing field `auth_code` at line 1 column 55"
+    );
+
+    const payload = {
+      request: {
+        kind: 'cessao_posse',
+        payload: {
+          document_number: '2026-0001/CP',
+        },
+      },
+    } as unknown as GenerateDocumentPayload;
+
+    try {
+      await generateDocument(payload);
+      expect.unreachable('Deveria ter lançado erro');
+    } catch (err: unknown) {
+      expect(err).toBeInstanceOf(DocumentBridgeError);
+      const bridgeErr = err as DocumentBridgeError;
+      expect(bridgeErr.code).toBe('VALIDATION_ERROR');
+      expect(bridgeErr.userMessage).toBe('O código de autenticação não foi informado.');
+      expect(bridgeErr.message).toBe('O código de autenticação não foi informado.');
+      expect(bridgeErr.technicalMessage).toContain('missing field `auth_code`');
+    }
   });
 });

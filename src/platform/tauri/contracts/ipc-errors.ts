@@ -20,6 +20,8 @@ export type IpcErrorCode =
 export interface SerializedIpcError {
   code: IpcErrorCode;
   message: string;
+  technicalMessage?: string;
+  userMessage?: string;
   command?: string;
   timestamp: string;
 }
@@ -71,7 +73,8 @@ const CREDENTIAL_PATTERN =
  * Representa um erro normalizado da comunicação IPC.
  *
  * A mensagem é sanitizada antes de ser disponibilizada por meio
- * da propriedade Error.message.
+ * da propriedade Error.message. Separa a mensagem técnica (diagnóstico)
+ * da mensagem amigável para o usuário final.
  */
 export class IpcError extends Error {
   public readonly code: IpcErrorCode;
@@ -80,10 +83,15 @@ export class IpcError extends Error {
 
   public readonly timestamp: string;
 
+  public readonly technicalMessage: string;
+
+  public readonly userMessage: string;
+
   constructor(
     message: string,
     code: IpcErrorCode = 'UNKNOWN_ERROR',
-    command?: string
+    command?: string,
+    userMessage?: string
   ) {
     const sanitizedMessage = IpcError.sanitizeMessage(message);
 
@@ -93,6 +101,8 @@ export class IpcError extends Error {
     this.code = code;
     this.command = command;
     this.timestamp = new Date().toISOString();
+    this.technicalMessage = sanitizedMessage;
+    this.userMessage = userMessage || sanitizedMessage;
   }
 
   /**
@@ -151,6 +161,8 @@ export class IpcError extends Error {
     return {
       code: this.code,
       message: this.message,
+      technicalMessage: this.technicalMessage,
+      userMessage: this.userMessage,
       ...(this.command !== undefined ? { command: this.command } : {}),
       timestamp: this.timestamp,
     };
