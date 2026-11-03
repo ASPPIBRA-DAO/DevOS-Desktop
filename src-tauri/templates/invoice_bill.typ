@@ -17,7 +17,7 @@
       #grid(
         columns: (1.5fr, 1fr, 1.5fr),
         align: (left, center, right),
-        text(size: 6.5pt, fill: rgb("#718096"))[ASPPIBRA DAO • CNPJ: 48.293.109/0001-84],
+        text(size: 6.5pt, fill: rgb("#718096"))[ASPPIBRA DAO • CNPJ: 26.325.396/0001-30],
         text(size: 7pt, weight: "bold", fill: rgb("#10B981"))[Página #i de #n],
         text(size: 6.5pt, fill: rgb("#718096"))[Autenticação Edge Cloudflare D1],
       )
@@ -42,7 +42,7 @@
       #text(size: 16pt, weight: "bold", fill: rgb("#10B981"))[DAO]
     ] \
     #v(2pt)
-    #text(size: 7.5pt, fill: rgb("#718096"))[Associação dos Proprietários e Parceiros do Brasil] \
+    #text(size: 7.5pt, fill: rgb("#718096"))[Associação dos Proprietários e Posseiros de Imóveis no Brasil] \
     #text(size: 7pt, fill: rgb("#718096"))[Tesouraria Central e Controle de Faturamento Descentralizado]
   ],
   [
