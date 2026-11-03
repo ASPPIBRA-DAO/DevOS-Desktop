@@ -10,9 +10,13 @@
 #let get_val(key, default_val) = {
   if type(cdata) == dictionary and key in cdata {
     let v = cdata.at(key)
-    if v != none and str(v) != "" { str(v) } else { default_val }
+    if v != none and str(v) != "" and str(v) != default_val {
+      asppibra_tag(default_val, str(v))
+    } else {
+      asppibra_tag(default_val, none)
+    }
   } else {
-    default_val
+    asppibra_tag(default_val, none)
   }
 }
 
@@ -23,69 +27,14 @@
 
 #set page(
   paper: "a4",
-  margin: (top: 2.4cm, bottom: 2.2cm, left: 3cm, right: 2cm),
+  margin: (top: 2.5cm, bottom: 2.2cm, left: 3cm, right: 2cm),
   header: context {
     let i = counter(page).get().first()
-    if i == 1 {
-      // CABEÇALHO OFICIAL DA PRIMEIRA PÁGINA
-      block(width: 100%, inset: (bottom: 4pt))[
-        #grid(
-          columns: (1fr, auto),
-          align: (left + horizon, right + horizon),
-          [
-            #text(size: 13pt, weight: "bold", fill: rgb("#111827"))[ASPPIBRA-DAO] \
-            #v(1pt)
-            #text(size: 7pt, fill: rgb("#6B7280"), weight: "bold")[DOCUMENTO OFICIAL • PROTOCOLO DE REGULARIZAÇÃO]
-          ],
-          [
-            #rect(
-              fill: rgb("#F9FAFB"),
-              stroke: 1pt + rgb("#E5E7EB"),
-              radius: 3pt,
-              inset: (x: 8pt, y: 4pt),
-              [
-                #align(right)[
-                  #text(size: 6pt, weight: "bold", fill: rgb("#4B5563"))[Nº DE REGISTRO] \
-                  #text(size: 9.5pt, weight: "bold", fill: rgb("#111827"), font: "monospace")[#doc_number]
-                ]
-              ]
-            )
-          ]
-        )
-        #v(3pt)
-        #line(length: 100%, stroke: 2pt + rgb("#111827"))
-        #v(-3pt)
-        #line(length: 100%, stroke: 1pt + rgb("#D4AF37"))
-      ]
-    } else {
-      // CABEÇALHO CORRIDO LEVE NAS PÁGINAS SEGUINTES
-      grid(
-        columns: (1fr, 1fr),
-        align: (left, right),
-        text(size: 7pt, fill: rgb("#6B7280"), weight: "bold")[ASPPIBRA-DAO • Contrato de Cessão de Posse de Imóvel],
-        text(size: 7pt, fill: rgb("#111827"), font: "monospace", weight: "bold")[Nº #doc_number],
-      )
-      v(-2pt)
-      line(length: 100%, stroke: 0.5pt + rgb("#E5E7EB"))
+    if i > 1 {
+      asppibra_header_running(doc_number: doc_number, doc_title: "Contrato de Cessão de Posse de Imóvel")
     }
   },
-  footer: context {
-    let i = counter(page).get().first()
-    let n = counter(page).final().first()
-    
-    // RODAPÉ OFICIAL UNIFICADO
-    block(width: 100%, stroke: (top: 1.5pt + rgb("#111827")), inset: (top: 3pt))[
-      #line(length: 100%, stroke: 0.75pt + rgb("#D4AF37"))
-      #v(2pt)
-      #grid(
-        columns: (1.6fr, 1fr, 1.4fr),
-        align: (left + horizon, center + horizon, right + horizon),
-        text(size: 6.5pt, fill: rgb("#4B5563"))[Autenticação Digital • Lei Federal 14.063/2020 • ICP-Brasil / DAO],
-        text(size: 7.5pt, weight: "bold", fill: rgb("#0A3B18"))[Página #i de #n],
-        text(size: 6.5pt, fill: rgb("#4B5563"))[ASPPIBRA DAO • Cód: #text(weight: "bold", fill: rgb("#111827"))[#auth_code]],
-      )
-    ]
-  }
+  footer: asppibra_footer(doc_number: doc_number, auth_code: auth_code),
 )
 
 #set text(
@@ -107,6 +56,13 @@
   v(3pt)
 }
 
+// ====================================================================
+// CABEÇALHO OFICIAL PRINCIPAL (1ª Página)
+// ====================================================================
+#asppibra_header_first_page(doc_number: doc_number)
+
+#v(10pt)
+
 // TÍTULO DO INSTRUMENTO
 #align(center)[
   #text(size: 11pt, weight: "bold", fill: rgb("#111827"))[
@@ -121,11 +77,11 @@
 // ====================================================================
 #section_heading("CAPÍTULO I – DAS PARTES")
 
-1.1. *CEDENTE:* #text(fill: rgb("#0A3B18"), weight: "bold")[#get_val("cedenteNome", "NOME COMPLETO DO CEDENTE")], #get_val("cedenteNacionalidade", "nacionalidade"), maior e capaz, estado civil #get_val("cedenteEstadoCivil", "estado civil"), profissão #get_val("cedenteProfissao", "profissão"), portador(a) da Carteira de Identidade (RG) nº #get_val("cedenteRg", "número do RG"), órgão expedidor #get_val("cedenteRgOrgaoUf", "órgão e UF"), inscrito(a) no CPF sob o nº #get_val("cedenteCpf", "número do CPF"), residente e domiciliado(a) na #get_val("cedenteEndereco", "endereço completo com CEP"), endereço eletrônico (e-mail): #get_val("cedenteEmail", "e-mail do cedente") e telefone/WhatsApp: #get_val("cedenteTelefone", "telefone com DDD"), doravante denominado(a) simplesmente *CEDENTE*.
+1.1. *CEDENTE:* #get_val("cedenteNome", "NOME COMPLETO DO CEDENTE"), #get_val("cedenteNacionalidade", "nacionalidade"), maior e capaz, estado civil #get_val("cedenteEstadoCivil", "estado civil"), profissão #get_val("cedenteProfissao", "profissão"), portador(a) da Carteira de Identidade (RG) nº #get_val("cedenteRg", "número do RG"), órgão expedidor #get_val("cedenteRgOrgaoUf", "órgão e UF"), inscrito(a) no CPF sob o nº #get_val("cedenteCpf", "número do CPF"), residente e domiciliado(a) na #get_val("cedenteEndereco", "endereço completo com CEP"), endereço eletrônico (e-mail): #get_val("cedenteEmail", "e-mail do cedente") e telefone/WhatsApp: #get_val("cedenteTelefone", "telefone com DDD"), doravante denominado(a) simplesmente *CEDENTE*.
 
 1.2. *CÔNJUGE / COMPANHEIRO(A) DO CEDENTE:* #get_val("conjugeNome", "NOME COMPLETO DO CÔNJUGE/COMPANHEIRO(A)"), #get_val("conjugeNacionalidade", "nacionalidade"), maior e capaz, estado civil #get_val("conjugeEstadoCivil", "estado civil"), profissão #get_val("conjugeProfissao", "profissão"), portador(a) da Carteira de Identidade (RG) nº #get_val("conjugeRg", "número do RG"), órgão expedidor #get_val("conjugeRgOrgaoUf", "órgão e UF"), inscrito(a) no CPF/MF sob o nº #get_val("conjugeCpf", "número do CPF"), residente e domiciliado(a) na #get_val("conjugeEndereco", "endereço completo com CEP"), endereço eletrônico (e-mail): #get_val("conjugeEmail", "e-mail do cônjuge") e telefone/WhatsApp: #get_val("conjugeTelefone", "telefone com DDD"), na qualidade de *OUTORGANTE UXÓRIO / MARITAL / ANUENTE*.
 
-1.3. *CESSIONÁRIO(A):* #text(fill: rgb("#0A3B18"), weight: "bold")[#get_val("cessionarioNome", "NOME DO CESSIONÁRIO")], #get_val("cessionarioNacionalidade", "nacionalidade"), maior e capaz, estado civil #get_val("cessionarioEstadoCivil", "estado civil"), profissão #get_val("cessionarioProfissao", "profissão"), portador(a) da Carteira de Identidade (RG) nº #get_val("cessionarioRg", "RG do cessionário"), órgão expedidor #get_val("cessionarioRgOrgaoUf", "órgão e UF do cessionário"), inscrito(a) no CPF sob o nº #get_val("cessionarioCpf", "CPF do cessionário"), residente e domiciliado(a) em #get_val("cessionarioEndereco", "endereço completo do cessionário, com CEP"), e-mail: #get_val("cessionarioEmail", "e-mail do cessionário") e telefone/WhatsApp: #get_val("cessionarioTelefone", "telefone do cessionário"), doravante denominado(a) simplesmente *CESSIONÁRIO(A)*.
+1.3. *CESSIONÁRIO(A):* #get_val("cessionarioNome", "NOME DO CESSIONÁRIO"), #get_val("cessionarioNacionalidade", "nacionalidade"), maior e capaz, estado civil #get_val("cessionarioEstadoCivil", "estado civil"), profissão #get_val("cessionarioProfissao", "profissão"), portador(a) da Carteira de Identidade (RG) nº #get_val("cessionarioRg", "RG do cessionário"), órgão expedidor #get_val("cessionarioRgOrgaoUf", "órgão e UF do cessionário"), inscrito(a) no CPF sob o nº #get_val("cessionarioCpf", "CPF do cessionário"), residente e domiciliado(a) em #get_val("cessionarioEndereco", "endereço completo do cessionário, com CEP"), e-mail: #get_val("cessionarioEmail", "e-mail do cessionário") e telefone/WhatsApp: #get_val("cessionarioTelefone", "telefone do cessionário"), doravante denominado(a) simplesmente *CESSIONÁRIO(A)*.
 
 1.4. Em caso de pluralidade de cessionários, estes serão doravante denominados em conjunto *CESSIONÁRIOS*, respondendo cada um individualmente pela parte do imóvel que lhe for especificamente cedida nos termos do Capítulo III, sem solidariedade entre si quanto às obrigações de pagamento relativas à parte de outrem, salvo disposição expressa em contrário, ressalvada a hipótese de cessionários unidos entre si por casamento ou união estável sob regime de bens que implique comunhão, caso em que a responsabilidade pelas obrigações de pagamento observará as regras do respectivo regime de bens, independentemente da regra de ausência de solidariedade prevista nesta Cláusula.
 
@@ -179,7 +135,7 @@
         text(weight: "bold", size: 7.5pt)[Instituição / Banco:], text(size: 7.5pt)[#get_val("asppibraBanco", "403 - Cora SCD")],
         text(weight: "bold", size: 7.5pt)[Agência e Conta:], text(size: 7.5pt)[Agência: #get_val("asppibraAgencia", "0001") | Conta: #get_val("asppibraConta", "6193441-3")],
         text(weight: "bold", size: 7.5pt)[Titular / CNPJ:], text(size: 7.5pt)[ASPPIBRA (CNPJ: 26.325.396/0001-30)],
-        text(weight: "bold", size: 7.5pt)[Chave Pix Oficial:], text(size: 7.5pt, font: "monospace", weight: "bold", fill: rgb("#0A3B18"))[#get_val("asppibraChavePix", "26.325.396/0001-30 (CNPJ)")],
+        text(weight: "bold", size: 7.5pt)[Chave Pix Oficial:], text(size: 7.5pt, font: "monospace", weight: "bold", fill: rgb("#111827"))[#get_val("asppibraChavePix", "26.325.396/0001-30 (CNPJ)")],
       )
     ]
   ]

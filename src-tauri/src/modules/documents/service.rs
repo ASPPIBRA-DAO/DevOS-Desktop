@@ -20,6 +20,9 @@ static CONTRATO_CESSAO_TEMPLATE: &str =
 static RECONCILIATION_TEMPLATE: &str =
     include_str!("../../../templates/real_estate_reconciliation.typ");
 
+static ASPPIBRA_LAYOUT: &str =
+    include_str!("../../../templates/asppibra_layout.typ");
+
 static ROBOTO_REGULAR: &[u8] =
     include_bytes!("../../../assets/fonts/Roboto-Regular.ttf");
 
@@ -105,8 +108,16 @@ impl DocumentRenderer for DocumentsService {
         let mut string_inputs = HashMap::new();
         string_inputs.insert("data", json_payload);
 
+        let merged_template;
+        let final_template_source = if matches!(kind, DocumentKind::CessaoPosse) {
+            merged_template = format!("{ASPPIBRA_LAYOUT}\n{template_source}");
+            &merged_template
+        } else {
+            template_source
+        };
+
         let options = TypstCompileOptions {
-            template_source,
+            template_source: final_template_source,
             fonts: &[ROBOTO_REGULAR, ROBOTO_BOLD],
             string_inputs,
         };

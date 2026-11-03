@@ -131,4 +131,43 @@ mod tests {
             "Esperava CompilationFailed, mas recebeu: {error:?}"
         );
     }
+
+    #[test]
+    fn test_compile_typst_with_svg() {
+        let template = r#"
+        #set page(paper: "a4")
+        #let svg_str = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"32\" height=\"32\" viewBox=\"0 0 100 100\"><circle cx=\"50\" cy=\"50\" r=\"40\" fill=\"black\"/></svg>"
+        #image(bytes(svg_str), width: 24pt)
+        Teste de SVG embutido
+        "#;
+        let options = TypstCompileOptions {
+            template_source: template,
+            fonts: &[],
+            string_inputs: HashMap::new(),
+        };
+
+        let bytes = compile_typst_document(options).expect("Falha ao compilar Typst com SVG");
+        assert_valid_pdf_header(&bytes);
+    }
+
+    #[test]
+    fn test_compile_typst_with_import() {
+        // Testa se typst-as-lib tem suporte a múltiplos arquivos ou se concatenação/injeção é o padrão
+        let layout = r#"
+        #let saudacao(nome) = [Olá, #nome!]
+        "#;
+        let template = r#"
+        #set page(paper: "a4")
+        #saudacao("ASPPIBRA")
+        "#;
+        let combined = format!("{layout}\n{template}");
+        let options = TypstCompileOptions {
+            template_source: &combined,
+            fonts: &[],
+            string_inputs: HashMap::new(),
+        };
+
+        let bytes = compile_typst_document(options).expect("Falha ao compilar");
+        assert_valid_pdf_header(&bytes);
+    }
 }
