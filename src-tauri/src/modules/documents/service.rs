@@ -6,6 +6,7 @@ use crate::modules::documents::models::{
     DocumentError, DocumentKind, DocumentMetadata, DocumentOutput, DocumentRequest, DocumentScope,
 };
 use crate::modules::documents::ports::DocumentRenderer;
+use crate::platform::typst_engine::RenderedPagePreview;
 
 /// Serviço orquestrador para geração, autorização, validação e integridade de documentos canônicos.
 ///
@@ -77,6 +78,16 @@ impl DocumentsService {
         &self,
         request: DocumentRequest,
     ) -> Result<DocumentOutput, DocumentError> {
+        self.generate_document_with_pages(request)
+            .map(|(output, _)| output)
+    }
+
+    /// Gera o documento canônico com validação, autorização de escopo e cálculo de SHA-256,
+    /// retornando tanto o `DocumentOutput` quanto as páginas vetoriais para visualização interna.
+    pub fn generate_document_with_pages(
+        &self,
+        request: DocumentRequest,
+    ) -> Result<(DocumentOutput, Vec<RenderedPagePreview>), DocumentError> {
         // 1. Validação estrita das regras de domínio e integridade do payload
         request.validate()?;
 
@@ -109,10 +120,13 @@ impl DocumentsService {
             template_id: kind.template_id().to_string(),
         };
 
-        Ok(DocumentOutput {
-            pdf_bytes: rendered.pdf_bytes,
-            metadata,
-        })
+        Ok((
+            DocumentOutput {
+                pdf_bytes: rendered.pdf_bytes,
+                metadata,
+            },
+            rendered.pages,
+        ))
     }
 }
 
@@ -644,26 +658,18 @@ mod tests {
         // 1. Edição Cockpit (CockpitOnly): aceita Universal e CockpitOnly
         let cockpit_service =
             DocumentsService::with_scope(mock.clone(), DocumentScope::CockpitOnly);
-        assert!(
-            cockpit_service
-                .generate_document(ledger_req.clone())
-                .is_ok()
-        );
-        assert!(
-            cockpit_service
-                .generate_document(invoice_req.clone())
-                .is_ok()
-        );
-        assert!(
-            cockpit_service
-                .generate_document(cessao_req.clone())
-                .is_ok()
-        );
-        assert!(
-            cockpit_service
-                .generate_document(reconciliation_req.clone())
-                .is_ok()
-        );
+        assert!(cockpit_service
+            .generate_document(ledger_req.clone())
+            .is_ok());
+        assert!(cockpit_service
+            .generate_document(invoice_req.clone())
+            .is_ok());
+        assert!(cockpit_service
+            .generate_document(cessao_req.clone())
+            .is_ok());
+        assert!(cockpit_service
+            .generate_document(reconciliation_req.clone())
+            .is_ok());
         assert_eq!(mock.invocations(), 4);
 
         // 2. Edição Node (NodeOnly): aceita Universal (CitizenLedger, InvoiceBill),

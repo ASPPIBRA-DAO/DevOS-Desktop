@@ -56,6 +56,8 @@ macro_rules! app_invoke_handler {
             commands::fetch_wallet_balance,
             commands::batch_fetch_wallet_balances,
             commands::generate_document,
+            commands::preview_document,
+            commands::export_previewed_document,
             commands::get_ipfs_daemon_status,
             commands::execute_storage_proof,
             commands::ipfs_upload_file,

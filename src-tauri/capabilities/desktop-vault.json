@@ -22,6 +22,8 @@
     "allow-fetch-wallet-balance",
     "allow-batch-fetch-wallet-balances",
     "allow-generate-document",
+    "allow-preview-document",
+    "allow-export-previewed-document",
     "allow-get-ipfs-daemon-status",
     "allow-execute-storage-proof",
     "allow-ipfs-upload-file",

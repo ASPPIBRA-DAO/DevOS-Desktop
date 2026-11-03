@@ -1,5 +1,8 @@
 import type {
+  ExportPreviewPayload,
+  DocumentPreviewResult,
   GenerateDocumentResult,
+  PreviewDocumentPayload,
   GenerateDocumentPayload,
 } from '../contracts/document-contracts';
 
@@ -41,7 +44,7 @@ export class DocumentBridgeError extends Error {
  * ASPPIBRA DevOS — Document Bridge (Typst Engine)
  *
  * Provê interface desacoplada para invocar a compilação nativa de documentos
- * com hash Keccak-256 e salvamento local através do Tauri v2.
+ * com integridade SHA-256 e salvamento local através do Tauri v2.
  */
 export async function generateDocument(
   payload: GenerateDocumentPayload
@@ -68,6 +71,74 @@ export async function generateDocument(
       technicalDetail,
       normalized.code,
       'generate_document'
+    );
+  }
+}
+
+/**
+ * Compila o documento Typst em memória no backend e retorna o preview do PDF
+ * com SHA-256 e páginas vetoriais para renderização no visualizador interno.
+ * Não grava em disco e não abre visualizadores externos do SO.
+ */
+export async function previewDocument(
+  payload: PreviewDocumentPayload
+): Promise<DocumentPreviewResult> {
+  try {
+    return await invokeNative<DocumentPreviewResult>('preview_document', {
+      payload,
+    });
+  } catch (err: unknown) {
+    if (err instanceof DocumentBridgeError) {
+      throw err;
+    }
+
+    const normalized = TauriErrorMapper.normalize(err, 'preview_document');
+    const technicalDetail =
+      err instanceof IpcError
+        ? err.technicalMessage
+        : err instanceof Error
+          ? err.message
+          : normalized.technicalMessage;
+
+    throw new DocumentBridgeError(
+      normalized.userMessage,
+      technicalDetail,
+      normalized.code,
+      'preview_document'
+    );
+  }
+}
+
+/**
+ * Exporta em disco exatamente os mesmos bytes de um PDF previamente visualizado,
+ * validando o ID do preview e a igualdade estrita do SHA-256.
+ * Nunca recompila o documento no momento da exportação.
+ */
+export async function exportPreviewedDocument(
+  payload: ExportPreviewPayload
+): Promise<GenerateDocumentResult> {
+  try {
+    return await invokeNative<GenerateDocumentResult>('export_previewed_document', {
+      payload,
+    });
+  } catch (err: unknown) {
+    if (err instanceof DocumentBridgeError) {
+      throw err;
+    }
+
+    const normalized = TauriErrorMapper.normalize(err, 'export_previewed_document');
+    const technicalDetail =
+      err instanceof IpcError
+        ? err.technicalMessage
+        : err instanceof Error
+          ? err.message
+          : normalized.technicalMessage;
+
+    throw new DocumentBridgeError(
+      normalized.userMessage,
+      technicalDetail,
+      normalized.code,
+      'export_previewed_document'
     );
   }
 }

@@ -1,4 +1,5 @@
 import type { Theme } from '@mui/material/styles';
+import type { DocumentPreviewResult } from 'src/platform/tauri';
 
 import { useState } from 'react';
 
@@ -16,6 +17,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import { fDate, fNumber } from 'src/shared/utils';
 import { toast } from 'src/shared/components/snackbar';
 import { Iconify } from 'src/shared/components/iconify';
+import { PdfViewerLayout } from 'src/shared/components/abnt-document';
 
 import { useGetCitizenLedger } from '../../hooks/treasury-hooks';
 import { AssociateSearchCard } from '../components/associate-search-card';
@@ -26,6 +28,8 @@ import { FinancialTransactionsTable } from '../components/financial-transactions
 import {
   exportCitizenLedgerPdf,
   printCitizenLedgerHtml,
+  previewCitizenLedgerPdf,
+  exportPreviewedCitizenLedgerPdf,
   type ExportCitizenLedgerPdfPayload,
 } from '../../../services/ledger-export-service';
 
@@ -36,6 +40,8 @@ export function CitizenLedgerView() {
   const [searchQuery, setSearchQuery] = useState('');
   const [openPreview, setOpenPreview] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [pdfPreview, setPdfPreview] = useState<DocumentPreviewResult | null>(null);
 
   const [selectedCitizenId, setSelectedCitizenId] = useState<string | null>('10');
 
@@ -79,75 +85,100 @@ export function CitizenLedgerView() {
       return timeA - timeB;
     });
 
+  const buildLedgerPayload = (): ExportCitizenLedgerPdfPayload => {
+    const totalInflow = dataFiltered
+      .filter((tx: any) => tx.direction === 'inbound' || tx.type === 'income')
+      .reduce((acc: number, tx: any) => acc + (Number(tx.amount) || 0), 0);
+
+    const contractTotal = profile?.contract?.contractedAmount || 65000;
+    const totalPaid = profile?.contract?.paidAmount ?? totalInflow;
+    const outstandingBalance = profile?.contract?.openAmount ?? Math.max(0, contractTotal - totalPaid);
+
+    return {
+      associate_id: profile?.associate.id,
+      open_after_export: true,
+      data: {
+        meta: {
+          generated_at: fDate(new Date(), 'DD/MM/YYYY'),
+          reference_period: fDate(new Date(), 'YYYY-MM-A4'),
+          audit_hash: `d1_sha256_${profile?.associate.id || 'extrato'}_ledger`,
+        },
+        associate: {
+          id: profile?.associate.id || '10',
+          name: profile?.associate.name || 'ANDRESSA DE LIMA FERREIRA',
+          cpf: profile?.associate.cpf || '173.793.567-80',
+          email: profile?.associate.email || 'contato@asppibra.org.br',
+          avatar_letter: profile?.associate.name?.charAt(0) || 'A',
+          address_line1: 'Rua Palmira F. De Carvalho, lote 05, Quadra D',
+          address_line2: 'São José de Imbassaí, Maricá - RJ, 24912-000',
+        },
+        summary: {
+          total_contracted: fNumber(contractTotal),
+          total_paid: fNumber(totalPaid),
+          outstanding_balance: fNumber(outstandingBalance),
+        },
+        transactions: dataFiltered.map((row: any) => {
+          const isOutbound = row.direction === 'outbound';
+          const statusLabel =
+            row.status === 'confirmed'
+              ? 'Concluído'
+              : row.amount === 0 || row.category === 'Falta de Pagamento'
+              ? 'Falta Pgto'
+              : row.status === 'pending'
+              ? 'Pendente'
+              : 'Inadimplente';
+
+          const statusVariant =
+            row.status === 'confirmed'
+              ? 'confirmed'
+              : row.amount === 0 || row.category === 'Falta de Pagamento'
+              ? 'danger'
+              : 'muted';
+
+          return {
+            date: fDate(row.created_at, 'DD/MM/YYYY'),
+            counterparty: row.counterparty_name || 'N/A',
+            origin: row.origin_institution || 'N/A',
+            destination: row.destination_institution || 'N/A',
+            amount: fNumber(row.amount, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+            direction: isOutbound ? 'outbound' : 'inbound',
+            status_label: statusLabel,
+            status_variant: statusVariant,
+          };
+        }),
+      },
+    };
+  };
+
+  const handleOpenPreview = async () => {
+    if (!profile) return;
+    setOpenPreview(true);
+    setPreviewLoading(true);
+    try {
+      const payload = buildLedgerPayload();
+      const res = await previewCitizenLedgerPdf(payload);
+      setPdfPreview(res);
+      toast.success('Visualização nativa do PDF compilada via Typst Engine!');
+    } catch (err: any) {
+      console.warn('Fallback para visualização ABNT:', err);
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
   const handleExportPdf = async () => {
     if (!profile) return;
 
     try {
       setExporting(true);
 
-      const totalInflow = dataFiltered
-        .filter((tx: any) => tx.direction === 'inbound' || tx.type === 'income')
-        .reduce((acc: number, tx: any) => acc + (Number(tx.amount) || 0), 0);
+      if (pdfPreview?.preview_id && pdfPreview.metadata.sha256_checksum) {
+        const result = await exportPreviewedCitizenLedgerPdf(pdfPreview);
+        toast.success(`Relatório verificado e exportado com sucesso! Arquivo: ${result.file_name || result.file_path}`);
+        return;
+      }
 
-      const contractTotal = profile?.contract?.contractedAmount || 65000;
-      const totalPaid = profile?.contract?.paidAmount ?? totalInflow;
-      const outstandingBalance = profile?.contract?.openAmount ?? Math.max(0, contractTotal - totalPaid);
-
-      const payload: ExportCitizenLedgerPdfPayload = {
-        associate_id: profile.associate.id,
-        open_after_export: true,
-        data: {
-          meta: {
-            generated_at: fDate(new Date(), 'DD/MM/YYYY'),
-            reference_period: fDate(new Date(), 'YYYY-MM-A4'),
-            audit_hash: `d1_sha256_${profile.associate.id}_ledger`,
-          },
-          associate: {
-            id: profile.associate.id,
-            name: profile.associate.name || 'ANDRESSA DE LIMA FERREIRA',
-            cpf: profile.associate.cpf || '173.793.567-80',
-            email: profile.associate.email || 'contato@asppibra.org.br',
-            avatar_letter: profile.associate.name?.charAt(0) || 'A',
-            address_line1: 'Rua Palmira F. De Carvalho, lote 05, Quadra D',
-            address_line2: 'São José de Imbassaí, Maricá - RJ, 24912-000',
-          },
-          summary: {
-            total_contracted: fNumber(contractTotal),
-            total_paid: fNumber(totalPaid),
-            outstanding_balance: fNumber(outstandingBalance),
-          },
-          transactions: dataFiltered.map((row: any) => {
-            const isOutbound = row.direction === 'outbound';
-            const statusLabel =
-              row.status === 'confirmed'
-                ? 'Concluído'
-                : row.amount === 0 || row.category === 'Falta de Pagamento'
-                ? 'Falta Pgto'
-                : row.status === 'pending'
-                ? 'Pendente'
-                : 'Inadimplente';
-
-            const statusVariant =
-              row.status === 'confirmed'
-                ? 'confirmed'
-                : row.amount === 0 || row.category === 'Falta de Pagamento'
-                ? 'danger'
-                : 'muted';
-
-            return {
-              date: fDate(row.created_at, 'DD/MM/YYYY'),
-              counterparty: row.counterparty_name || 'N/A',
-              origin: row.origin_institution || 'N/A',
-              destination: row.destination_institution || 'N/A',
-              amount: fNumber(row.amount, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-              direction: isOutbound ? 'outbound' : 'inbound',
-              status_label: statusLabel,
-              status_variant: statusVariant,
-            };
-          }),
-        },
-      };
-
+      const payload = buildLedgerPayload();
       const result = await exportCitizenLedgerPdf(payload, profileToRender, dataFiltered);
       toast.success(`Relatório compilado com sucesso! Arquivo: ${result.file_name || result.file_path}`);
     } catch (err: any) {
@@ -165,10 +196,16 @@ export function CitizenLedgerView() {
             <Button
               variant="outlined"
               color="inherit"
-              startIcon={<Iconify icon={'solar:eye-bold' as any} />}
-              onClick={() => setOpenPreview(true)}
+              startIcon={
+                previewLoading ? (
+                  <CircularProgress size={16} color="inherit" />
+                ) : (
+                  <Iconify icon={'solar:eye-bold' as any} />
+                )
+              }
+              onClick={handleOpenPreview}
               sx={{ borderRadius: 1.5 }}
-              disabled={!profile}
+              disabled={!profile || previewLoading}
             >
               Visualizar Extrato A4
             </Button>
@@ -317,13 +354,23 @@ export function CitizenLedgerView() {
             bgcolor: (theme) => (theme.palette.mode === 'dark' ? '#0b0f19' : '#e2e8f0'),
           }}
         >
-          <Box sx={{ maxWidth: 860, mx: 'auto', my: 2 }}>
-            <FinancialHistoryPrint
-              transactions={dataFiltered}
-              profile={profileToRender}
-              preview
+          {pdfPreview ? (
+            <PdfViewerLayout
+              documentTitle={`Extrato_${profile?.associate.id || 'Associado'}`}
+              preview={pdfPreview}
+              onBack={() => setOpenPreview(false)}
+              onExport={handleExportPdf}
+              isExporting={exporting}
             />
-          </Box>
+          ) : (
+            <Box sx={{ maxWidth: 860, mx: 'auto', my: 2 }}>
+              <FinancialHistoryPrint
+                transactions={dataFiltered}
+                profile={profileToRender}
+                preview
+              />
+            </Box>
+          )}
         </DialogContent>
       </Dialog>
     </>

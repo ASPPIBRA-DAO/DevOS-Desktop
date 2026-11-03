@@ -4,9 +4,13 @@ import { it, expect, describe } from 'vitest';
 import { isTauri } from '@tauri-apps/api/core';
 
 import {
+  previewDocument,
   generateDocument,
   DocumentBridgeError,
   type DocumentRequest,
+  exportPreviewedDocument,
+  type ExportPreviewPayload,
+  type PreviewDocumentPayload,
   type GenerateDocumentPayload,
 } from 'src/platform/tauri';
 
@@ -390,5 +394,83 @@ describe('DocumentBridge — Native Typst Engine IPC Contract', () => {
       expect(bridgeErr.message).toBe('O código de autenticação não foi informado.');
       expect(bridgeErr.technicalMessage).toContain('missing field `auth_code`');
     }
+  });
+
+  it('deve invocar preview_document no Tauri com payload de cessao_posse retornando páginas e SHA-256', async () => {
+    const mockPreviewResult = {
+      success: true,
+      preview_id: 'prev-uuid-1234',
+      pdf_base64: 'JVBERi0xLjcK',
+      page_count: 1,
+      pages: [
+        {
+          page_number: 1,
+          width_pt: 595,
+          height_pt: 842,
+          svg_base64: 'PHN2Zz48L3N2Zz4=',
+        },
+      ],
+      created_at_utc: '2026-11-03T14:00:00Z',
+      expires_at_utc: '2026-11-03T14:30:00Z',
+      message: 'Visualização gerada com sucesso.',
+      metadata: {
+        document_kind: 'cessao_posse' as const,
+        generated_at_utc: '2026-11-03T14:00:00Z',
+        sha256_checksum: 'a'.repeat(64),
+        byte_size: 1024,
+        template_id: 'contrato_cessao_posse.typ',
+      },
+    };
+
+    mockIpcResponse('preview_document', mockPreviewResult);
+
+    const payload: PreviewDocumentPayload = {
+      request: {
+        kind: 'cessao_posse',
+        payload: {
+          document_number: '2026-0001/CP',
+          auth_code: '2026-X7Y9',
+        },
+      },
+    };
+
+    const result = await previewDocument(payload);
+
+    expect(result.success).toBe(true);
+    expect(result.preview_id).toBe('prev-uuid-1234');
+    expect(result.page_count).toBe(1);
+    expect(result.pages).toHaveLength(1);
+    expect(result.metadata.sha256_checksum).toHaveLength(64);
+  });
+
+  it('deve invocar export_previewed_document com preview_id e expected_sha256', async () => {
+    const mockExportResult = {
+      success: true,
+      file_path: '/downloads/Contrato_Cessao_Posse.pdf',
+      file_name: 'Contrato_Cessao_Posse.pdf',
+      message: 'Documento verificado e exportado com sucesso.',
+      metadata: {
+        document_kind: 'cessao_posse' as const,
+        generated_at_utc: '2026-11-03T14:00:00Z',
+        sha256_checksum: 'b'.repeat(64),
+        byte_size: 2048,
+        template_id: 'contrato_cessao_posse.typ',
+      },
+    };
+
+    mockIpcResponse('export_previewed_document', mockExportResult);
+
+    const payload: ExportPreviewPayload = {
+      preview_id: 'prev-uuid-5678',
+      expected_sha256: 'b'.repeat(64),
+      open_after_export: true,
+      target_file_name: 'Contrato_Cessao_Posse.pdf',
+    };
+
+    const result = await exportPreviewedDocument(payload);
+
+    expect(result.success).toBe(true);
+    expect(result.file_name).toBe('Contrato_Cessao_Posse.pdf');
+    expect(result.metadata.sha256_checksum).toBe('b'.repeat(64));
   });
 });

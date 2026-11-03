@@ -631,22 +631,18 @@ mod tests {
         };
 
         // 1. Valor positivo válido -> OK
-        assert!(
-            DocumentRequest::InvoiceBill(base_invoice.clone())
-                .validate()
-                .is_ok()
-        );
+        assert!(DocumentRequest::InvoiceBill(base_invoice.clone())
+            .validate()
+            .is_ok());
 
         // 2. Valor zero -> OK (com item gratuito coerente)
         let mut zero_invoice = base_invoice.clone();
         zero_invoice.amount = 0.0;
         zero_invoice.items[0].price = 0.0;
         zero_invoice.items[0].total = 0.0;
-        assert!(
-            DocumentRequest::InvoiceBill(zero_invoice)
-                .validate()
-                .is_ok()
-        );
+        assert!(DocumentRequest::InvoiceBill(zero_invoice)
+            .validate()
+            .is_ok());
 
         // 3. Valor negativo -> Err
         let mut negative_invoice = base_invoice.clone();
@@ -832,11 +828,9 @@ mod tests {
 
         let mut zero_discount = base_invoice;
         zero_discount.discount = Some(0.0);
-        assert!(
-            DocumentRequest::InvoiceBill(zero_discount)
-                .validate()
-                .is_ok()
-        );
+        assert!(DocumentRequest::InvoiceBill(zero_discount)
+            .validate()
+            .is_ok());
     }
 
     #[test]

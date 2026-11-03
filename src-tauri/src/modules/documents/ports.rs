@@ -1,17 +1,25 @@
 use crate::modules::documents::models::{DocumentError, DocumentKind, DocumentRequest};
+use crate::platform::typst_engine::{inspect_pdf_bytes_pages, RenderedPagePreview};
 
 /// Resultado bruto da compilação documental emitida por um renderizador.
 ///
-/// Encapsula exclusivamente os bytes binários do documento gerado (por exemplo, PDF),
-/// sem metadados de emissão ou cálculos criptográficos de integridade.
+/// Encapsula os bytes binários do documento gerado (PDF) e as páginas vetoriais
+/// correspondentes para visualização interna, sem metadados de emissão ou cálculos
+/// criptográficos de integridade.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RenderedDocument {
     pub pdf_bytes: Vec<u8>,
+    pub pages: Vec<RenderedPagePreview>,
 }
 
 impl RenderedDocument {
     pub fn new(pdf_bytes: Vec<u8>) -> Self {
-        Self { pdf_bytes }
+        let pages = inspect_pdf_bytes_pages(&pdf_bytes).unwrap_or_default();
+        Self { pdf_bytes, pages }
+    }
+
+    pub fn with_pages(pdf_bytes: Vec<u8>, pages: Vec<RenderedPagePreview>) -> Self {
+        Self { pdf_bytes, pages }
     }
 }
 

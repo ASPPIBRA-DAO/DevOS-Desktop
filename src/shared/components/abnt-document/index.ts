@@ -8,3 +8,4 @@ export * from './default-footer';
 export * from './document-context';
 export * from './digital-signature';
 export * from './pdf-viewer-layout';
+export * from './pdf-binary-utils';

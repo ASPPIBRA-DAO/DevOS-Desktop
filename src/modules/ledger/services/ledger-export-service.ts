@@ -1,8 +1,15 @@
-import type { GenerateDocumentResult } from '../../../platform/tauri';
 import type { IFinancialProfile, ITreasuryTransaction } from '../domain/ledger-models';
+import type {
+  DocumentPreviewResult,
+  GenerateDocumentResult,
+} from '../../../platform/tauri';
 
-import { generateDocument } from '../../../platform/tauri';
 import { isTauriDesktop } from '../../../platform/tauri/core/invoke';
+import {
+  previewDocument,
+  generateDocument,
+  exportPreviewedDocument,
+} from '../../../platform/tauri';
 
 export interface ExportCitizenLedgerPdfPayload {
   associate_id?: string;
@@ -38,6 +45,32 @@ export interface ExportCitizenLedgerPdfPayload {
       status_variant: 'confirmed' | 'danger' | 'muted';
     }>;
   };
+}
+
+export async function previewCitizenLedgerPdf(
+  payload: ExportCitizenLedgerPdfPayload
+): Promise<DocumentPreviewResult> {
+  return previewDocument({
+    request: {
+      kind: 'citizen_ledger',
+      payload: {
+        associate_id: payload.associate_id,
+        data: payload.data,
+      },
+    },
+  });
+}
+
+export async function exportPreviewedCitizenLedgerPdf(
+  preview: DocumentPreviewResult,
+  targetFileName?: string
+): Promise<GenerateDocumentResult> {
+  return exportPreviewedDocument({
+    preview_id: preview.preview_id,
+    expected_sha256: preview.metadata.sha256_checksum,
+    open_after_export: true,
+    target_file_name: targetFileName,
+  });
 }
 
 export async function exportCitizenLedgerPdf(

@@ -14,6 +14,7 @@
 
 pub mod models;
 pub mod ports;
+pub mod preview_store;
 pub mod service;
 pub mod typst_renderer;
 
@@ -22,6 +23,9 @@ pub use models::*;
 
 // Mantém as abstrações disponíveis diretamente na raiz do módulo.
 pub use ports::*;
+
+// Mantém o store de previews em memória disponível na raiz do módulo.
+pub use preview_store::*;
 
 // Mantém os serviços disponíveis diretamente na raiz do módulo.
 pub use service::*;

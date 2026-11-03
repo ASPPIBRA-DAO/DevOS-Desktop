@@ -104,6 +104,36 @@ export interface GenerateDocumentPayload {
   target_file_name?: string;
 }
 
+export interface DocumentPreviewPage {
+  page_number: number;
+  width_pt: number;
+  height_pt: number;
+  svg_base64: string;
+}
+
+export interface PreviewDocumentPayload {
+  request: DocumentRequest;
+}
+
+export interface DocumentPreviewResult {
+  success: boolean;
+  preview_id: string;
+  pdf_base64: string;
+  page_count: number;
+  pages: DocumentPreviewPage[];
+  created_at_utc: string;
+  expires_at_utc: string;
+  message: string;
+  metadata: DocumentMetadata;
+}
+
+export interface ExportPreviewPayload {
+  preview_id: string;
+  expected_sha256: string;
+  open_after_export?: boolean;
+  target_file_name?: string;
+}
+
 export interface GenerateDocumentResult {
   success: boolean;
   file_path: string;

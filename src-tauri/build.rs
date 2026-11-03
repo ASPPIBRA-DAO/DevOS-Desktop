@@ -25,6 +25,8 @@ const TAURI_APP_COMMANDS: &[&str] = &[
     "batch_fetch_wallet_balances",
     // Geração de documentos e relatórios nativos (Typst)
     "generate_document",
+    "preview_document",
+    "export_previewed_document",
     // Armazenamento descentralizado e DePIN (IPFS / Kubo)
     "get_ipfs_daemon_status",
     "execute_storage_proof",
@@ -50,11 +52,9 @@ const TAURI_APP_COMMANDS: &[&str] = &[
 ];
 
 fn main() {
-    let attributes = tauri_build::Attributes::new().app_manifest(
-        tauri_build::AppManifest::new().commands(TAURI_APP_COMMANDS),
-    );
+    let attributes = tauri_build::Attributes::new()
+        .app_manifest(tauri_build::AppManifest::new().commands(TAURI_APP_COMMANDS));
 
-    tauri_build::try_build(attributes).expect(
-        "Falha ao executar tauri-build e gerar o manifesto de permissões da aplicação",
-    );
+    tauri_build::try_build(attributes)
+        .expect("Falha ao executar tauri-build e gerar o manifesto de permissões da aplicação");
 }

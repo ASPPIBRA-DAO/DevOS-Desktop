@@ -2,7 +2,9 @@ use std::collections::HashMap;
 
 use crate::modules::documents::models::{DocumentError, DocumentKind, DocumentRequest};
 use crate::modules::documents::ports::{DocumentRenderer, RenderedDocument};
-use crate::platform::typst_engine::{TypstCompileOptions, compile_typst_document};
+use crate::platform::typst_engine::{
+    compile_typst_document, compile_typst_document_with_preview, TypstCompileOptions,
+};
 
 static CITIZEN_TEMPLATE: &str = include_str!("../../../templates/extrato_citizen_ledger.typ");
 
@@ -112,10 +114,13 @@ impl DocumentRenderer for TypstDocumentRenderer {
             static_sources: CANONICAL_TYPST_STATIC_SOURCES,
         };
 
-        let pdf_bytes = compile_typst_document(options)
+        let compiled = compile_typst_document_with_preview(options)
             .map_err(|error| DocumentError::CompilationError(error.to_string()))?;
 
-        Ok(RenderedDocument::new(pdf_bytes))
+        Ok(RenderedDocument::with_pages(
+            compiled.pdf_bytes,
+            compiled.pages,
+        ))
     }
 }
 
@@ -136,6 +141,10 @@ mod tests {
         assert!(
             rendered.pdf_bytes.starts_with(b"%PDF-"),
             "O PDF gerado deve iniciar com o cabeçalho %PDF-"
+        );
+        assert!(
+            !rendered.pages.is_empty(),
+            "A renderização deve produzir ao menos uma página vetorial para preview"
         );
     }
 

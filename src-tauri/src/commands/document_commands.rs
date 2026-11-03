@@ -1,19 +1,49 @@
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 
 use crate::modules::documents::models::DocumentError;
 use crate::modules::documents::{
-    DocumentKind, DocumentMetadata, DocumentRequest, DocumentScope, active_document_scope,
-    documents_service_with_scope,
+    active_document_scope, documents_service_with_scope, global_preview_store, DocumentKind,
+    DocumentMetadata, DocumentPreviewStore, DocumentRequest, DocumentScope,
 };
+use crate::platform::typst_engine::{encode_base64, RenderedPagePreview};
+
+pub type DocumentPreviewPage = RenderedPagePreview;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GenerateDocumentPayload {
     pub request: DocumentRequest,
     pub open_after_export: Option<bool>,
     /// Nome de arquivo opcional; se omitido, será gerado com timestamp UTC.
+    pub target_file_name: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PreviewDocumentPayload {
+    pub request: DocumentRequest,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct DocumentPreviewResult {
+    pub success: bool,
+    pub preview_id: String,
+    pub pdf_base64: String,
+    pub page_count: usize,
+    pub pages: Vec<DocumentPreviewPage>,
+    pub created_at_utc: String,
+    pub expires_at_utc: String,
+    pub message: String,
+    pub metadata: DocumentMetadata,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ExportPreviewPayload {
+    pub preview_id: String,
+    pub expected_sha256: String,
+    pub open_after_export: Option<bool>,
     pub target_file_name: Option<String>,
 }
 
@@ -34,6 +64,124 @@ pub fn generate_document(
     let download_dir = resolve_download_dir();
 
     generate_document_in_directory(payload, &download_dir)
+}
+
+/// Comando IPC para compilação em memória e entrega de preview do PDF real ao visualizador interno.
+///
+/// Não grava arquivo em disco e não dispara visualizadores externos do sistema operacional.
+#[tauri::command]
+pub fn preview_document(payload: PreviewDocumentPayload) -> Result<DocumentPreviewResult, String> {
+    preview_document_with_store_and_scope(payload, global_preview_store(), active_document_scope())
+}
+
+/// Comando IPC para exportação verificada dos bytes exatos de um PDF previamente visualizado.
+///
+/// Não recompila o template: valida `preview_id`, expiração, escopo de edição e igualdade
+/// criptográfica SHA-256 antes de gravar o artefato em disco.
+#[tauri::command]
+pub fn export_previewed_document(
+    payload: ExportPreviewPayload,
+) -> Result<GenerateDocumentResult, String> {
+    let download_dir = resolve_download_dir();
+
+    export_previewed_document_in_directory_with_store_and_scope(
+        payload,
+        &download_dir,
+        global_preview_store(),
+        active_document_scope(),
+    )
+}
+
+pub(crate) fn preview_document_with_store_and_scope(
+    payload: PreviewDocumentPayload,
+    store: &DocumentPreviewStore,
+    active_scope: DocumentScope,
+) -> Result<DocumentPreviewResult, String> {
+    let service = documents_service_with_scope(active_scope);
+
+    let (output, pages) = service
+        .generate_document_with_pages(payload.request)
+        .map_err(public_document_error)?;
+
+    let stored = store
+        .store_preview(output, pages, active_scope)
+        .map_err(|err| err.public_message())?;
+
+    let page_count = stored.pages.len();
+    let pdf_base64 = encode_base64(&stored.pdf_bytes);
+
+    Ok(DocumentPreviewResult {
+        success: true,
+        preview_id: stored.preview_id,
+        pdf_base64,
+        page_count,
+        pages: stored.pages,
+        created_at_utc: stored.created_at_utc,
+        expires_at_utc: stored.expires_at_utc,
+        message: "Visualização do PDF gerada em memória com sucesso.".to_string(),
+        metadata: stored.metadata,
+    })
+}
+
+pub(crate) fn export_previewed_document_in_directory_with_store_and_scope(
+    payload: ExportPreviewPayload,
+    download_dir: &Path,
+    store: &DocumentPreviewStore,
+    active_scope: DocumentScope,
+) -> Result<GenerateDocumentResult, String> {
+    let ExportPreviewPayload {
+        preview_id,
+        expected_sha256,
+        open_after_export,
+        target_file_name,
+    } = payload;
+
+    let stored = store
+        .verify_and_get_for_export(&preview_id, &expected_sha256, active_scope)
+        .map_err(|err| err.public_message())?;
+
+    let kind = stored.metadata.document_kind;
+    let file_name = match target_file_name {
+        Some(name) => normalize_pdf_file_name(&name)?,
+        None => default_file_name(kind),
+    };
+
+    fs::create_dir_all(download_dir)
+        .map_err(|_| "Não foi possível preparar o diretório de destino do PDF.".to_string())?;
+
+    let target_path = download_dir.join(&file_name);
+
+    write_pdf_without_overwrite(&target_path, &stored.pdf_bytes)?;
+
+    // Confirmação criptográfica pós-gravação: o arquivo gravado possui exatamente o mesmo SHA-256 do preview
+    let disk_bytes = fs::read(&target_path)
+        .map_err(|_| "Não foi possível verificar a integridade do PDF exportado.".to_string())?;
+    let disk_sha256 = hex::encode(Sha256::digest(&disk_bytes));
+    if disk_sha256 != stored.sha256_checksum {
+        let _ = fs::remove_file(&target_path);
+        return Err(
+            "Falha de integridade pós-gravação: o hash SHA-256 do arquivo divergiu do preview."
+                .to_string(),
+        );
+    }
+
+    let message = if open_after_export.unwrap_or(false) {
+        if open::that(&target_path).is_ok() {
+            "Documento verificado e exportado com sucesso.".to_string()
+        } else {
+            "Documento exportado com integridade verificada, mas não foi possível abri-lo automaticamente.".to_string()
+        }
+    } else {
+        "Documento verificado e exportado com sucesso.".to_string()
+    };
+
+    Ok(GenerateDocumentResult {
+        success: true,
+        file_path: target_path.to_string_lossy().into_owned(),
+        file_name,
+        message,
+        metadata: stored.metadata,
+    })
 }
 
 /// Resolve o diretório padrão, preservando a ordem de preferência existente.
@@ -515,11 +663,10 @@ mod tests {
         });
         let res1 = serde_json::from_value::<GenerateDocumentPayload>(missing_doc_num);
         assert!(res1.is_err());
-        assert!(
-            res1.unwrap_err()
-                .to_string()
-                .contains("missing field `document_number`")
-        );
+        assert!(res1
+            .unwrap_err()
+            .to_string()
+            .contains("missing field `document_number`"));
 
         // 2. auth_code ausente
         let missing_auth = serde_json::json!({
@@ -532,11 +679,10 @@ mod tests {
         });
         let res2 = serde_json::from_value::<GenerateDocumentPayload>(missing_auth);
         assert!(res2.is_err());
-        assert!(
-            res2.unwrap_err()
-                .to_string()
-                .contains("missing field `auth_code`")
-        );
+        assert!(res2
+            .unwrap_err()
+            .to_string()
+            .contains("missing field `auth_code`"));
     }
 
     #[test]
@@ -623,5 +769,174 @@ mod tests {
             rec_node.unwrap_err(),
             "Esta edição do aplicativo não está autorizada a gerar este documento."
         );
+    }
+
+    #[test]
+    fn test_preview_and_export_previewed_document_guarantee_identical_sha256_and_bytes() {
+        let directory = TestDirectory::new();
+        let store = DocumentPreviewStore::new();
+
+        let preview_payload = PreviewDocumentPayload {
+            request: DocumentRequest::CessaoPosse(
+                crate::modules::documents::models::CessaoPossePayload {
+                    document_number: "2026-0001/CP".to_string(),
+                    auth_code: "2026-X7Y9".to_string(),
+                    data: json!({
+                        "cedenteNome": "CARLOS EDUARDO TESTE",
+                        "cessionarioNome": "ANA PAULA TESTE",
+                        "imovelLote": "15",
+                        "imovelQuadra": "D"
+                    }),
+                },
+            ),
+        };
+
+        // 1. Preview em memória não escreve no diretório de destino
+        let preview = preview_document_with_store_and_scope(
+            preview_payload,
+            &store,
+            DocumentScope::CockpitOnly,
+        )
+        .expect("Preview de CessaoPosse deve ter sucesso no Cockpit");
+
+        assert!(preview.success);
+        assert!(!preview.preview_id.is_empty());
+        assert!(preview.page_count >= 1);
+        assert_eq!(preview.pages.len(), preview.page_count);
+        assert_eq!(preview.metadata.document_kind, DocumentKind::CessaoPosse);
+        assert_eq!(preview.metadata.sha256_checksum.len(), 64);
+
+        let preview_bytes = crate::platform::typst_engine::decode_base64(&preview.pdf_base64)
+            .expect("pdf_base64 deve ser Base64 válido");
+        assert!(preview_bytes.starts_with(b"%PDF-"));
+        assert_eq!(preview_bytes.len(), preview.metadata.byte_size);
+        assert_eq!(
+            hex::encode(Sha256::digest(&preview_bytes)),
+            preview.metadata.sha256_checksum
+        );
+        assert_eq!(
+            fs::read_dir(directory.path()).unwrap().count(),
+            0,
+            "preview_document não deve criar arquivos no diretório de exportação"
+        );
+
+        // 2. Exportação verificada grava exatamente os mesmos bytes do preview
+        let export_payload = ExportPreviewPayload {
+            preview_id: preview.preview_id.clone(),
+            expected_sha256: preview.metadata.sha256_checksum.clone(),
+            open_after_export: Some(false),
+            target_file_name: Some("cessao_preview_verificada.pdf".to_string()),
+        };
+
+        let exported = export_previewed_document_in_directory_with_store_and_scope(
+            export_payload,
+            directory.path(),
+            &store,
+            DocumentScope::CockpitOnly,
+        )
+        .expect("Exportação do preview verificado deve ter sucesso");
+
+        assert_valid_result(&exported, DocumentKind::CessaoPosse, directory.path());
+        assert_eq!(
+            exported.metadata.sha256_checksum, preview.metadata.sha256_checksum,
+            "O SHA-256 do documento exportado deve ser idêntico ao do preview"
+        );
+
+        let exported_disk_bytes = fs::read(&exported.file_path).unwrap();
+        assert_eq!(
+            exported_disk_bytes, preview_bytes,
+            "Os bytes físicos exportados em disco devem ser idênticos aos bytes entregues ao preview"
+        );
+    }
+
+    #[test]
+    fn test_preview_and_export_enforce_scope_hash_and_expiration_guards() {
+        let directory = TestDirectory::new();
+        let store = DocumentPreviewStore::new();
+
+        // 1. NodeOnly não pode gerar preview de CessaoPosse (CockpitOnly)
+        let forbidden_preview = preview_document_with_store_and_scope(
+            PreviewDocumentPayload {
+                request: DocumentRequest::CessaoPosse(
+                    crate::modules::documents::models::CessaoPossePayload {
+                        document_number: "2026-0001/CP".to_string(),
+                        auth_code: "2026-X7Y9".to_string(),
+                        data: json!({}),
+                    },
+                ),
+            },
+            &store,
+            DocumentScope::NodeOnly,
+        );
+        assert!(forbidden_preview.is_err());
+        assert_eq!(
+            forbidden_preview.unwrap_err(),
+            "Esta edição do aplicativo não está autorizada a gerar este documento."
+        );
+
+        // 2. Preview válido em CockpitOnly
+        let preview = preview_document_with_store_and_scope(
+            PreviewDocumentPayload {
+                request: DocumentRequest::CitizenLedger(CitizenLedgerPayload {
+                    associate_id: Some("ASSOC-PREVIEW-01".to_string()),
+                    data: json!({
+                        "meta": {
+                            "generated_at": "23/10/2026",
+                            "reference_period": "2026-10",
+                            "audit_hash": "hash-1"
+                        },
+                        "associate": {
+                            "id": "1",
+                            "name": "Associado Preview",
+                            "cpf": "000.111.222-33",
+                            "email": "preview@asppibra.org",
+                            "avatar_letter": "A",
+                            "address_line1": "Rua A, 10",
+                            "address_line2": "Centro"
+                        },
+                        "summary": {
+                            "total_contracted": "500,00",
+                            "total_paid": "500,00",
+                            "outstanding_balance": "0,00"
+                        },
+                        "transactions": []
+                    }),
+                }),
+            },
+            &store,
+            DocumentScope::CockpitOnly,
+        )
+        .expect("Preview de CitizenLedger deve ter sucesso");
+
+        // 3. Rejeita exportação com SHA-256 divergente
+        let bad_hash_res = export_previewed_document_in_directory_with_store_and_scope(
+            ExportPreviewPayload {
+                preview_id: preview.preview_id.clone(),
+                expected_sha256: "f".repeat(64),
+                open_after_export: Some(false),
+                target_file_name: Some("nao_deve_gravar.pdf".to_string()),
+            },
+            directory.path(),
+            &store,
+            DocumentScope::CockpitOnly,
+        );
+        assert!(bad_hash_res.is_err());
+        assert!(bad_hash_res.unwrap_err().contains("SHA-256"));
+        assert!(!directory.path().join("nao_deve_gravar.pdf").exists());
+
+        // 4. Rejeita exportação com preview_id inexistente
+        let unknown_id_res = export_previewed_document_in_directory_with_store_and_scope(
+            ExportPreviewPayload {
+                preview_id: "preview-id-inexistente".to_string(),
+                expected_sha256: preview.metadata.sha256_checksum.clone(),
+                open_after_export: Some(false),
+                target_file_name: Some("nao_deve_gravar_2.pdf".to_string()),
+            },
+            directory.path(),
+            &store,
+            DocumentScope::CockpitOnly,
+        );
+        assert!(unknown_id_res.is_err());
+        assert!(unknown_id_res.unwrap_err().contains("não foi encontrado"));
     }
 }
