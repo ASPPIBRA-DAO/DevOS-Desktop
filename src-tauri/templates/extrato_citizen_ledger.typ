@@ -2,6 +2,13 @@
 // ASPPIBRA DAO - Template Oficial do Livro-Razão do Cidadão (Typst)
 // Consome a Biblioteca Institucional Modular (asppibra_layout.typ)
 // ============================================================================
+// Nota de domínio: CitizenLedgerPayload (models.rs) contém os dados cadastrais
+// do associado (`associate.id`), o período de referência (`meta.reference_period`)
+// e o resumo de conferência do lote de dados (`meta.audit_hash`), mas não possui
+// `document_number` nem `auth_code` (cuja geração e persistência pertencem
+// à FASE 7). O ID do associado não é utilizado como número documental e o
+// `audit_hash` não é apresentado como código de autenticação institucional.
+// ============================================================================
 
 #import "asppibra_layout.typ": *
 
@@ -19,43 +26,38 @@
   (:)
 }
 
-#let raw_doc_num = if type(data) == dictionary and "document_number" in data and data.document_number != none and str(data.document_number).trim() != "" {
-  str(data.document_number).trim()
-} else {
-  let raw_assoc_id = assoc_dict.at("id", default: none)
-  let raw_ref_period = meta_dict.at("reference_period", default: none)
-  if raw_assoc_id != none and str(raw_assoc_id).trim() != "" {
-    "EXT-" + str(raw_assoc_id).trim() + (if raw_ref_period != none and str(raw_ref_period).trim() != "" { "/" + str(raw_ref_period).trim() } else { "" })
-  } else {
-    none
-  }
-}
-
-#let doc_number = if raw_doc_num != none and str(raw_doc_num).trim() != "" {
-  str(raw_doc_num).trim()
+#let raw_assoc_id = assoc_dict.at("id", default: none)
+#let associate_id = if raw_assoc_id != none and str(raw_assoc_id).trim() != "" {
+  str(raw_assoc_id).trim()
 } else {
   none
 }
 
-#let raw_auth_code = if type(data) == dictionary and "auth_code" in data and data.auth_code != none and str(data.auth_code).trim() != "" {
-  str(data.auth_code).trim()
+#let raw_ref_period = meta_dict.at("reference_period", default: none)
+#let reference_period = if raw_ref_period != none and str(raw_ref_period).trim() != "" {
+  str(raw_ref_period).trim()
 } else {
-  let raw_audit_hash = meta_dict.at("audit_hash", default: none)
-  if raw_audit_hash != none and str(raw_audit_hash).trim() != "" {
-    str(raw_audit_hash).trim()
-  } else {
-    none
-  }
+  none
 }
 
-#let auth_code = if raw_auth_code != none and str(raw_auth_code).trim() != "" {
-  str(raw_auth_code).trim()
+#assert(
+  associate_id != none,
+  message: "extrato_citizen_ledger.typ: 'associate.id' é obrigatório e não pode ser vazio.",
+)
+#assert(
+  reference_period != none,
+  message: "extrato_citizen_ledger.typ: 'meta.reference_period' é obrigatório e não pode ser vazio.",
+)
+
+#let raw_audit_hash = meta_dict.at("audit_hash", default: none)
+#let data_batch_hash = if raw_audit_hash != none and str(raw_audit_hash).trim() != "" {
+  str(raw_audit_hash).trim()
 } else {
   none
 }
 
 #set document(
-  title: "Relatorio_Extrato_Associado_" + str(doc_number),
+  title: "Relatorio_Extrato_Associado_" + associate_id,
   author: asppibra_sigla,
 )
 
@@ -66,14 +68,13 @@
     let i = counter(page).get().first()
     if i > 1 {
       asppibra_header_running(
-        doc_number: doc_number,
         doc_title: "Demonstrativo Financeiro • Livro-Razão do Cidadão",
+        require_registration: false,
       )
     }
   },
   footer: asppibra_footer(
-    doc_number: doc_number,
-    auth_code: auth_code,
+    require_registration: false,
   ),
 )
 
@@ -86,7 +87,10 @@
 )
 
 // 1. CABEÇALHO INSTITUCIONAL DA PRIMEIRA PÁGINA
-#asppibra_header_first_page(doc_number: doc_number)
+#asppibra_header_first_page(
+  require_registration: false,
+  subtitle: "DOCUMENTO OFICIAL • DEMONSTRATIVO FINANCEIRO DO ASSOCIADO",
+)
 
 #v(6pt)
 
@@ -100,9 +104,9 @@
     #text(size: font_size_subtitle, fill: color_secondary_text)[Relatório Financeiro Consolidado • #asppibra_razao_social_curta]
   ],
   [
-    #text(size: font_size_body, weight: "bold", fill: color_primary)[Competência: #data.meta.reference_period] \
+    #text(size: font_size_body, weight: "bold", fill: color_primary)[Competência: #reference_period] \
     #v(2pt)
-    #text(size: font_size_running, fill: color_secondary_text)[Gerado em: #data.meta.generated_at • Cód. Rastreio: #auth_code]
+    #text(size: font_size_running, fill: color_secondary_text)[Gerado em: #data.meta.generated_at]
   ]
 )
 
@@ -134,7 +138,7 @@
       #text(size: 10pt, weight: "bold", fill: color_primary)[#data.associate.name] \
       #v(2pt)
       #text(size: font_size_caption, fill: color_secondary_text)[CONTA ASSOCIADA] \
-      #text(size: 8pt, weight: "bold", fill: color_primary)[\##data.associate.id ]
+      #text(size: 8pt, weight: "bold", fill: color_primary)[\##associate_id ]
       #text(size: 8pt, weight: "bold", fill: color_status_paid)[(Ativo)] \
       #v(2pt)
       #text(size: font_size_caption, fill: color_secondary_text)[CPF / CNPJ] \
@@ -256,6 +260,9 @@
 )[
   #text(size: font_size_caption, fill: color_secondary_text)[
     #text(weight: "bold", fill: color_primary)[CONTROLE DOCUMENTAL INTERNO (#asppibra_sigla • CNPJ: #asppibra_cnpj): ]
-    Este documento foi gerado pelo sistema DevOS Desktop da #asppibra_razao_social_curta e reflete os registros administrativos e financeiros processados durante o período de referência (#data.meta.reference_period). As informações apresentadas constituem demonstrativo interno informativo das operações vinculadas ao cadastro do associado.
+    Este documento foi gerado pelo sistema DevOS Desktop da #asppibra_razao_social_curta e reflete os registros administrativos e financeiros processados durante o período de referência (#reference_period). As informações apresentadas constituem demonstrativo interno informativo das operações vinculadas ao cadastro do associado.
+    #if data_batch_hash != none [
+      \ #text(font: font_family_mono)[Resumo de Conferência do Lote de Dados (audit_hash): #data_batch_hash]
+    ]
   ]
 ]

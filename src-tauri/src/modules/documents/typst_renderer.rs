@@ -714,7 +714,31 @@ mod tests {
 
     #[test]
     fn test_all_non_contract_templates_reject_missing_or_empty_identifiers() {
-        // 1. InvoiceBill sem id ou com id vazio deve falhar na compilação do template
+        // 1. Garante que nenhum dos 3 templates não contratuais fabrica doc_number ou auth_code fictícios
+        for (name, source) in [
+            ("invoice_bill.typ", INVOICE_TEMPLATE),
+            ("extrato_citizen_ledger.typ", CITIZEN_TEMPLATE),
+            ("real_estate_reconciliation.typ", RECONCILIATION_TEMPLATE),
+        ] {
+            assert!(
+                source.contains("require_registration: false"),
+                "O template {name} deve utilizar require_registration: false nos cabeçalhos/rodapés até a FASE 7"
+            );
+            for forbidden_fabrication in [
+                "\"FAT-\" +",
+                "\"EXT-\" +",
+                "\"REC-\" +",
+                "\"CAD-MARICA-\"",
+                "d1_protocol",
+            ] {
+                assert!(
+                    !source.contains(forbidden_fabrication),
+                    "O template {name} não deve fabricar identificador documental fictício ('{forbidden_fabrication}')"
+                );
+            }
+        }
+
+        // 2. InvoiceBill sem id ou com id vazio deve falhar na compilação do template
         for invalid_invoice_json in [
             json!({"invoice": {"id": "", "reference_month": "2026-10", "amount": 100.0, "status": "pending", "member_name": "Teste", "member_doc": "000", "due_date": "2026-10-31", "payment_method": "Pix", "items": []}}),
             json!({"invoice": {"id": "   ", "reference_month": "2026-10", "amount": 100.0, "status": "pending", "member_name": "Teste", "member_doc": "000", "due_date": "2026-10-31", "payment_method": "Pix", "items": []}}),
@@ -733,10 +757,10 @@ mod tests {
             );
         }
 
-        // 2. CitizenLedger sem associate.id ou sem meta.audit_hash deve falhar na compilação do template
+        // 3. CitizenLedger sem associate.id ou sem meta.reference_period deve falhar na compilação do template
         for invalid_ledger_json in [
-            json!({"meta": {"generated_at": "23/10/2026", "reference_period": "2026-10", "audit_hash": ""}, "associate": {"id": "123", "name": "A", "cpf": "0", "email": "a@b", "avatar_letter": "A", "address_line1": "R", "address_line2": "B"}, "summary": {"total_contracted": "0", "total_paid": "0", "outstanding_balance": "0"}, "transactions": []}),
-            json!({"meta": {"generated_at": "23/10/2026", "reference_period": "2026-10", "audit_hash": "hash-ok"}, "associate": {"id": "   ", "name": "A", "cpf": "0", "email": "a@b", "avatar_letter": "A", "address_line1": "R", "address_line2": "B"}, "summary": {"total_contracted": "0", "total_paid": "0", "outstanding_balance": "0"}, "transactions": []}),
+            json!({"meta": {"generated_at": "23/10/2026", "reference_period": ""}, "associate": {"id": "123", "name": "A", "cpf": "0", "email": "a@b", "avatar_letter": "A", "address_line1": "R", "address_line2": "B"}, "summary": {"total_contracted": "0", "total_paid": "0", "outstanding_balance": "0"}, "transactions": []}),
+            json!({"meta": {"generated_at": "23/10/2026", "reference_period": "2026-10"}, "associate": {"id": "   ", "name": "A", "cpf": "0", "email": "a@b", "avatar_letter": "A", "address_line1": "R", "address_line2": "B"}, "summary": {"total_contracted": "0", "total_paid": "0", "outstanding_balance": "0"}, "transactions": []}),
         ] {
             let mut string_inputs = HashMap::new();
             string_inputs.insert("data", invalid_ledger_json.to_string());
@@ -748,11 +772,11 @@ mod tests {
             };
             assert!(
                 compile_typst_document(options).is_err(),
-                "extrato_citizen_ledger.typ deve rejeitar extrato sem associate.id ou sem meta.audit_hash"
+                "extrato_citizen_ledger.typ deve rejeitar extrato sem associate.id ou sem meta.reference_period"
             );
         }
 
-        // 3. RealEstateReconciliation sem generatedAt / report_id deve falhar na compilação do template
+        // 4. RealEstateReconciliation sem generatedAt deve falhar na compilação do template
         for invalid_rec_json in [
             json!({"generatedAt": "   ", "stats": {"totalProperties": 1, "totalIdentifiers": 1, "totalAddresses": 1, "totalBatches": 1, "openFindingsCount": 0, "pendingProposalsCount": 0}, "batches": [], "findings": [], "properties": []}),
             json!({"stats": {"totalProperties": 1, "totalIdentifiers": 1, "totalAddresses": 1, "totalBatches": 1, "openFindingsCount": 0, "pendingProposalsCount": 0}, "batches": [], "findings": [], "properties": []}),
@@ -767,13 +791,20 @@ mod tests {
             };
             assert!(
                 compile_typst_document(options).is_err(),
-                "real_estate_reconciliation.typ deve rejeitar payload sem identificador/generatedAt válido"
+                "real_estate_reconciliation.typ deve rejeitar payload sem generatedAt válido"
             );
         }
     }
 
     #[test]
     fn test_cessao_posse_template_reconciles_full_legal_content_and_dynamic_fields() {
+        // 0. Garante que não há artefatos residuais de JSX no template Typst
+        for jsx_artifact in ["{' '}", "{\" \"}", "<Clause>", "</Clause>", "<DataTag"] {
+            assert!(
+                !CONTRATO_CESSAO_TEMPLATE.contains(jsx_artifact),
+                "contrato_cessao_posse.typ não deve conter artefato residual de JSX: {jsx_artifact}"
+            );
+        }
         // 1. Verifica que todos os 17 capítulos + seções de assinaturas e testemunhas estão presentes (idênticos ao CessaoPosseContent.tsx)
         let required_sections = [
             "CAPÍTULO I – DAS PARTES",

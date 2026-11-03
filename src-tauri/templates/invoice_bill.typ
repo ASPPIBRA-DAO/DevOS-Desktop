@@ -2,42 +2,34 @@
 // ASPPIBRA DAO - Template Oficial de Recibo e Fatura Associativa (Typst)
 // Consome a Biblioteca Institucional Modular (asppibra_layout.typ)
 // ============================================================================
+// Nota de domínio: InvoiceReportPayload (models.rs) possui `id` (identificador
+// comercial da fatura) e `reference_month` (competência), mas não possui
+// `document_number` nem `auth_code` (cuja geração e persistência pertencem
+// à FASE 7). Portanto, o cabeçalho e o rodapé institucionais são utilizados
+// com `require_registration: false`, sem fabricar números de registro ou
+// códigos de autenticação fictícios.
+// ============================================================================
 
 #import "asppibra_layout.typ": *
 
 #let data = json(bytes(sys.inputs.data))
 
-#let raw_id = if type(data) == dictionary and "invoice" in data and type(data.invoice) == dictionary {
+#let raw_invoice_id = if type(data) == dictionary and "invoice" in data and type(data.invoice) == dictionary {
   data.invoice.at("id", default: none)
 } else {
   none
 }
 
-#let doc_number = if raw_id != none and str(raw_id).trim() != "" {
-  str(raw_id).trim()
+#let invoice_id = if raw_invoice_id != none and str(raw_invoice_id).trim() != "" {
+  str(raw_invoice_id).trim()
 } else {
   none
 }
 
-#let raw_protocol = if type(data) == dictionary and "invoice" in data and type(data.invoice) == dictionary {
-  data.invoice.at("d1_protocol", default: none)
-} else {
-  none
-}
-
-#let ref_month = if type(data) == dictionary and "invoice" in data and type(data.invoice) == dictionary {
-  data.invoice.at("reference_month", default: "")
-} else {
-  ""
-}
-
-#let auth_code = if raw_protocol != none and str(raw_protocol).trim() != "" {
-  str(raw_protocol).trim()
-} else if doc_number != none {
-  "FAT-" + doc_number + (if ref_month != none and str(ref_month).trim() != "" { "-" + str(ref_month).trim() } else { "" })
-} else {
-  none
-}
+#assert(
+  invoice_id != none,
+  message: "invoice_bill.typ: 'invoice.id' é obrigatório e não pode ser vazio.",
+)
 
 #let subtotal_amount = calc.round(data.invoice.amount, digits: 2)
 #let taxes_amount = if "taxes" in data.invoice and data.invoice.taxes != none {
@@ -53,7 +45,7 @@
 #let final_total = calc.round(subtotal_amount + taxes_amount - discount_amount, digits: 2)
 
 #set document(
-  title: "Fatura_" + str(doc_number),
+  title: "Fatura_" + invoice_id,
   author: asppibra_sigla,
   description: "Subtotal: R$ " + str(subtotal_amount) + " | Tributos: R$ " + str(taxes_amount) + " | Desconto: R$ " + str(discount_amount) + " | Total: R$ " + str(final_total),
 )
@@ -65,14 +57,13 @@
     let i = counter(page).get().first()
     if i > 1 {
       asppibra_header_running(
-        doc_number: doc_number,
         doc_title: "Fatura e Recibo Associativo",
+        require_registration: false,
       )
     }
   },
   footer: asppibra_footer(
-    doc_number: doc_number,
-    auth_code: auth_code,
+    require_registration: false,
   ),
 )
 
@@ -85,7 +76,10 @@
 )
 
 // 1. CABEÇALHO INSTITUCIONAL DA PRIMEIRA PÁGINA
-#asppibra_header_first_page(doc_number: doc_number)
+#asppibra_header_first_page(
+  require_registration: false,
+  subtitle: "DOCUMENTO OFICIAL • DEMONSTRATIVO DE FATURAMENTO ASSOCIATIVO",
+)
 
 #v(6pt)
 
@@ -120,7 +114,7 @@
       ]
     ] \
     #v(4pt)
-    #text(size: 10pt, weight: "bold", fill: color_primary)[Fatura Nº #doc_number] \
+    #text(size: 10pt, weight: "bold", fill: color_primary)[Fatura: #invoice_id] \
     #text(size: font_size_subtitle, fill: color_secondary_text)[Competência: #data.invoice.reference_month]
   ]
 )
@@ -165,6 +159,8 @@
       #grid(
         columns: (1fr, 1.2fr),
         row-gutter: 3.5pt,
+        text(size: font_size_subtitle, fill: color_secondary_text)[Identificador da Fatura:],
+        text(size: font_size_subtitle, font: font_family_mono, weight: "bold", fill: color_primary)[#invoice_id],
         text(size: font_size_subtitle, fill: color_secondary_text)[Vencimento:],
         text(size: font_size_subtitle, weight: "bold", fill: color_primary)[#data.invoice.due_date],
         text(size: font_size_subtitle, fill: color_secondary_text)[Liquidação:],
@@ -177,8 +173,6 @@
         ],
         text(size: font_size_subtitle, fill: color_secondary_text)[Método:],
         text(size: font_size_subtitle, weight: "bold", fill: color_primary)[#data.invoice.payment_method],
-        text(size: font_size_subtitle, fill: color_secondary_text)[Protocolo Interno:],
-        text(size: font_size_caption, font: font_family_mono, fill: color_primary_text)[#auth_code],
       )
     ]
   )
@@ -272,14 +266,14 @@
   stroke: (paint: color_border, dash: "dashed", thickness: 0.8pt),
   inset: 8pt,
   [
-    #text(size: font_size_running, weight: "bold", fill: color_primary)[RASTREABILIDADE E CONTROLE DOCUMENTAL INTERNO (DEVOS)] \
+    #text(size: font_size_running, weight: "bold", fill: color_primary)[CONTROLE ADMINISTRATIVO E FINANCEIRO INTERNO (DEVOS)] \
     #v(2pt)
     #text(size: font_size_caption, font: font_family_mono, fill: color_secondary_text)[
-      IDENTIFICADOR INTERNO: FATURA-#doc_number | COMPETÊNCIA: #data.invoice.reference_month | CÓDIGO: #auth_code
+      FATURA: #invoice_id | COMPETÊNCIA: #data.invoice.reference_month
     ] \
     #v(2pt)
     #text(size: font_size_caption, fill: color_muted_text)[
-      Documento emitido pelo sistema DevOS Desktop para controle administrativo e financeiro interno da #asppibra_razao_social_curta (#asppibra_sigla).
+      Documento emitido pelo sistema DevOS Desktop para controle administrativo e financeiro interno da #asppibra_razao_social_curta (#asppibra_sigla). A integridade binária do arquivo PDF gerado é aferida pelo checksum SHA-256 nos metadados de emissão do sistema.
     ]
   ]
 )

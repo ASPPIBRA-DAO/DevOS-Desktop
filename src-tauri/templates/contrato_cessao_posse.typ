@@ -105,38 +105,38 @@
 // ============================================================================
 #section_heading("CAPÍTULO I – DAS PARTES")
 
-1.1. *CEDENTE:* #get_val("cedenteNome", "NOME COMPLETO DO CEDENTE"),{' '}
-  #get_val("cedenteNacionalidade", "NACIONALIDADE"), maior e capaz,{' '}
-  #get_val("cedenteEstadoCivil", "ESTADO CIVIL"),{' '}
-  #get_val("cedenteProfissao", "PROFISSÃO"), portador(a) da Carteira de Identidade (RG) nº{' '}
-  #get_val("cedenteRg", "NÚMERO DO RG"), órgão expedidor{' '}
-  #get_val("cedenteRgOrgaoUf", "ÓRGÃO E UF"), inscrito(a) no CPF sob o nº{' '}
-  #get_val("cedenteCpf", "NÚMERO DO CPF"), residente e domiciliado(a) na{' '}
-  #get_val("cedenteEndereco", "ENDEREÇO COMPLETO COM CEP"), endereço eletrônico (e-mail):{' '}
-  #get_val("cedenteEmail", "E-MAIL DO CEDENTE") e telefone/WhatsApp:{' '}
+1.1. *CEDENTE:* #get_val("cedenteNome", "NOME COMPLETO DO CEDENTE"),
+  #get_val("cedenteNacionalidade", "NACIONALIDADE"), maior e capaz,
+  #get_val("cedenteEstadoCivil", "ESTADO CIVIL"),
+  #get_val("cedenteProfissao", "PROFISSÃO"), portador(a) da Carteira de Identidade (RG) nº
+  #get_val("cedenteRg", "NÚMERO DO RG"), órgão expedidor
+  #get_val("cedenteRgOrgaoUf", "ÓRGÃO E UF"), inscrito(a) no CPF sob o nº
+  #get_val("cedenteCpf", "NÚMERO DO CPF"), residente e domiciliado(a) na
+  #get_val("cedenteEndereco", "ENDEREÇO COMPLETO COM CEP"), endereço eletrônico (e-mail):
+  #get_val("cedenteEmail", "E-MAIL DO CEDENTE") e telefone/WhatsApp:
   #get_val("cedenteTelefone", "TELEFONE COM DDD"), doravante denominado(a) simplesmente *CEDENTE*.
 
-1.2. *CÔNJUGE / COMPANHEIRO(A) DO CEDENTE:* #get_val("conjugeNome", "NOME COMPLETO DO CÔNJUGE/COMPANHEIRO(A)"),{' '}
-  #get_val("conjugeNacionalidade", "NACIONALIDADE"), maior e capaz,{' '}
-  #get_val("conjugeEstadoCivil", "ESTADO CIVIL"),{' '}
-  #get_val("conjugeProfissao", "PROFISSÃO"), portador(a) da Carteira de Identidade (RG) nº{' '}
-  #get_val("conjugeRg", "NÚMERO DO RG"), órgão expedidor{' '}
-  #get_val("conjugeRgOrgaoUf", "ÓRGÃO E UF"), inscrito(a) no CPF/MF sob o nº{' '}
-  #get_val("conjugeCpf", "NÚMERO DO CPF"), residente e domiciliado(a) na{' '}
-  #get_val("conjugeEndereco", "ENDEREÇO COMPLETO COM CEP"), endereço eletrônico (e-mail):{' '}
-  #get_val("conjugeEmail", "E-MAIL DO CÔNJUGE") e telefone/WhatsApp:{' '}
-  #get_val("conjugeTelefone", "TELEFONE COM DDD"), na qualidade de{' '}
+1.2. *CÔNJUGE / COMPANHEIRO(A) DO CEDENTE:* #get_val("conjugeNome", "NOME COMPLETO DO CÔNJUGE/COMPANHEIRO(A)"),
+  #get_val("conjugeNacionalidade", "NACIONALIDADE"), maior e capaz,
+  #get_val("conjugeEstadoCivil", "ESTADO CIVIL"),
+  #get_val("conjugeProfissao", "PROFISSÃO"), portador(a) da Carteira de Identidade (RG) nº
+  #get_val("conjugeRg", "NÚMERO DO RG"), órgão expedidor
+  #get_val("conjugeRgOrgaoUf", "ÓRGÃO E UF"), inscrito(a) no CPF/MF sob o nº
+  #get_val("conjugeCpf", "NÚMERO DO CPF"), residente e domiciliado(a) na
+  #get_val("conjugeEndereco", "ENDEREÇO COMPLETO COM CEP"), endereço eletrônico (e-mail):
+  #get_val("conjugeEmail", "E-MAIL DO CÔNJUGE") e telefone/WhatsApp:
+  #get_val("conjugeTelefone", "TELEFONE COM DDD"), na qualidade de
   #get_val("conjugeQualidade", "OUTORGANTE UXÓRIO / MARITAL / ANUENTE").
 
-1.3. *CESSIONÁRIO(A):* #get_val("cessionarioNome", "NOME DO CESSIONÁRIO"),{' '}
-  #get_val("cessionarioNacionalidade", "NACIONALIDADE"), maior e capaz,{' '}
-  #get_val("cessionarioEstadoCivil", "ESTADO CIVIL"),{' '}
-  #get_val("cessionarioProfissao", "PROFISSÃO"), portador(a) da Carteira de Identidade (RG) nº{' '}
-  #get_val("cessionarioRg", "RG DO CESSIONÁRIO"), órgão expedidor{' '}
-  #get_val("cessionarioRgOrgaoUf", "ÓRGÃO E UF DO CESSIONÁRIO"), inscrito(a) no CPF sob o nº{' '}
-  #get_val("cessionarioCpf", "CPF DO CESSIONÁRIO"), residente e domiciliado(a) em{' '}
-  #get_val("cessionarioEndereco", "ENDEREÇO COMPLETO DO CESSIONÁRIO, COM CEP"), e-mail{' '}
-  #get_val("cessionarioEmail", "E-MAIL DO CESSIONÁRIO") e telefone/WhatsApp{' '}
+1.3. *CESSIONÁRIO(A):* #get_val("cessionarioNome", "NOME DO CESSIONÁRIO"),
+  #get_val("cessionarioNacionalidade", "NACIONALIDADE"), maior e capaz,
+  #get_val("cessionarioEstadoCivil", "ESTADO CIVIL"),
+  #get_val("cessionarioProfissao", "PROFISSÃO"), portador(a) da Carteira de Identidade (RG) nº
+  #get_val("cessionarioRg", "RG DO CESSIONÁRIO"), órgão expedidor
+  #get_val("cessionarioRgOrgaoUf", "ÓRGÃO E UF DO CESSIONÁRIO"), inscrito(a) no CPF sob o nº
+  #get_val("cessionarioCpf", "CPF DO CESSIONÁRIO"), residente e domiciliado(a) em
+  #get_val("cessionarioEndereco", "ENDEREÇO COMPLETO DO CESSIONÁRIO, COM CEP"), e-mail
+  #get_val("cessionarioEmail", "E-MAIL DO CESSIONÁRIO") e telefone/WhatsApp
   #get_val("cessionarioTelefone", "TELEFONE DO CESSIONÁRIO"), doravante denominado(a) simplesmente *CESSIONÁRIO(A)*.
 
 1.4. Em caso de pluralidade de cessionários, estes serão doravante denominados em conjunto *CESSIONÁRIOS*, respondendo cada um individualmente pela parte do imóvel que lhe for especificamente cedida nos termos do Capítulo III, sem solidariedade entre si quanto às obrigações de pagamento relativas à parte de outrem, salvo disposição expressa em contrário, ressalvada a hipótese de cessionários unidos entre si por casamento ou união estável sob regime de bens que implique comunhão, caso em que a responsabilidade pelas obrigações de pagamento observará as regras do respectivo regime de bens, independentemente da regra de ausência de solidariedade prevista nesta Cláusula.

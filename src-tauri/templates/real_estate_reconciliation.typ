@@ -2,52 +2,35 @@
 // ASPPIBRA DAO — Template Oficial de Reconciliação Imobiliária (Typst)
 // Consome a Biblioteca Institucional Modular (asppibra_layout.typ)
 // ============================================================================
+// Nota de domínio: RealEstateReconciliationPayload (models.rs) contém a data
+// de geração (`generatedAt`), estatísticas (`stats`), lotes (`batches`),
+// apontamentos (`findings`) e imóveis (`properties`), mas não possui
+// `document_number` nem `auth_code` (cuja geração e persistência pertencem
+// à FASE 7). Portanto, `generatedAt` e `stats.totalProperties` são exibidos
+// estritamente com sua semântica de domínio (data de geração e métrica de
+// imóveis), sem serem transformados em número de registro ou código de autenticação.
+// ============================================================================
 
 #import "asppibra_layout.typ": *
 
 #let data = json(bytes(sys.inputs.data))
 
-#let raw_doc_num = if type(data) == dictionary {
-  if "document_number" in data and data.document_number != none and str(data.document_number).trim() != "" {
-    str(data.document_number).trim()
-  } else if "report_id" in data and data.report_id != none and str(data.report_id).trim() != "" {
-    str(data.report_id).trim()
-  } else if "reportId" in data and data.reportId != none and str(data.reportId).trim() != "" {
-    str(data.reportId).trim()
-  } else if "generatedAt" in data and data.generatedAt != none and str(data.generatedAt).trim() != "" {
-    "REC-" + str(data.generatedAt).trim()
-  } else {
-    none
-  }
+#let raw_generated_at = if type(data) == dictionary and "generatedAt" in data {
+  data.generatedAt
 } else {
   none
 }
 
-#let doc_number = if raw_doc_num != none and str(raw_doc_num).trim() != "" {
-  str(raw_doc_num).trim()
+#let generated_at = if raw_generated_at != none and str(raw_generated_at).trim() != "" {
+  str(raw_generated_at).trim()
 } else {
   none
 }
 
-#let raw_auth_code = if type(data) == dictionary {
-  if "auth_code" in data and data.auth_code != none and str(data.auth_code).trim() != "" {
-    str(data.auth_code).trim()
-  } else if "audit_hash" in data and data.audit_hash != none and str(data.audit_hash).trim() != "" {
-    str(data.audit_hash).trim()
-  } else if "generatedAt" in data and data.generatedAt != none and str(data.generatedAt).trim() != "" and "stats" in data and type(data.stats) == dictionary and "totalProperties" in data.stats and data.stats.totalProperties != none {
-    "CAD-MARICA-" + str(data.stats.totalProperties).trim() + "IMV"
-  } else {
-    none
-  }
-} else {
-  none
-}
-
-#let auth_code = if raw_auth_code != none and str(raw_auth_code).trim() != "" {
-  str(raw_auth_code).trim()
-} else {
-  none
-}
+#assert(
+  generated_at != none,
+  message: "real_estate_reconciliation.typ: 'generatedAt' é obrigatório e não pode ser vazio.",
+)
 
 #set document(
   title: "Relatorio_Analitico_Reconciliacao_Imobiliaria",
@@ -61,14 +44,13 @@
     let i = counter(page).get().first()
     if i > 1 {
       asppibra_header_running(
-        doc_number: doc_number,
         doc_title: "Relatório Analítico de Reconciliação Imobiliária",
+        require_registration: false,
       )
     }
   },
   footer: asppibra_footer(
-    doc_number: doc_number,
-    auth_code: auth_code,
+    require_registration: false,
   ),
 )
 
@@ -81,7 +63,10 @@
 )
 
 // 1. CABEÇALHO INSTITUCIONAL DA PRIMEIRA PÁGINA
-#asppibra_header_first_page(doc_number: doc_number)
+#asppibra_header_first_page(
+  require_registration: false,
+  subtitle: "DOCUMENTO OFICIAL • RELATÓRIO ANALÍTICO DE AUDITORIA E RECONCILIAÇÃO TERRITORIAL",
+)
 
 #v(6pt)
 
@@ -92,7 +77,7 @@
   [
     #text(size: font_size_heading, weight: "bold", fill: color_primary)[RELATÓRIO ANALÍTICO DE RECONCILIAÇÃO IMOBILIÁRIA] \
     #v(2pt)
-    #text(size: font_size_running, fill: color_secondary_text)[Consolidação de auditoria cadastral e reconciliação de lotes • Gerado em: #data.generatedAt]
+    #text(size: font_size_running, fill: color_secondary_text)[Consolidação de auditoria cadastral e reconciliação de lotes • Gerado em: #generated_at]
   ],
   [
     #rect(
