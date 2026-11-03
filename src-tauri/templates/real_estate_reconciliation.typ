@@ -1,76 +1,119 @@
+// ============================================================================
 // ASPPIBRA DAO — Template Oficial de Reconciliação Imobiliária (Typst)
-// Compilação nativa de alta fidelidade para auditoria cadastral e relatórios territoriais.
+// Consome a Biblioteca Institucional Modular (asppibra_layout.typ)
+// ============================================================================
+
+#import "asppibra_layout.typ": *
 
 #let data = json(bytes(sys.inputs.data))
 
+#let raw_doc_num = if type(data) == dictionary {
+  if "document_number" in data and data.document_number != none and str(data.document_number).trim() != "" {
+    str(data.document_number).trim()
+  } else if "report_id" in data and data.report_id != none and str(data.report_id).trim() != "" {
+    str(data.report_id).trim()
+  } else if "reportId" in data and data.reportId != none and str(data.reportId).trim() != "" {
+    str(data.reportId).trim()
+  } else if "generatedAt" in data and data.generatedAt != none and str(data.generatedAt).trim() != "" {
+    "REC-" + str(data.generatedAt).trim()
+  } else {
+    none
+  }
+} else {
+  none
+}
+
+#let doc_number = if raw_doc_num != none and str(raw_doc_num).trim() != "" {
+  str(raw_doc_num).trim()
+} else {
+  none
+}
+
+#let raw_auth_code = if type(data) == dictionary {
+  if "auth_code" in data and data.auth_code != none and str(data.auth_code).trim() != "" {
+    str(data.auth_code).trim()
+  } else if "audit_hash" in data and data.audit_hash != none and str(data.audit_hash).trim() != "" {
+    str(data.audit_hash).trim()
+  } else if "generatedAt" in data and data.generatedAt != none and str(data.generatedAt).trim() != "" and "stats" in data and type(data.stats) == dictionary and "totalProperties" in data.stats and data.stats.totalProperties != none {
+    "CAD-MARICA-" + str(data.stats.totalProperties).trim() + "IMV"
+  } else {
+    none
+  }
+} else {
+  none
+}
+
+#let auth_code = if raw_auth_code != none and str(raw_auth_code).trim() != "" {
+  str(raw_auth_code).trim()
+} else {
+  none
+}
+
 #set document(
   title: "Relatorio_Analitico_Reconciliacao_Imobiliaria",
-  author: "ASPPIBRA DAO • Cockpit Real Estate Engine",
+  author: asppibra_sigla,
 )
 
 #set page(
-  paper: "a4",
-  margin: (top: 2.0cm, bottom: 2.0cm, left: 1.5cm, right: 1.5cm),
-  footer: context {
+  paper: standard_paper,
+  margin: margins_institutional_territorial,
+  header: context {
     let i = counter(page).get().first()
-    let n = counter(page).final().first()
-    
-    block(width: 100%, stroke: (top: 1.5pt + rgb("#0284C7")), inset: (top: 6pt))[
-      #grid(
-        columns: (1.5fr, 2fr, 1fr, 1.5fr),
-        align: (left, center, center, right),
-        text(size: 6.5pt, fill: rgb("#64748B"))[Gerado em: #data.generatedAt],
-        text(size: 6.5pt, fill: rgb("#64748B"))[Confidencial • Base Territorial Oficial de Maricá - RJ],
-        text(size: 7pt, weight: "bold", fill: rgb("#0284C7"))[Página #i de #n],
-        text(size: 6.5pt, fill: rgb("#64748B"))[Documento Oficial ASPPIBRA DAO],
+    if i > 1 {
+      asppibra_header_running(
+        doc_number: doc_number,
+        doc_title: "Relatório Analítico de Reconciliação Imobiliária",
       )
-    ]
-  }
+    }
+  },
+  footer: asppibra_footer(
+    doc_number: doc_number,
+    auth_code: auth_code,
+  ),
 )
 
 #set text(
-  font: ("Roboto", "Liberation Sans", "Arial"),
+  font: font_family_base,
   size: 8pt,
-  fill: rgb("#1E293B"),
+  fill: color_primary_text,
   lang: "pt",
+  region: "BR",
 )
 
-// 1. CABEÇALHO INSTITUCIONAL
+// 1. CABEÇALHO INSTITUCIONAL DA PRIMEIRA PÁGINA
+#asppibra_header_first_page(doc_number: doc_number)
+
+#v(6pt)
+
+// 2. TÍTULO E METADADOS DA BASE TERRITORIAL
 #grid(
   columns: (1fr, auto),
   align: (left + bottom, right + bottom),
   [
-    #box[
-      #text(size: 15pt, weight: "bold", fill: rgb("#0F172A"))[ASPPIBRA ]
-      #text(size: 15pt, weight: "bold", fill: rgb("#0284C7"))[DAO]
-    ] \
+    #text(size: font_size_heading, weight: "bold", fill: color_primary)[RELATÓRIO ANALÍTICO DE RECONCILIAÇÃO IMOBILIÁRIA] \
     #v(2pt)
-    #text(size: 11pt, weight: "bold", fill: rgb("#0F172A"))[Relatório Analítico de Reconciliação Imobiliária] \
-    #v(1pt)
-    #text(size: 7pt, fill: rgb("#64748B"))[Consolidação de auditoria cadastral e reconciliação de lotes • Gerado em: #data.generatedAt]
+    #text(size: font_size_running, fill: color_secondary_text)[Consolidação de auditoria cadastral e reconciliação de lotes • Gerado em: #data.generatedAt]
   ],
   [
     #rect(
       radius: 3pt,
       inset: (x: 8pt, y: 4pt),
-      fill: rgb("#F0F9FF"),
-      stroke: 1pt + rgb("#0284C7"),
+      fill: color_sky_light,
+      stroke: 1pt + color_sky,
     )[
-      #text(size: 7pt, weight: "bold", fill: rgb("#0369A1"))[COCKPIT REAL ESTATE ENGINE]
+      #text(size: font_size_running, weight: "bold", fill: color_sky_dark)[COCKPIT REAL ESTATE ENGINE]
     ] \
     #v(3pt)
-    #text(size: 7pt, fill: rgb("#64748B"))[Base Territorial Oficial de Maricá - RJ] \
-    #text(size: 7pt, weight: "bold", fill: rgb("#334155"))[SQLite WAL • Integridade Garantida]
+    #text(size: font_size_running, fill: color_secondary_text)[Base Territorial Oficial de Maricá - RJ • #asppibra_sigla]
   ]
 )
 
-#v(8pt)
-#line(length: 100%, stroke: 0.8pt + rgb("#CBD5E1"))
 #v(6pt)
-
-// 2. MÉTRICAS CADASTRAIS CONSOLIDADAS (6 CARDS)
-#text(size: 8.5pt, weight: "bold", fill: rgb("#0369A1"))[MÉTRICAS CADASTRAIS CONSOLIDADAS]
+#line(length: 100%, stroke: 0.8pt + color_border)
 #v(4pt)
+
+// 3. MÉTRICAS CADASTRAIS CONSOLIDADAS (6 CARDS)
+#section_heading("MÉTRICAS CADASTRAIS CONSOLIDADAS")
 
 #grid(
   columns: (1fr, 1fr, 1fr),
@@ -79,52 +122,52 @@
   rect(
     width: 100%,
     radius: 3pt,
-    stroke: (left: 3pt + rgb("#0284C7"), rest: 0.8pt + rgb("#E2E8F0")),
+    stroke: (left: 3pt + color_sky, rest: 0.8pt + color_border),
     inset: 7pt,
-    fill: rgb("#F8FAFC"),
+    fill: color_bg_box,
     [
-      #text(size: 6.5pt, weight: "bold", fill: rgb("#64748B"))[TOTAL DE IMÓVEIS] \
+      #text(size: font_size_caption, weight: "bold", fill: color_secondary_text)[TOTAL DE IMÓVEIS] \
       #v(2pt)
-      #text(size: 12pt, weight: "bold", fill: rgb("#0F172A"))[#data.stats.totalProperties]
+      #text(size: 12pt, weight: "bold", fill: color_primary)[#data.stats.totalProperties]
     ]
   ),
   // Card 2: Identificadores
   rect(
     width: 100%,
     radius: 3pt,
-    stroke: (left: 3pt + rgb("#3B82F6"), rest: 0.8pt + rgb("#E2E8F0")),
+    stroke: (left: 3pt + color_gold, rest: 0.8pt + color_border),
     inset: 7pt,
-    fill: rgb("#F8FAFC"),
+    fill: color_bg_box,
     [
-      #text(size: 6.5pt, weight: "bold", fill: rgb("#64748B"))[IDENTIFICADORES] \
+      #text(size: font_size_caption, weight: "bold", fill: color_secondary_text)[IDENTIFICADORES] \
       #v(2pt)
-      #text(size: 12pt, weight: "bold", fill: rgb("#0F172A"))[#data.stats.totalIdentifiers]
+      #text(size: 12pt, weight: "bold", fill: color_primary)[#data.stats.totalIdentifiers]
     ]
   ),
   // Card 3: Endereços Vinculados
   rect(
     width: 100%,
     radius: 3pt,
-    stroke: (left: 3pt + rgb("#6366F1"), rest: 0.8pt + rgb("#E2E8F0")),
+    stroke: (left: 3pt + color_sky_dark, rest: 0.8pt + color_border),
     inset: 7pt,
-    fill: rgb("#F8FAFC"),
+    fill: color_bg_box,
     [
-      #text(size: 6.5pt, weight: "bold", fill: rgb("#64748B"))[ENDEREÇOS VINCULADOS] \
+      #text(size: font_size_caption, weight: "bold", fill: color_secondary_text)[ENDEREÇOS VINCULADOS] \
       #v(2pt)
-      #text(size: 12pt, weight: "bold", fill: rgb("#0F172A"))[#data.stats.totalAddresses]
+      #text(size: 12pt, weight: "bold", fill: color_primary)[#data.stats.totalAddresses]
     ]
   ),
   // Card 4: Lotes Processados
   rect(
     width: 100%,
     radius: 3pt,
-    stroke: (left: 3pt + rgb("#8B5CF6"), rest: 0.8pt + rgb("#E2E8F0")),
+    stroke: (left: 3pt + color_primary, rest: 0.8pt + color_border),
     inset: 7pt,
-    fill: rgb("#F8FAFC"),
+    fill: color_bg_box,
     [
-      #text(size: 6.5pt, weight: "bold", fill: rgb("#64748B"))[LOTES PROCESSADOS] \
+      #text(size: font_size_caption, weight: "bold", fill: color_secondary_text)[LOTES PROCESSADOS] \
       #v(2pt)
-      #text(size: 12pt, weight: "bold", fill: rgb("#0F172A"))[#data.stats.totalBatches]
+      #text(size: 12pt, weight: "bold", fill: color_primary)[#data.stats.totalBatches]
     ]
   ),
   // Card 5: Inconsistências Abertas
@@ -132,18 +175,18 @@
     width: 100%,
     radius: 3pt,
     stroke: (
-      left: 3pt + if data.stats.openFindingsCount > 0 { rgb("#EF4444") } else { rgb("#10B981") },
-      rest: 0.8pt + rgb("#E2E8F0")
+      left: 3pt + if data.stats.openFindingsCount > 0 { color_status_overdue } else { color_emerald },
+      rest: 0.8pt + color_border
     ),
     inset: 7pt,
-    fill: rgb("#F8FAFC"),
+    fill: color_bg_box,
     [
-      #text(size: 6.5pt, weight: "bold", fill: rgb("#64748B"))[INCONSISTÊNCIAS ABERTAS] \
+      #text(size: font_size_caption, weight: "bold", fill: color_secondary_text)[INCONSISTÊNCIAS ABERTAS] \
       #v(2pt)
       #text(
         size: 12pt,
         weight: "bold",
-        fill: if data.stats.openFindingsCount > 0 { rgb("#DC2626") } else { rgb("#16A34A") }
+        fill: if data.stats.openFindingsCount > 0 { color_status_overdue } else { color_status_paid }
       )[#data.stats.openFindingsCount]
     ]
   ),
@@ -151,99 +194,97 @@
   rect(
     width: 100%,
     radius: 3pt,
-    stroke: (left: 3pt + rgb("#F59E0B"), rest: 0.8pt + rgb("#E2E8F0")),
+    stroke: (left: 3pt + color_status_pending, rest: 0.8pt + color_border),
     inset: 7pt,
-    fill: rgb("#F8FAFC"),
+    fill: color_bg_box,
     [
-      #text(size: 6.5pt, weight: "bold", fill: rgb("#64748B"))[PROPOSTAS PENDENTES] \
+      #text(size: font_size_caption, weight: "bold", fill: color_secondary_text)[PROPOSTAS PENDENTES] \
       #v(2pt)
-      #text(size: 12pt, weight: "bold", fill: rgb("#0F172A"))[#data.stats.pendingProposalsCount]
+      #text(size: 12pt, weight: "bold", fill: color_primary)[#data.stats.pendingProposalsCount]
     ]
   )
 )
 
-#v(8pt)
-
-// 3. HISTÓRICO RECENTE DE LOTES DE IMPORTAÇÃO
-#text(size: 8.5pt, weight: "bold", fill: rgb("#0369A1"))[HISTÓRICO RECENTE DE LOTES DE IMPORTAÇÃO]
 #v(4pt)
+
+// 4. HISTÓRICO RECENTE DE LOTES DE IMPORTAÇÃO
+#section_heading("HISTÓRICO RECENTE DE LOTES DE IMPORTAÇÃO")
 
 #if data.batches.len() == 0 [
   #rect(
     width: 100%,
     radius: 3pt,
-    stroke: 0.8pt + rgb("#E2E8F0"),
+    stroke: 0.8pt + color_border,
     inset: 8pt,
-    fill: rgb("#F8FAFC"),
-    align(center)[#text(size: 7.5pt, fill: rgb("#64748B"))[Nenhum lote processado registrado no banco local.]]
+    fill: color_bg_box,
+    align(center)[#text(size: font_size_subtitle, fill: color_secondary_text)[Nenhum lote processado registrado no banco local.]]
   )
 ] else [
   #table(
     columns: (40pt, 1fr, 80pt, 75pt),
-    stroke: (x, y) => if y == 0 { (bottom: 1.5pt + rgb("#0284C7")) } else { (bottom: 0.5pt + rgb("#E2E8F0")) },
-    fill: (x, y) => if y == 0 { rgb("#F1F5F9") } else if calc.even(y) { rgb("#F8FAFC") } else { rgb("#FFFFFF") },
+    stroke: (x, y) => if y == 0 { (bottom: 1.5pt + color_gold) } else { (bottom: 0.5pt + color_border) },
+    fill: (x, y) => if y == 0 { color_primary } else if calc.even(y) { color_bg_box } else { color_bg_white },
     align: (center + horizon, left + horizon, center + horizon, right + horizon),
     inset: (x: 6pt, y: 5pt),
     table.header(
-      text(size: 6.5pt, weight: "bold", fill: rgb("#475569"))[ID],
-      text(size: 6.5pt, weight: "bold", fill: rgb("#475569"))[ARQUIVO DE ORIGEM],
-      text(size: 6.5pt, weight: "bold", fill: rgb("#475569"))[STATUS],
-      text(size: 6.5pt, weight: "bold", fill: rgb("#475569"))[IMPORTADOS],
+      text(size: font_size_caption, weight: "bold", fill: color_bg_white)[ID],
+      text(size: font_size_caption, weight: "bold", fill: color_bg_white)[ARQUIVO DE ORIGEM],
+      text(size: font_size_caption, weight: "bold", fill: color_bg_white)[STATUS],
+      text(size: font_size_caption, weight: "bold", fill: color_bg_white)[IMPORTADOS],
     ),
     ..for batch in data.batches {
       (
-        text(size: 7pt, weight: "bold", fill: rgb("#0F172A"))[\##batch.id],
-        text(size: 7pt, fill: rgb("#334155"))[#batch.filename],
-        text(size: 7pt, fill: rgb("#475569"))[#batch.status],
-        text(size: 7pt, weight: "bold", fill: rgb("#0284C7"))[#batch.importedRecords],
+        text(size: font_size_running, weight: "bold", fill: color_primary)[\##batch.id],
+        text(size: font_size_running, fill: color_primary_text)[#batch.filename],
+        text(size: font_size_running, fill: color_secondary_text)[#batch.status],
+        text(size: font_size_running, weight: "bold", fill: color_sky_dark)[#batch.importedRecords],
       )
     }
   )
 ]
 
-#v(8pt)
-
-// 4. APONTAMENTOS CRÍTICOS DE AUDITORIA
-#text(size: 8.5pt, weight: "bold", fill: rgb("#0369A1"))[APONTAMENTOS CRÍTICOS DE AUDITORIA]
 #v(4pt)
+
+// 5. APONTAMENTOS CRÍTICOS DE AUDITORIA
+#section_heading("APONTAMENTOS CRÍTICOS DE AUDITORIA")
 
 #if data.findings.len() == 0 [
   #rect(
     width: 100%,
     radius: 3pt,
-    stroke: 0.8pt + rgb("#E2E8F0"),
+    stroke: 0.8pt + color_border,
     inset: 8pt,
-    fill: rgb("#F8FAFC"),
-    align(center)[#text(size: 7.5pt, fill: rgb("#64748B"))[Nenhuma inconsistência em aberto no momento.]]
+    fill: color_bg_box,
+    align(center)[#text(size: font_size_subtitle, fill: color_secondary_text)[Nenhuma inconsistência em aberto no momento.]]
   )
 ] else [
   #table(
     columns: (40pt, 90pt, 1fr, 70pt),
-    stroke: (x, y) => if y == 0 { (bottom: 1.5pt + rgb("#0284C7")) } else { (bottom: 0.5pt + rgb("#E2E8F0")) },
-    fill: (x, y) => if y == 0 { rgb("#F1F5F9") } else if calc.even(y) { rgb("#F8FAFC") } else { rgb("#FFFFFF") },
+    stroke: (x, y) => if y == 0 { (bottom: 1.5pt + color_gold) } else { (bottom: 0.5pt + color_border) },
+    fill: (x, y) => if y == 0 { color_primary } else if calc.even(y) { color_bg_box } else { color_bg_white },
     align: (center + horizon, left + horizon, left + horizon, center + horizon),
     inset: (x: 6pt, y: 5pt),
     table.header(
-      text(size: 6.5pt, weight: "bold", fill: rgb("#475569"))[ID],
-      text(size: 6.5pt, weight: "bold", fill: rgb("#475569"))[CATEGORIA],
-      text(size: 6.5pt, weight: "bold", fill: rgb("#475569"))[DESCRIÇÃO],
-      text(size: 6.5pt, weight: "bold", fill: rgb("#475569"))[SEVERIDADE],
+      text(size: font_size_caption, weight: "bold", fill: color_bg_white)[ID],
+      text(size: font_size_caption, weight: "bold", fill: color_bg_white)[CATEGORIA],
+      text(size: font_size_caption, weight: "bold", fill: color_bg_white)[DESCRIÇÃO],
+      text(size: font_size_caption, weight: "bold", fill: color_bg_white)[SEVERIDADE],
     ),
     ..for finding in data.findings {
       (
-        text(size: 7pt, weight: "bold", fill: rgb("#0F172A"))[\##finding.id],
-        text(size: 7pt, fill: rgb("#334155"))[#finding.category],
-        text(size: 7pt, fill: rgb("#475569"))[#finding.description],
+        text(size: font_size_running, weight: "bold", fill: color_primary)[\##finding.id],
+        text(size: font_size_running, fill: color_primary_text)[#finding.category],
+        text(size: font_size_running, fill: color_secondary_text)[#finding.description],
         rect(
           radius: 2pt,
           inset: (x: 4pt, y: 2pt),
-          fill: if finding.severity == "high" or finding.severity == "critical" { rgb("#FEE2E2") } else { rgb("#FEF3C7") },
-          stroke: 0.5pt + if finding.severity == "high" or finding.severity == "critical" { rgb("#EF4444") } else { rgb("#F59E0B") },
+          fill: if finding.severity == "high" or finding.severity == "critical" { color_status_overdue_bg } else { color_status_pending_bg },
+          stroke: 0.5pt + if finding.severity == "high" or finding.severity == "critical" { color_status_overdue } else { color_status_pending },
           [
             #text(
               size: 6pt,
               weight: "bold",
-              fill: if finding.severity == "high" or finding.severity == "critical" { rgb("#B91C1C") } else { rgb("#B45309") }
+              fill: if finding.severity == "high" or finding.severity == "critical" { color_status_overdue } else { color_status_pending }
             )[#upper(finding.severity)]
           ]
         ),
@@ -252,26 +293,25 @@
   )
 ]
 
-#v(8pt)
-
-// 5. PLANILHA CADASTRAL TERRITORIAL
-#text(size: 8.5pt, weight: "bold", fill: rgb("#0369A1"))[PLANILHA CADASTRAL TERRITORIAL (#data.properties.len() Imóveis)]
 #v(4pt)
+
+// 6. PLANILHA CADASTRAL TERRITORIAL
+#section_heading("PLANILHA CADASTRAL TERRITORIAL (" + str(data.properties.len()) + " Imóveis)")
 
 #if data.properties.len() == 0 [
   #rect(
     width: 100%,
     radius: 3pt,
-    stroke: 0.8pt + rgb("#E2E8F0"),
+    stroke: 0.8pt + color_border,
     inset: 8pt,
-    fill: rgb("#F8FAFC"),
-    align(center)[#text(size: 7.5pt, fill: rgb("#64748B"))[Nenhum imóvel cadastrado registrado no banco local.]]
+    fill: color_bg_box,
+    align(center)[#text(size: font_size_subtitle, fill: color_secondary_text)[Nenhum imóvel cadastrado registrado no banco local.]]
   )
 ] else [
   #table(
     columns: (30pt, 55pt, 1.3fr, 70pt, 1fr, 28pt, 34pt, 28pt, 50pt),
-    stroke: (x, y) => if y == 0 { (bottom: 1.5pt + rgb("#0284C7")) } else { (bottom: 0.5pt + rgb("#E2E8F0")) },
-    fill: (x, y) => if y == 0 { rgb("#F1F5F9") } else if calc.even(y) { rgb("#F8FAFC") } else { rgb("#FFFFFF") },
+    stroke: (x, y) => if y == 0 { (bottom: 1.5pt + color_gold) } else { (bottom: 0.5pt + color_border) },
+    fill: (x, y) => if y == 0 { color_primary } else if calc.even(y) { color_bg_box } else { color_bg_white },
     align: (
       center + horizon,
       left + horizon,
@@ -285,27 +325,27 @@
     ),
     inset: (x: 4pt, y: 4pt),
     table.header(
-      text(size: 6pt, weight: "bold", fill: rgb("#475569"))[\#ID],
-      text(size: 6pt, weight: "bold", fill: rgb("#475569"))[MATRÍCULA],
-      text(size: 6pt, weight: "bold", fill: rgb("#475569"))[CONTRIBUINTE],
-      text(size: 6pt, weight: "bold", fill: rgb("#475569"))[BAIRRO],
-      text(size: 6pt, weight: "bold", fill: rgb("#475569"))[RUA],
-      text(size: 6pt, weight: "bold", fill: rgb("#475569"))[Nº],
-      text(size: 6pt, weight: "bold", fill: rgb("#475569"))[QUADRA],
-      text(size: 6pt, weight: "bold", fill: rgb("#475569"))[LOTE],
-      text(size: 6pt, weight: "bold", fill: rgb("#475569"))[COMPL.],
+      text(size: 6pt, weight: "bold", fill: color_bg_white)[\#ID],
+      text(size: 6pt, weight: "bold", fill: color_bg_white)[MATRÍCULA],
+      text(size: 6pt, weight: "bold", fill: color_bg_white)[CONTRIBUINTE],
+      text(size: 6pt, weight: "bold", fill: color_bg_white)[BAIRRO],
+      text(size: 6pt, weight: "bold", fill: color_bg_white)[RUA],
+      text(size: 6pt, weight: "bold", fill: color_bg_white)[Nº],
+      text(size: 6pt, weight: "bold", fill: color_bg_white)[QUADRA],
+      text(size: 6pt, weight: "bold", fill: color_bg_white)[LOTE],
+      text(size: 6pt, weight: "bold", fill: color_bg_white)[COMPL.],
     ),
     ..for prop in data.properties {
       (
-        text(size: 6pt, weight: "bold", fill: rgb("#0F172A"))[\##prop.id],
-        text(size: 6pt, fill: rgb("#475569"))[#prop.matricula],
-        text(size: 6pt, weight: "bold", fill: rgb("#1E293B"))[#prop.contribuinte],
-        text(size: 6pt, fill: rgb("#475569"))[#prop.bairro],
-        text(size: 6pt, fill: rgb("#475569"))[#prop.rua],
-        text(size: 6pt, fill: rgb("#475569"))[#prop.numero],
-        text(size: 6pt, fill: rgb("#475569"))[#prop.quadra],
-        text(size: 6pt, fill: rgb("#475569"))[#prop.lote],
-        text(size: 6pt, fill: rgb("#475569"))[#prop.complemento],
+        text(size: 6pt, weight: "bold", fill: color_primary)[\##prop.id],
+        text(size: 6pt, fill: color_secondary_text)[#prop.matricula],
+        text(size: 6pt, weight: "bold", fill: color_primary_text)[#prop.contribuinte],
+        text(size: 6pt, fill: color_secondary_text)[#prop.bairro],
+        text(size: 6pt, fill: color_secondary_text)[#prop.rua],
+        text(size: 6pt, fill: color_secondary_text)[#prop.numero],
+        text(size: 6pt, fill: color_secondary_text)[#prop.quadra],
+        text(size: 6pt, fill: color_secondary_text)[#prop.lote],
+        text(size: 6pt, fill: color_secondary_text)[#prop.complemento],
       )
     }
   )
@@ -316,12 +356,12 @@
   #rect(
     width: 100%,
     radius: 3pt,
-    stroke: 0.8pt + rgb("#CBD5E1"),
+    stroke: 0.8pt + color_border,
     inset: 6pt,
-    fill: rgb("#F8FAFC"),
+    fill: color_bg_box,
     align(center)[
-      #text(size: 6.5pt, fill: rgb("#64748B"))[
-        Documento analítico contendo #data.properties.len() registros impressos da base territorial oficial de Maricá - RJ (total de #data.stats.totalProperties imóveis cadastrados). Para a extração integral sem limite de paginação, utilize a exportação completa em Planilha CSV.
+      #text(size: font_size_caption, fill: color_secondary_text)[
+        Documento analítico contendo #data.properties.len() registros impressos da base territorial oficial de Maricá - RJ (total de #data.stats.totalProperties imóveis cadastrados • #asppibra_razao_social_curta • CNPJ: #asppibra_cnpj). Para a extração integral sem limite de paginação, utilize a exportação completa em Planilha CSV.
       ]
     ]
   )

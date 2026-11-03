@@ -1,5 +1,44 @@
+// ============================================================================
 // ASPPIBRA DAO - Template Oficial de Recibo e Fatura Associativa (Typst)
+// Consome a Biblioteca Institucional Modular (asppibra_layout.typ)
+// ============================================================================
+
+#import "asppibra_layout.typ": *
+
 #let data = json(bytes(sys.inputs.data))
+
+#let raw_id = if type(data) == dictionary and "invoice" in data and type(data.invoice) == dictionary {
+  data.invoice.at("id", default: none)
+} else {
+  none
+}
+
+#let doc_number = if raw_id != none and str(raw_id).trim() != "" {
+  str(raw_id).trim()
+} else {
+  none
+}
+
+#let raw_protocol = if type(data) == dictionary and "invoice" in data and type(data.invoice) == dictionary {
+  data.invoice.at("d1_protocol", default: none)
+} else {
+  none
+}
+
+#let ref_month = if type(data) == dictionary and "invoice" in data and type(data.invoice) == dictionary {
+  data.invoice.at("reference_month", default: "")
+} else {
+  ""
+}
+
+#let auth_code = if raw_protocol != none and str(raw_protocol).trim() != "" {
+  str(raw_protocol).trim()
+} else if doc_number != none {
+  "FAT-" + doc_number + (if ref_month != none and str(ref_month).trim() != "" { "-" + str(ref_month).trim() } else { "" })
+} else {
+  none
+}
+
 #let subtotal_amount = calc.round(data.invoice.amount, digits: 2)
 #let taxes_amount = if "taxes" in data.invoice and data.invoice.taxes != none {
   calc.round(data.invoice.taxes, digits: 2)
@@ -14,61 +53,63 @@
 #let final_total = calc.round(subtotal_amount + taxes_amount - discount_amount, digits: 2)
 
 #set document(
-  title: "Fatura_" + str(data.invoice.id),
-  author: "ASPPIBRA DAO",
+  title: "Fatura_" + str(doc_number),
+  author: asppibra_sigla,
   description: "Subtotal: R$ " + str(subtotal_amount) + " | Tributos: R$ " + str(taxes_amount) + " | Desconto: R$ " + str(discount_amount) + " | Total: R$ " + str(final_total),
 )
 
 #set page(
-  paper: "a4",
-  margin: (top: 2.2cm, bottom: 2.2cm, left: 1.8cm, right: 1.8cm),
-  footer: context {
+  paper: standard_paper,
+  margin: margins_institutional_financial,
+  header: context {
     let i = counter(page).get().first()
-    let n = counter(page).final().first()
-    
-    block(width: 100%, stroke: (top: 1.5pt + rgb("#10B981")), inset: (top: 6pt))[
-      #grid(
-        columns: (1.5fr, 1fr, 1.5fr),
-        align: (left, center, right),
-        text(size: 6.5pt, fill: rgb("#718096"))[ASPPIBRA DAO • CNPJ: 26.325.396/0001-30],
-        text(size: 7pt, weight: "bold", fill: rgb("#10B981"))[Página #i de #n],
-        text(size: 6.5pt, fill: rgb("#718096"))[Controle Documental DevOS],
+    if i > 1 {
+      asppibra_header_running(
+        doc_number: doc_number,
+        doc_title: "Fatura e Recibo Associativo",
       )
-    ]
-  }
+    }
+  },
+  footer: asppibra_footer(
+    doc_number: doc_number,
+    auth_code: auth_code,
+  ),
 )
 
 #set text(
-  font: ("Roboto", "Liberation Sans", "Arial"),
-  size: 8.5pt,
-  fill: rgb("#2D3748"),
+  font: font_family_base,
+  size: font_size_body,
+  fill: color_primary_text,
   lang: "pt",
+  region: "BR",
 )
 
-// 1. CABEÇALHO INSTITUCIONAL & STATUS DA FATURA
+// 1. CABEÇALHO INSTITUCIONAL DA PRIMEIRA PÁGINA
+#asppibra_header_first_page(doc_number: doc_number)
+
+#v(6pt)
+
+// 2. TÍTULO FUNCIONAL E STATUS DA FATURA
 #grid(
   columns: (1.2fr, 1fr),
-  align: (left + top, right + top),
+  align: (left + horizon, right + horizon),
   [
-    #box[
-      #text(size: 16pt, weight: "bold", fill: rgb("#1A202C"))[ASPPIBRA ]
-      #text(size: 16pt, weight: "bold", fill: rgb("#10B981"))[DAO]
-    ] \
+    #text(size: font_size_heading, weight: "bold", fill: color_primary)[FATURA E RECIBO ASSOCIATIVO] \
     #v(2pt)
-    #text(size: 7.5pt, fill: rgb("#718096"))[Associação dos Proprietários e Posseiros de Imóveis no Brasil] \
-    #text(size: 7pt, fill: rgb("#718096"))[Tesouraria Central e Controle de Faturamento Descentralizado]
+    #text(size: font_size_subtitle, fill: color_secondary_text)[#asppibra_razao_social_curta • CNPJ: #asppibra_cnpj] \
+    #text(size: font_size_running, fill: color_muted_text)[Tesouraria Central e Controle de Faturamento Associativo]
   ],
   [
     #box(
       radius: 3pt,
       inset: (x: 8pt, y: 4pt),
-      fill: if data.invoice.status == "paid" { rgb("#DCFCE7") } else if data.invoice.status == "overdue" { rgb("#FEE2E2") } else { rgb("#FEF3C7") },
-      stroke: 1pt + if data.invoice.status == "paid" { rgb("#16A34A") } else if data.invoice.status == "overdue" { rgb("#DC2626") } else { rgb("#D97706") },
+      fill: if data.invoice.status == "paid" { color_status_paid_bg } else if data.invoice.status == "overdue" { color_status_overdue_bg } else { color_status_pending_bg },
+      stroke: 1pt + if data.invoice.status == "paid" { color_status_paid } else if data.invoice.status == "overdue" { color_status_overdue } else { color_status_pending },
     )[
       #text(
-        size: 8.5pt,
+        size: font_size_body,
         weight: "bold",
-        fill: if data.invoice.status == "paid" { rgb("#15803D") } else if data.invoice.status == "overdue" { rgb("#B91C1C") } else { rgb("#B45309") }
+        fill: if data.invoice.status == "paid" { color_status_paid } else if data.invoice.status == "overdue" { color_status_overdue } else { color_status_pending }
       )[
         #{
           if data.invoice.status == "paid" [LIQUIDADA / PAGA]
@@ -79,165 +120,166 @@
       ]
     ] \
     #v(4pt)
-    #text(size: 11pt, weight: "bold", fill: rgb("#1A202C"))[Fatura: #data.invoice.id] \
-    #text(size: 7.5pt, fill: rgb("#718096"))[Ref: #data.invoice.reference_month]
+    #text(size: 10pt, weight: "bold", fill: color_primary)[Fatura Nº #doc_number] \
+    #text(size: font_size_subtitle, fill: color_secondary_text)[Competência: #data.invoice.reference_month]
   ]
 )
 
-#v(10pt)
-#line(length: 100%, stroke: 0.8pt + rgb("#E2E8F0"))
+#v(8pt)
+#line(length: 100%, stroke: 0.8pt + color_border)
 #v(8pt)
 
-// 2. DADOS DO PAGADOR E DA EMISSÃO
+// 3. DADOS DO PAGADOR E DETALHES DA COBRANÇA
 #grid(
   columns: (1fr, 1fr),
   gutter: 12pt,
   rect(
     width: 100%,
     radius: 4pt,
-    stroke: 1pt + rgb("#E2E8F0"),
+    stroke: 1pt + color_border,
+    fill: color_bg_box,
     inset: 10pt,
     [
-      #text(size: 7pt, weight: "bold", fill: rgb("#718096"))[FATURADO PARA (MEMBRO DA DAO)] \
+      #text(size: font_size_running, weight: "bold", fill: color_secondary_text)[FATURADO PARA (MEMBRO ASSOCIADO)] \
+      #v(3pt)
+      #text(size: 10pt, weight: "bold", fill: color_primary)[#data.invoice.member_name] \
       #v(2pt)
-      #text(size: 10pt, weight: "bold", fill: rgb("#1A202C"))[#data.invoice.member_name] \
-      #v(2pt)
-      #text(size: 7.5pt, fill: rgb("#4A5568"))[Documento: #data.invoice.member_doc] \
+      #text(size: font_size_subtitle, fill: color_primary_text)[Documento: #data.invoice.member_doc] \
       #if "member_email" in data.invoice and data.invoice.member_email != none [
-        #text(size: 7.5pt, fill: rgb("#4A5568"))[E-mail: #data.invoice.member_email] \
+        #text(size: font_size_subtitle, fill: color_primary_text)[E-mail: #data.invoice.member_email] \
       ]
       #if "member_address" in data.invoice and data.invoice.member_address != none [
-        #text(size: 7.5pt, fill: rgb("#4A5568"))[Endereço: #data.invoice.member_address]
+        #text(size: font_size_subtitle, fill: color_primary_text)[Endereço: #data.invoice.member_address]
       ]
     ]
   ),
   rect(
     width: 100%,
     radius: 4pt,
-    stroke: 1pt + rgb("#E2E8F0"),
+    stroke: 1pt + color_border,
+    fill: color_bg_box,
     inset: 10pt,
     [
-      #text(size: 7pt, weight: "bold", fill: rgb("#718096"))[DETALHES DA COBRANÇA] \
-      #v(2pt)
+      #text(size: font_size_running, weight: "bold", fill: color_secondary_text)[DETALHES DA COBRANÇA] \
+      #v(3pt)
       #grid(
         columns: (1fr, 1.2fr),
-        row-gutter: 3pt,
-        text(size: 7.5pt, fill: rgb("#718096"))[Vencimento:],
-        text(size: 7.5pt, weight: "bold", fill: rgb("#1A202C"))[#data.invoice.due_date],
-        text(size: 7.5pt, fill: rgb("#718096"))[Liquidação:],
-        text(size: 7.5pt, weight: "bold", fill: rgb("#10B981"))[
+        row-gutter: 3.5pt,
+        text(size: font_size_subtitle, fill: color_secondary_text)[Vencimento:],
+        text(size: font_size_subtitle, weight: "bold", fill: color_primary)[#data.invoice.due_date],
+        text(size: font_size_subtitle, fill: color_secondary_text)[Liquidação:],
+        text(size: font_size_subtitle, weight: "bold", fill: if "settled_date" in data.invoice and data.invoice.settled_date != none { color_status_paid } else { color_secondary_text })[
           #if "settled_date" in data.invoice and data.invoice.settled_date != none [
             #data.invoice.settled_date
           ] else [
             Pendente
           ]
         ],
-        text(size: 7.5pt, fill: rgb("#718096"))[Método:],
-        text(size: 7.5pt, weight: "bold", fill: rgb("#1A202C"))[#data.invoice.payment_method],
-        text(size: 7.5pt, fill: rgb("#718096"))[Protocolo Interno:],
-        text(size: 6.5pt, fill: rgb("#4A5568"))[
-          #if "d1_protocol" in data.invoice and data.invoice.d1_protocol != none [
-            #data.invoice.d1_protocol
-          ] else [
-            FATURA-#data.invoice.id
-          ]
-        ],
+        text(size: font_size_subtitle, fill: color_secondary_text)[Método:],
+        text(size: font_size_subtitle, weight: "bold", fill: color_primary)[#data.invoice.payment_method],
+        text(size: font_size_subtitle, fill: color_secondary_text)[Protocolo Interno:],
+        text(size: font_size_caption, font: font_family_mono, fill: color_primary_text)[#auth_code],
       )
     ]
   )
 )
 
-#v(10pt)
+#v(6pt)
 
-// 3. TABELA DE ITENS DA FATURA
-#text(size: 9pt, weight: "bold", fill: rgb("#1A202C"))[Itens e Serviços Discriminados]
-#v(4pt)
+// 4. TABELA DE ITENS DA FATURA
+#section_heading("ITENS E SERVIÇOS DISCRIMINADOS")
 
 #table(
   columns: (30pt, 1fr, 45pt, 75pt, 75pt),
-  stroke: (x, y) => if y == 0 { (bottom: 1.5pt + rgb("#10B981")) } else { (bottom: 0.5pt + rgb("#E2E8F0")) },
-  fill: (x, y) => if y == 0 { rgb("#F8FAFC") } else if calc.even(y) { rgb("#FAFAFA") } else { rgb("#FFFFFF") },
+  stroke: (x, y) => if y == 0 { (bottom: 1.5pt + color_gold) } else { (bottom: 0.5pt + color_border) },
+  fill: (x, y) => if y == 0 { color_primary } else if calc.even(y) { color_bg_box } else { color_bg_white },
   align: (center + horizon, left + horizon, center + horizon, right + horizon, right + horizon),
   inset: (x: 6pt, y: 6pt),
-  
-  // Cabeçalho
+
   table.header(
-    text(size: 7pt, weight: "bold", fill: rgb("#475569"))[\#],
-    text(size: 7pt, weight: "bold", fill: rgb("#475569"))[DESCRIÇÃO / SERVIÇO],
-    text(size: 7pt, weight: "bold", fill: rgb("#475569"))[QTD],
-    text(size: 7pt, weight: "bold", fill: rgb("#475569"))[VALOR UNIT.],
-    text(size: 7pt, weight: "bold", fill: rgb("#475569"))[TOTAL],
+    text(size: font_size_running, weight: "bold", fill: color_bg_white)[\#],
+    text(size: font_size_running, weight: "bold", fill: color_bg_white)[DESCRIÇÃO / SERVIÇO],
+    text(size: font_size_running, weight: "bold", fill: color_bg_white)[QTD],
+    text(size: font_size_running, weight: "bold", fill: color_bg_white)[VALOR UNIT.],
+    text(size: font_size_running, weight: "bold", fill: color_bg_white)[TOTAL],
   ),
-  
-  // Linhas
+
   ..for (idx, item) in data.invoice.items.enumerate() {
     (
-      text(size: 7.5pt, fill: rgb("#64748B"))[#(idx + 1)],
+      text(size: font_size_subtitle, fill: color_secondary_text)[#(idx + 1)],
       [
-        #text(size: 8pt, weight: "bold", fill: rgb("#1E293B"))[#item.description] \
+        #text(size: 8pt, weight: "bold", fill: color_primary)[#item.description] \
         #if "service" in item and item.service != none [
-          #text(size: 6.5pt, fill: rgb("#94A3B8"))[#item.service]
+          #text(size: font_size_caption, fill: color_muted_text)[#item.service]
         ]
       ],
-      text(size: 7.5pt, fill: rgb("#334155"))[#item.quantity],
-      text(size: 7.5pt, fill: rgb("#334155"))[R\$ #calc.round(item.price, digits: 2)],
-      text(size: 8pt, weight: "bold", fill: rgb("#0F172A"))[R\$ #calc.round(item.total, digits: 2)],
+      text(size: font_size_subtitle, fill: color_primary_text)[#item.quantity],
+      text(size: font_size_subtitle, fill: color_primary_text)[R\$ #calc.round(item.price, digits: 2)],
+      text(size: 8pt, weight: "bold", fill: color_primary)[R\$ #calc.round(item.total, digits: 2)],
     )
   }
 )
 
-#v(8pt)
+#v(10pt)
 
-// 4. TOTAIS E SUMÁRIO FINANCEIRO
+// 5. TOTAIS E SUMÁRIO FINANCEIRO
 #align(right)[
-  #block(width: 45%)[
-    #grid(
-      columns: (1fr, 1fr),
-      row-gutter: 4pt,
-      align: (left, right),
-      text(size: 7.5pt, fill: rgb("#718096"))[Subtotal:],
-      text(size: 8pt, weight: "bold", fill: rgb("#2D3748"))[R\$ #subtotal_amount],
-      
-      ..(if taxes_amount > 0 {
-        (
-          text(size: 7.5pt, fill: rgb("#718096"))[Tributos / Taxas:],
-          text(size: 8pt, fill: rgb("#2D3748"))[R\$ #taxes_amount],
-        )
-      } else { () }),
-      ..(if discount_amount > 0 {
-        (
-          text(size: 7.5pt, fill: rgb("#718096"))[Desconto:],
-          text(size: 8pt, fill: rgb("#16A34A"))[- R\$ #discount_amount],
-        )
-      } else { () }),
-      
-      grid.hline(stroke: 1pt + rgb("#CBD5E1")),
-      text(size: 9pt, weight: "bold", fill: rgb("#0F172A"))[VALOR TOTAL:],
-      text(size: 11pt, weight: "bold", fill: if data.invoice.status == "paid" { rgb("#15803D") } else { rgb("#0F172A") })[
-        R\$ #final_total
-      ],
-    )
+  #block(width: 48%)[
+    #rect(
+      width: 100%,
+      radius: 4pt,
+      stroke: 1pt + color_border,
+      fill: color_bg_box,
+      inset: 10pt,
+    )[
+      #grid(
+        columns: (1fr, 1fr),
+        row-gutter: 5pt,
+        align: (left + horizon, right + horizon),
+        text(size: font_size_subtitle, fill: color_secondary_text)[Subtotal:],
+        text(size: 8pt, weight: "bold", fill: color_primary_text)[R\$ #subtotal_amount],
+
+        ..(if taxes_amount > 0 {
+          (
+            text(size: font_size_subtitle, fill: color_secondary_text)[Tributos / Taxas:],
+            text(size: 8pt, fill: color_primary_text)[R\$ #taxes_amount],
+          )
+        } else { () }),
+        ..(if discount_amount > 0 {
+          (
+            text(size: font_size_subtitle, fill: color_secondary_text)[Desconto:],
+            text(size: 8pt, fill: color_status_paid)[- R\$ #discount_amount],
+          )
+        } else { () }),
+
+        grid.hline(stroke: 1pt + color_gold),
+        text(size: font_size_section, weight: "bold", fill: color_primary)[VALOR TOTAL:],
+        text(size: font_size_heading, weight: "bold", fill: if data.invoice.status == "paid" { color_status_paid } else { color_primary })[
+          R\$ #final_total
+        ],
+      )
+    ]
   ]
 ]
 
-#v(14pt)
+#v(12pt)
 
-// 5. QUADRO DE RASTREABILIDADE E CONTROLE INTERNO
+// 6. QUADRO DE RASTREABILIDADE E CONTROLE INTERNO
 #rect(
   width: 100%,
   radius: 4pt,
-  fill: rgb("#F8FAFC"),
-  stroke: (paint: rgb("#CBD5E1"), dash: "dashed", thickness: 0.8pt),
+  fill: color_bg_box,
+  stroke: (paint: color_border, dash: "dashed", thickness: 0.8pt),
   inset: 8pt,
   [
-    #text(size: 7pt, weight: "bold", fill: rgb("#334155"))[RASTREABILIDADE E CONTROLE DOCUMENTAL INTERNO (DEVOS)] \
+    #text(size: font_size_running, weight: "bold", fill: color_primary)[RASTREABILIDADE E CONTROLE DOCUMENTAL INTERNO (DEVOS)] \
     #v(2pt)
-    #text(size: 6.5pt, font: ("Roboto", "Courier"), fill: rgb("#475569"))[
-      IDENTIFICADOR INTERNO: FATURA-#data.invoice.id | COMPETÊNCIA: #data.invoice.reference_month
+    #text(size: font_size_caption, font: font_family_mono, fill: color_secondary_text)[
+      IDENTIFICADOR INTERNO: FATURA-#doc_number | COMPETÊNCIA: #data.invoice.reference_month | CÓDIGO: #auth_code
     ] \
     #v(2pt)
-    #text(size: 6.5pt, fill: rgb("#64748B"))[
-      Documento emitido pelo sistema DevOS Desktop para controle administrativo e financeiro interno da ASPPIBRA DAO.
+    #text(size: font_size_caption, fill: color_muted_text)[
+      Documento emitido pelo sistema DevOS Desktop para controle administrativo e financeiro interno da #asppibra_razao_social_curta (#asppibra_sigla).
     ]
   ]
 )

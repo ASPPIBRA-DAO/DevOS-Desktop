@@ -646,15 +646,332 @@ mod tests {
 
         // Garante que as cláusulas jurídicas materiais 16.1 e 16.2 do contrato foram preservadas
         assert!(
-            CONTRATO_CESSAO_TEMPLATE
-                .contains("16.1. As partes reconhecem a plena eficácia da assinatura eletrônica"),
-            "A cláusula contratual material 16.1 deve ser preservada"
+            CONTRATO_CESSAO_TEMPLATE.contains(
+                "16.1. As partes reconhecem, desde já, a validade jurídica, a autenticidade e a força probante da assinatura eletrônica aposta a este instrumento"
+            ),
+            "A cláusula contratual material 16.1 deve ser preservada integralmente"
         );
         assert!(
             CONTRATO_CESSAO_TEMPLATE.contains(
-                "16.2. São válidas assinaturas simples, avançadas ou qualificadas ICP-Brasil."
+                "16.2. Consideram-se válidas, para fins de celebração e prova deste contrato entre as partes, as assinaturas eletrônicas nas modalidades simples, avançada ou qualificada (certificado ICP-Brasil)"
             ),
-            "A cláusula contratual material 16.2 deve ser preservada"
+            "A cláusula contratual material 16.2 deve ser preservada integralmente"
+        );
+    }
+
+    #[test]
+    fn test_all_four_templates_import_canonical_layout_and_apply_institutional_profiles() {
+        let expectations = [
+            (
+                "contrato_cessao_posse.typ",
+                CONTRATO_CESSAO_TEMPLATE,
+                "margins_institutional_contract",
+            ),
+            (
+                "invoice_bill.typ",
+                INVOICE_TEMPLATE,
+                "margins_institutional_financial",
+            ),
+            (
+                "extrato_citizen_ledger.typ",
+                CITIZEN_TEMPLATE,
+                "margins_institutional_financial",
+            ),
+            (
+                "real_estate_reconciliation.typ",
+                RECONCILIATION_TEMPLATE,
+                "margins_institutional_territorial",
+            ),
+        ];
+
+        for (name, source, expected_margin_profile) in expectations {
+            assert!(
+                source.contains("#import \"asppibra_layout.typ\": *"),
+                "O template {name} deve importar explicitamente '#import \"asppibra_layout.typ\": *'"
+            );
+            assert!(
+                source.contains(expected_margin_profile),
+                "O template {name} deve aplicar o perfil geométrico {expected_margin_profile}"
+            );
+            assert!(
+                source.contains("asppibra_header_first_page("),
+                "O template {name} deve utilizar o cabeçalho institucional da 1ª página (asppibra_header_first_page)"
+            );
+            assert!(
+                source.contains("asppibra_header_running("),
+                "O template {name} deve utilizar o cabeçalho institucional corrente (asppibra_header_running)"
+            );
+            assert!(
+                source.contains("asppibra_footer("),
+                "O template {name} deve utilizar o rodapé institucional (asppibra_footer)"
+            );
+            assert!(
+                source.contains("section_heading("),
+                "O template {name} deve utilizar os títulos de seção institucionais (section_heading)"
+            );
+        }
+    }
+
+    #[test]
+    fn test_all_non_contract_templates_reject_missing_or_empty_identifiers() {
+        // 1. InvoiceBill sem id ou com id vazio deve falhar na compilação do template
+        for invalid_invoice_json in [
+            json!({"invoice": {"id": "", "reference_month": "2026-10", "amount": 100.0, "status": "pending", "member_name": "Teste", "member_doc": "000", "due_date": "2026-10-31", "payment_method": "Pix", "items": []}}),
+            json!({"invoice": {"id": "   ", "reference_month": "2026-10", "amount": 100.0, "status": "pending", "member_name": "Teste", "member_doc": "000", "due_date": "2026-10-31", "payment_method": "Pix", "items": []}}),
+        ] {
+            let mut string_inputs = HashMap::new();
+            string_inputs.insert("data", invalid_invoice_json.to_string());
+            let options = TypstCompileOptions {
+                template_source: INVOICE_TEMPLATE,
+                fonts: &[ROBOTO_REGULAR, ROBOTO_BOLD],
+                string_inputs,
+                static_sources: CANONICAL_TYPST_STATIC_SOURCES,
+            };
+            assert!(
+                compile_typst_document(options).is_err(),
+                "invoice_bill.typ deve rejeitar fatura sem id válido"
+            );
+        }
+
+        // 2. CitizenLedger sem associate.id ou sem meta.audit_hash deve falhar na compilação do template
+        for invalid_ledger_json in [
+            json!({"meta": {"generated_at": "23/10/2026", "reference_period": "2026-10", "audit_hash": ""}, "associate": {"id": "123", "name": "A", "cpf": "0", "email": "a@b", "avatar_letter": "A", "address_line1": "R", "address_line2": "B"}, "summary": {"total_contracted": "0", "total_paid": "0", "outstanding_balance": "0"}, "transactions": []}),
+            json!({"meta": {"generated_at": "23/10/2026", "reference_period": "2026-10", "audit_hash": "hash-ok"}, "associate": {"id": "   ", "name": "A", "cpf": "0", "email": "a@b", "avatar_letter": "A", "address_line1": "R", "address_line2": "B"}, "summary": {"total_contracted": "0", "total_paid": "0", "outstanding_balance": "0"}, "transactions": []}),
+        ] {
+            let mut string_inputs = HashMap::new();
+            string_inputs.insert("data", invalid_ledger_json.to_string());
+            let options = TypstCompileOptions {
+                template_source: CITIZEN_TEMPLATE,
+                fonts: &[ROBOTO_REGULAR, ROBOTO_BOLD],
+                string_inputs,
+                static_sources: CANONICAL_TYPST_STATIC_SOURCES,
+            };
+            assert!(
+                compile_typst_document(options).is_err(),
+                "extrato_citizen_ledger.typ deve rejeitar extrato sem associate.id ou sem meta.audit_hash"
+            );
+        }
+
+        // 3. RealEstateReconciliation sem generatedAt / report_id deve falhar na compilação do template
+        for invalid_rec_json in [
+            json!({"generatedAt": "   ", "stats": {"totalProperties": 1, "totalIdentifiers": 1, "totalAddresses": 1, "totalBatches": 1, "openFindingsCount": 0, "pendingProposalsCount": 0}, "batches": [], "findings": [], "properties": []}),
+            json!({"stats": {"totalProperties": 1, "totalIdentifiers": 1, "totalAddresses": 1, "totalBatches": 1, "openFindingsCount": 0, "pendingProposalsCount": 0}, "batches": [], "findings": [], "properties": []}),
+        ] {
+            let mut string_inputs = HashMap::new();
+            string_inputs.insert("data", invalid_rec_json.to_string());
+            let options = TypstCompileOptions {
+                template_source: RECONCILIATION_TEMPLATE,
+                fonts: &[ROBOTO_REGULAR, ROBOTO_BOLD],
+                string_inputs,
+                static_sources: CANONICAL_TYPST_STATIC_SOURCES,
+            };
+            assert!(
+                compile_typst_document(options).is_err(),
+                "real_estate_reconciliation.typ deve rejeitar payload sem identificador/generatedAt válido"
+            );
+        }
+    }
+
+    #[test]
+    fn test_cessao_posse_template_reconciles_full_legal_content_and_dynamic_fields() {
+        // 1. Verifica que todos os 17 capítulos + seções de assinaturas e testemunhas estão presentes (idênticos ao CessaoPosseContent.tsx)
+        let required_sections = [
+            "CAPÍTULO I – DAS PARTES",
+            "CAPÍTULO II – DAS DECLARAÇÕES PRELIMINARES",
+            "CAPÍTULO III – DO OBJETO",
+            "CAPÍTULO IV – DA ORIGEM DA POSSE, CADEIA POSSESSÓRIA E REGULARIZAÇÃO FUNDIÁRIA",
+            "CAPÍTULO V – DO PREÇO E DAS CONDIÇÕES DE PAGAMENTO",
+            "CAPÍTULO VI – DA FORMA DE PAGAMENTO E COMPROVAÇÃO",
+            "CAPÍTULO VII – DAS OBRIGAÇÕES TRIBUTÁRIAS, MUNICIPAIS, NOTARIAIS E REGISTRAIS",
+            "CAPÍTULO VIII – DA IMISSÃO NA POSSE E DAS BENFEITORIAS",
+            "CAPÍTULO IX – DO INADIMPLEMENTO, JUROS E MULTA",
+            "CAPÍTULO X – DA RESOLUÇÃO, DO DISTRATO E DE SUAS CONSEQUÊNCIAS",
+            "CAPÍTULO XI – DA EVICÇÃO, DA PERDA DA POSSE E DA VERACIDADE DAS DECLARAÇÕES DO CEDENTE",
+            "CAPÍTULO XII – DO CASO FORTUITO E DA FORÇA MAIOR",
+            "CAPÍTULO XIII – DA PROTEÇÃO DE DADOS PESSOAIS",
+            "CAPÍTULO XIV – DA MEDIAÇÃO, DA ARBITRAGEM E DO FORO",
+            "CAPÍTULO XV – DAS CUSTAS E HONORÁRIOS EM CASO DE LITÍGIO",
+            "CAPÍTULO XVI – DA ASSINATURA ELETRÔNICA E DA ATUALIZAÇÃO CADASTRAL",
+            "CAPÍTULO XVII – DISPOSIÇÕES GERAIS",
+            "ASSINATURAS E VALIDAÇÃO DIGITAL",
+            "TESTEMUNHAS INSTRUMENTÁRIAS",
+        ];
+
+        for section in required_sections {
+            assert!(
+                CONTRATO_CESSAO_TEMPLATE.contains(section),
+                "O template contrato_cessao_posse.typ deve conter a seção '{section}'"
+            );
+        }
+
+        // 2. Verifica que as subcláusulas e parágrafos reconciliados (que estavam condensados antes da Fase 4) estão integralmente presentes
+        let required_clauses = [
+            "1.5.1.",
+            "1.5.8.",
+            "1.5.12.",
+            "1.5.17.",
+            "1.5.25.",
+            "1.5.34.",
+            "1.5.45.",
+            "2.7.1.",
+            "2.7.2.",
+            "2.8.",
+            "2.8.1.",
+            "3.3.1.",
+            "3.3.2.",
+            "3.3.3.",
+            "4.1.1.",
+            "4.2.1.",
+            "4.3.1.",
+            "4.9.",
+            "5.7.1.",
+            "5.7.2.",
+            "6.5.",
+            "7.5.1.",
+            "7.7.",
+            "8.4.1.",
+            "9.6.",
+            "10.2.1.",
+            "10.2.2.",
+            "10.2.3.",
+            "10.2.3.1.",
+            "10.2.3.2.",
+            "10.2.3.3.",
+            "10.3.1.",
+            "10.3.2.",
+            "10.3.3.",
+            "10.3.4.",
+            "10.5.",
+            "11.1.1.",
+            "11.1.2.",
+            "11.1.3.",
+            "11.5.",
+            "12.1.",
+            "12.2.",
+            "13.1.",
+            "13.2.",
+            "13.3.",
+            "13.4.",
+            "14.1.",
+            "14.2.",
+            "14.3.",
+            "15.1.",
+            "16.1.",
+            "16.2.",
+            "16.3.",
+            "16.4.",
+            "16.5.",
+            "16.6.",
+            "17.1.",
+            "17.2.",
+            "17.3.",
+            "17.4.",
+            "17.5.",
+            "17.6.",
+            "17.7.",
+            "17.8.",
+            "17.9.",
+            "17.10.",
+        ];
+
+        for clause_marker in required_clauses {
+            assert!(
+                CONTRATO_CESSAO_TEMPLATE.contains(clause_marker),
+                "O template contrato_cessao_posse.typ deve conter a cláusula reconciliada '{clause_marker}'"
+            );
+        }
+
+        // 3. Verifica a presença dos campos dinâmicos reconciliados que estavam ausentes antes da Fase 4
+        let reconciled_fields = [
+            "conjugeQualidade",
+            "asppibraRepresentanteNacionalidade",
+            "asppibraRepresentanteEstadoCivil",
+            "asppibraRepresentanteRgOrgaoUf",
+            "asppibraDocumentoPoderes",
+            "asppibraRemuneracaoValor",
+            "asppibraRemuneracaoValorExtenso",
+            "asppibraRemuneracaoPercentual",
+            "asppibraRemuneracaoBaseCalculo",
+            "asppibraRemuneracaoResponsavel",
+            "comarcaCartorioImoveis",
+            "municipioPrefeitura",
+            "numeroCertidaoFiscalVenal",
+            "cpfCnpjTitularCadastral",
+            "nomeLoteamento",
+            "municipioLoteamento",
+            "processoAdmLoteamento",
+            "cartorioLoteamento",
+            "registroLoteamento",
+            "identificacaoLoteTerreno",
+            "dataReferenciaIptu",
+            "valorTotalDividaExtenso",
+            "anoVigenteIptu",
+            "valorParcelaIptu",
+            "numeroParcelasIptu",
+            "saldoVencerIptu",
+            "capituloPenalidadesOmissao",
+            "prazoComprovacaoQuitacaoDivida",
+            "prazoApresentacaoComprovanteParcelamento",
+            "totalParcelasMensais",
+            "valorTotalCiclo",
+            "vencimentoPrimeiroCiclo",
+            "prazoEntregaCertidoes",
+            "prazoEntregaCertidoesDisponibilizadas",
+            "plataformaAssinatura",
+            "municipioAssinatura",
+            "diaAssinatura",
+            "mesAssinatura",
+            "anoAssinatura",
+            "cedenteAssinatura",
+            "cessionarioAssinatura",
+            "conjugeAssinatura",
+            "asppibraAssinatura",
+            "testemunha1Assinatura",
+            "testemunha2Assinatura",
+            "testemunha3Assinatura",
+        ];
+
+        for field in reconciled_fields {
+            let pattern = format!("#get_val(\"{field}\",");
+            assert!(
+                CONTRATO_CESSAO_TEMPLATE.contains(&pattern),
+                "O template contrato_cessao_posse.typ deve conter o campo dinâmico reconciliado '{field}'"
+            );
+        }
+
+        // 4. Compila o contrato reconciliado preenchendo os campos dinâmicos e verifica o PDF gerado
+        let renderer = TypstDocumentRenderer::new();
+        let payload = CessaoPossePayload {
+            document_number: "2026-FASE4-0001/CP".to_string(),
+            auth_code: "AUTH-FASE4-2026".to_string(),
+            data: json!({
+                "cedenteNome": "CARLOS ALBERTO MENDES",
+                "cessionarioNome": "FERNANDA LIMA COSTA",
+                "conjugeQualidade": "anuente",
+                "asppibraRepresentanteNome": "SANDRO PEREIRA",
+                "asppibraRemuneracaoValor": "3.500,00",
+                "nomeLoteamento": "Jardim Atlântico",
+                "municipioLoteamento": "Maricá/RJ",
+                "numeroLote": "14",
+                "quadraLote": "B",
+                "valorTotalCessao": "120.000,00",
+                "plataformaAssinatura": "Gov.br",
+                "municipioAssinatura": "Maricá/RJ",
+                "diaAssinatura": "03",
+                "mesAssinatura": "novembro",
+                "anoAssinatura": "2026"
+            }),
+        };
+
+        let rendered = renderer
+            .render(DocumentRequest::CessaoPosse(payload))
+            .expect("O contrato reconciliado deve compilar com sucesso");
+
+        assert_valid_rendered(&rendered);
+        assert!(
+            rendered.pdf_bytes.len() > 20_000,
+            "O PDF do contrato integral reconciliado deve possuir tamanho substancial (> 20 KB), obtido: {} bytes",
+            rendered.pdf_bytes.len()
         );
     }
 
