@@ -1,3 +1,4 @@
+import type { PDFDocumentProxy, PDFDocumentLoadingTask } from 'pdfjs-dist';
 import type { DocumentPreviewResult } from 'src/platform/tauri/contracts/document-contracts';
 
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
@@ -15,6 +16,8 @@ import { useRouter } from 'src/app/router/hooks';
 import { toast } from 'src/shared/components/snackbar';
 import { Iconify } from 'src/shared/components/iconify';
 
+import { pdfjsLib } from './pdf-engine';
+import { PdfPageCanvas } from './pdf-page-canvas';
 import {
   isValidPdfHeader,
   computeSha256Hex,
@@ -65,35 +68,55 @@ export function PdfViewerLayout({
   const [checksumVerified, setChecksumVerified] = useState<boolean>(false);
   const [validationError, setValidationError] = useState<string | null>(null);
 
+  // Estado do documento PDF real interpretado pelo PDF.js
+  const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null);
+  const [numDocPages, setNumDocPages] = useState<number>(1);
+  const [isPdfLoading, setIsPdfLoading] = useState<boolean>(false);
+
   const displayTitle = documentTitle.endsWith('.pdf') ? documentTitle : `${documentTitle}.pdf`;
 
   const totalPages = useMemo(() => {
+    if (pdfDoc) {
+      return numDocPages;
+    }
+    if (preview?.page_count && preview.page_count > 0) {
+      return preview.page_count;
+    }
     if (preview?.pages && preview.pages.length > 0) {
       return preview.pages.length;
     }
     return 1;
-  }, [preview]);
+  }, [pdfDoc, numDocPages, preview]);
 
-  // Validação estrita do binário do PDF ao receber ou trocar o preview
+  // Validação estrita do binário do PDF e carregamento via PDF.js ao receber preview
   useEffect(() => {
     let isCancelled = false;
+    let loadingTask: PDFDocumentLoadingTask | null = null;
+    let loadedDoc: PDFDocumentProxy | null = null;
 
     if (!preview || !preview.pdf_base64) {
+      setPdfDoc(null);
+      setNumDocPages(1);
       setChecksumVerified(false);
       setValidationError(null);
+      setIsPdfLoading(false);
     } else {
-      const validatePreviewPayload = async () => {
+      const validateAndLoadPdf = async () => {
         try {
+          setIsPdfLoading(true);
           const bytes = base64ToUint8Array(preview.pdf_base64);
 
+          // 1. Validação canônica do cabeçalho %PDF-
           if (!isValidPdfHeader(bytes)) {
             if (!isCancelled) {
               setValidationError('O buffer binário recebido não possui o cabeçalho canônico %PDF-.');
               setChecksumVerified(false);
+              setIsPdfLoading(false);
             }
             return;
           }
 
+          // 2. Cálculo do SHA-256 no cliente sobre os bytes reais do PDF
           const calculatedSha256 = await computeSha256Hex(bytes);
           const expectedSha256 = preview.metadata.sha256_checksum.toLowerCase();
 
@@ -101,28 +124,62 @@ export function PdfViewerLayout({
             if (!isCancelled) {
               setValidationError('Divergência de integridade: SHA-256 do binário difere dos metadados.');
               setChecksumVerified(false);
+              setIsPdfLoading(false);
             }
             return;
           }
 
-          if (!isCancelled) {
-            setChecksumVerified(true);
-            setValidationError(null);
+          if (isCancelled) return;
+          setChecksumVerified(true);
+          setValidationError(null);
+
+          // 3. Fornecimento de cópia defensiva do buffer para o PDF.js
+          const pdfBufferCopy = bytes.slice();
+          loadingTask = pdfjsLib.getDocument({
+            data: pdfBufferCopy,
+            cMapPacked: true,
+          });
+
+          const doc = await loadingTask.promise;
+          if (isCancelled) {
+            doc.loadingTask.destroy();
+            return;
           }
+
+          loadedDoc = doc;
+          setPdfDoc(doc);
+          setNumDocPages(doc.numPages);
+          setCurrentPage(1);
+          setIsPdfLoading(false);
         } catch (err: unknown) {
           if (!isCancelled) {
-            const msg = err instanceof Error ? err.message : 'Falha na validação do PDF.';
+            const msg = err instanceof Error ? err.message : 'Falha na validação e interpretação do PDF.';
             setValidationError(msg);
             setChecksumVerified(false);
+            setIsPdfLoading(false);
           }
         }
       };
 
-      validatePreviewPayload();
+      validateAndLoadPdf();
     }
 
     return () => {
       isCancelled = true;
+      if (loadingTask) {
+        try {
+          loadingTask.destroy();
+        } catch {
+          // No-op
+        }
+      }
+      if (loadedDoc) {
+        try {
+          loadedDoc.loadingTask.destroy();
+        } catch {
+          // No-op
+        }
+      }
     };
   }, [preview]);
 
@@ -193,6 +250,37 @@ export function PdfViewerLayout({
       return next;
     });
   }, [totalPages, onPageChange]);
+
+  // Suporte à navegação via teclado (PageUp, PageDown, Home, End)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+      if (e.key === 'PageUp') {
+        e.preventDefault();
+        handlePrevPage();
+      } else if (e.key === 'PageDown') {
+        e.preventDefault();
+        handleNextPage();
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        setCurrentPage(1);
+        onPageChange?.(1);
+        document.getElementById('pdf-page-1')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        setCurrentPage(totalPages);
+        onPageChange?.(totalPages);
+        document.getElementById(`pdf-page-${totalPages}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handlePrevPage, handleNextPage, totalPages, onPageChange]);
 
   const handleCopySha256 = useCallback(() => {
     if (preview?.metadata.sha256_checksum) {
@@ -305,7 +393,7 @@ export function PdfViewerLayout({
           }}
         >
           {/* Paginação */}
-          {preview?.pages && preview.pages.length > 0 && (
+          {(Boolean(pdfDoc) || Boolean(preview?.pdf_base64)) && (
             <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', pr: 1, borderRight: '1px solid rgba(255, 255, 255, 0.12)' }}>
               <IconButton
                 size="small"
@@ -424,7 +512,7 @@ export function PdfViewerLayout({
             variant="outlined"
             size="small"
             onClick={handleView}
-            loading={isBusy}
+            loading={isBusy || isPdfLoading}
             startIcon={<Iconify icon="solar:eye-bold" width={16} />}
             sx={{
               color: '#f8fafc',
@@ -449,17 +537,17 @@ export function PdfViewerLayout({
             size="small"
             onClick={onExport}
             loading={isExporting}
-            startIcon={<Iconify icon="solar:file-download-bold" width={16} />}
+            startIcon={<Iconify icon="solar:download-square-bold" width={16} />}
             sx={{
               bgcolor: '#10B981',
               color: '#ffffff',
-              fontWeight: 800,
+              fontWeight: 700,
               textTransform: 'none',
               fontSize: '0.8rem',
               px: 2,
               py: 0.5,
               borderRadius: 0.75,
-              boxShadow: '0 2px 8px rgba(16, 185, 129, 0.35)',
+              boxShadow: '0 4px 14px rgba(16, 185, 129, 0.4)',
               '&:hover': {
                 bgcolor: '#059669',
               },
@@ -521,50 +609,26 @@ export function PdfViewerLayout({
           },
         }}
       >
-        {isBusy ? (
+        {isBusy || isPdfLoading ? (
           <Box sx={{ py: 12, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
             <CircularProgress size={42} sx={{ color: '#10B981' }} />
             <Typography sx={{ color: '#94a3b8', fontSize: '0.9rem', fontWeight: 500 }}>
-              Compilando visualização oficial do PDF via Typst Engine...
+              {isBusy
+                ? 'Compilando documento via Typst Engine...'
+                : 'Interpretando bytes reais do PDF via PDF.js...'}
             </Typography>
           </Box>
-        ) : preview?.pages && preview.pages.length > 0 ? (
-          /* Renderização das Páginas Vetoriais do PDF Real */
+        ) : pdfDoc ? (
+          /* Renderização das Páginas Reais do PDF em Canvas via PDF.js */
           <Stack spacing={3} sx={{ alignItems: 'center', width: '100%' }}>
-            {preview.pages.map((page) => {
-              const scaledWidth = Math.round(page.width_pt * zoom);
-              const scaledHeight = Math.round(page.height_pt * zoom);
-
-              return (
-                <Box
-                  key={page.page_number}
-                  id={`pdf-page-${page.page_number}`}
-                  sx={{
-                    width: scaledWidth,
-                    minHeight: scaledHeight,
-                    bgcolor: '#ffffff',
-                    borderRadius: 0.5,
-                    boxShadow: '0 8px 30px rgba(0, 0, 0, 0.35)',
-                    overflow: 'hidden',
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    transition: 'width 0.1s ease-out, min-height 0.1s ease-out',
-                  }}
-                >
-                  <img
-                    src={`data:image/svg+xml;base64,${page.svg_base64}`}
-                    alt={`Página ${page.page_number} de ${totalPages}`}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      display: 'block',
-                      objectFit: 'contain',
-                    }}
-                  />
-                </Box>
-              );
-            })}
+            {Array.from({ length: totalPages }, (_, idx) => idx + 1).map((pageNum) => (
+              <PdfPageCanvas
+                key={pageNum}
+                pdfDoc={pdfDoc}
+                pageNumber={pageNum}
+                zoom={zoom}
+              />
+            ))}
           </Stack>
         ) : (
           /* Fallback para Children / Modo Standalone Pré-Preview */

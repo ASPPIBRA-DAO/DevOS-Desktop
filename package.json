@@ -58,6 +58,7 @@
     "minimal-shared": "^1.1.0",
     "mui-one-time-password-input": "^6.0.0",
     "nprogress": "^0.2.0",
+    "pdfjs-dist": "6.5.438",
     "react": "^19.1.1",
     "react-apexcharts": "^1.7.0",
     "react-dom": "^19.1.1",
