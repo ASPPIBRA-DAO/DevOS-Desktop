@@ -22,6 +22,7 @@ pub struct TypstCompileOptions<'a> {
     pub template_source: &'a str,
     pub fonts: &'a [&'a [u8]],
     pub string_inputs: HashMap<&'a str, String>,
+    pub static_sources: &'a [(&'a str, &'a str)],
 }
 
 /// Compila um documento Typst em memória e retorna os bytes do PDF.
@@ -36,10 +37,15 @@ pub fn compile_typst_document(
         inputs.insert(key.into(), Value::Str(value.into()));
     }
 
-    let engine = TypstEngine::builder()
-        .main_file(options.template_source)
-        .fonts(options.fonts.iter().copied())
-        .build();
+    let mut builder = TypstEngine::builder()
+        .main_file(("main.typ", options.template_source))
+        .fonts(options.fonts.iter().copied());
+
+    if !options.static_sources.is_empty() {
+        builder = builder.with_static_source_file_resolver(options.static_sources.iter().copied());
+    }
+
+    let engine = builder.build();
 
     let document = engine
         .compile_with_input(inputs)
@@ -79,11 +85,11 @@ mod tests {
             template_source: template,
             fonts: &[],
             string_inputs: HashMap::new(),
+            static_sources: &[],
         };
 
-        let bytes = compile_typst_document(options).unwrap_or_else(|error| {
-            panic!("Falha ao compilar documento mínimo: {error:?}")
-        });
+        let bytes = compile_typst_document(options)
+            .unwrap_or_else(|error| panic!("Falha ao compilar documento mínimo: {error:?}"));
 
         assert_valid_pdf_header(&bytes);
     }
@@ -102,6 +108,7 @@ mod tests {
             template_source: template,
             fonts: &[],
             string_inputs,
+            static_sources: &[],
         };
 
         let bytes = compile_typst_document(options).unwrap_or_else(|error| {
@@ -113,14 +120,12 @@ mod tests {
 
     #[test]
     fn test_invalid_typst_syntax_returns_compilation_error() {
-        let template = concat!(
-            "#set page(paper: \"a4\"\n",
-            "// falta fechar parenteses"
-        );
+        let template = concat!("#set page(paper: \"a4\"\n", "// falta fechar parenteses");
         let options = TypstCompileOptions {
             template_source: template,
             fonts: &[],
             string_inputs: HashMap::new(),
+            static_sources: &[],
         };
 
         let error = compile_typst_document(options)
@@ -144,6 +149,7 @@ mod tests {
             template_source: template,
             fonts: &[],
             string_inputs: HashMap::new(),
+            static_sources: &[],
         };
 
         let bytes = compile_typst_document(options).expect("Falha ao compilar Typst com SVG");
@@ -152,7 +158,6 @@ mod tests {
 
     #[test]
     fn test_compile_typst_with_import() {
-        // Testa se typst-as-lib tem suporte a múltiplos arquivos ou se concatenação/injeção é o padrão
         let layout = r#"
         #let saudacao(nome) = [Olá, #nome!]
         "#;
@@ -165,9 +170,97 @@ mod tests {
             template_source: &combined,
             fonts: &[],
             string_inputs: HashMap::new(),
+            static_sources: &[],
         };
 
         let bytes = compile_typst_document(options).expect("Falha ao compilar");
+        assert_valid_pdf_header(&bytes);
+    }
+
+    #[test]
+    fn test_compile_typst_with_static_source_resolver() {
+        let branding = r##"
+        #let asppibra_sigla = "ASPPIBRA-DAO"
+        #let badge(sigla) = box(stroke: 1pt + rgb("#D4AF37"), inset: 3pt)[#sigla]
+        "##;
+        let template = r##"
+        #import "core/branding.typ": *
+        #set page(paper: "a4")
+        Documento Oficial #badge(asppibra_sigla)
+        "##;
+        let static_sources = [("core/branding.typ", branding)];
+        let options = TypstCompileOptions {
+            template_source: template,
+            fonts: &[],
+            string_inputs: HashMap::new(),
+            static_sources: &static_sources,
+        };
+
+        let bytes = compile_typst_document(options)
+            .expect("Falha ao compilar Typst resolvendo módulo via static_sources");
+        assert_valid_pdf_header(&bytes);
+    }
+
+    #[test]
+    fn test_compile_typst_nested_facade_import() {
+        let branding = r##"
+        #let asppibra_sigla = "ASPPIBRA-DAO"
+        "##;
+        let layout_facade = r##"
+        #import "core/branding.typ": *
+        "##;
+        let template = r##"
+        #import "asppibra_layout.typ": *
+        #set page(paper: "a4")
+        Sigla: #asppibra_sigla
+        "##;
+        let static_sources = [
+            ("core/branding.typ", branding),
+            ("asppibra_layout.typ", layout_facade),
+        ];
+        let options = TypstCompileOptions {
+            template_source: template,
+            fonts: &[],
+            string_inputs: HashMap::new(),
+            static_sources: &static_sources,
+        };
+
+        let bytes = compile_typst_document(options)
+            .expect("Import transitivo em Typst em memória deve compilar perfeitamente");
+        assert_valid_pdf_header(&bytes);
+    }
+
+    #[test]
+    fn test_in_memory_resolver_does_not_depend_on_physical_disk_files() {
+        let tokens = r##"
+        #let cor_destaque = rgb("#10B981")
+        #let rotulo = "TOKEN_PURO_MEMORIA"
+        "##;
+        let component = r##"
+        #import "../tokens.typ": cor_destaque, rotulo
+        #let banner() = rect(fill: cor_destaque, radius: 2pt)[#rotulo]
+        "##;
+        let main = r##"
+        #import "virtual/components/banner.typ": banner
+        #set page(paper: "a4")
+        #banner()
+        "##;
+
+        let static_sources = [
+            ("virtual/tokens.typ", tokens),
+            ("virtual/components/banner.typ", component),
+        ];
+
+        let options = TypstCompileOptions {
+            template_source: main,
+            fonts: &[],
+            string_inputs: HashMap::new(),
+            static_sources: &static_sources,
+        };
+
+        let bytes = compile_typst_document(options).expect(
+            "Caminhos puramente virtuais em memória devem compilar sem tocar o disco físico",
+        );
         assert_valid_pdf_header(&bytes);
     }
 }

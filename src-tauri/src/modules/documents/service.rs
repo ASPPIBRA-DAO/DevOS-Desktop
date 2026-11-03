@@ -5,7 +5,7 @@ use std::sync::Arc;
 use crate::modules::documents::models::{
     DocumentError, DocumentKind, DocumentMetadata, DocumentOutput, DocumentRequest, DocumentScope,
 };
-use crate::modules::documents::ports::{DocumentRenderer, RenderedDocument};
+use crate::modules::documents::ports::DocumentRenderer;
 
 /// Serviço orquestrador para geração, autorização, validação e integridade de documentos canônicos.
 ///
@@ -121,6 +121,7 @@ mod tests {
     use super::*;
     use sha2::{Digest, Sha256};
 
+    use crate::modules::documents::ports::RenderedDocument;
     use crate::modules::documents::typst_renderer::TypstDocumentRenderer;
     use crate::modules::reports::models::{
         CitizenLedgerPayload, InvoiceReportItem, InvoiceReportPayload,

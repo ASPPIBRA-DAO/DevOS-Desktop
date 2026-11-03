@@ -15,6 +15,26 @@ static RECONCILIATION_TEMPLATE: &str =
     include_str!("../../../templates/real_estate_reconciliation.typ");
 
 static ASPPIBRA_LAYOUT: &str = include_str!("../../../templates/asppibra_layout.typ");
+static CORE_BRANDING: &str = include_str!("../../../templates/core/branding.typ");
+static CORE_TYPOGRAPHY: &str = include_str!("../../../templates/core/typography.typ");
+static CORE_PAGE_ABNT: &str = include_str!("../../../templates/core/page_abnt.typ");
+static CORE_HEADER_FOOTER: &str = include_str!("../../../templates/core/header_footer.typ");
+static CORE_DATA_TAGS: &str = include_str!("../../../templates/core/data_tags.typ");
+
+pub static CANONICAL_TYPST_STATIC_SOURCES: &[(&str, &str)] = &[
+    ("asppibra_layout.typ", ASPPIBRA_LAYOUT),
+    ("core/branding.typ", CORE_BRANDING),
+    ("core/typography.typ", CORE_TYPOGRAPHY),
+    ("core/page_abnt.typ", CORE_PAGE_ABNT),
+    ("core/header_footer.typ", CORE_HEADER_FOOTER),
+    ("core/data_tags.typ", CORE_DATA_TAGS),
+    // Aliases sem prefixo para máxima resiliência de resolução relativa a partir de subdiretórios:
+    ("branding.typ", CORE_BRANDING),
+    ("typography.typ", CORE_TYPOGRAPHY),
+    ("page_abnt.typ", CORE_PAGE_ABNT),
+    ("header_footer.typ", CORE_HEADER_FOOTER),
+    ("data_tags.typ", CORE_DATA_TAGS),
+];
 
 static ROBOTO_REGULAR: &[u8] = include_bytes!("../../../assets/fonts/Roboto-Regular.ttf");
 
@@ -99,6 +119,7 @@ impl DocumentRenderer for TypstDocumentRenderer {
             template_source: final_template_source,
             fonts: &[ROBOTO_REGULAR, ROBOTO_BOLD],
             string_inputs,
+            static_sources: CANONICAL_TYPST_STATIC_SOURCES,
         };
 
         let pdf_bytes = compile_typst_document(options)
@@ -255,5 +276,268 @@ mod tests {
             .expect("Renderização da reconciliação deve ter sucesso");
 
         assert_valid_rendered(&output);
+    }
+
+    #[test]
+    fn test_canonical_typst_static_sources_contain_all_core_modules() {
+        let registered_paths: Vec<&str> = CANONICAL_TYPST_STATIC_SOURCES
+            .iter()
+            .map(|(path, _)| *path)
+            .collect();
+
+        assert!(registered_paths.contains(&"asppibra_layout.typ"));
+        assert!(registered_paths.contains(&"core/branding.typ"));
+        assert!(registered_paths.contains(&"core/typography.typ"));
+        assert!(registered_paths.contains(&"core/page_abnt.typ"));
+        assert!(registered_paths.contains(&"core/header_footer.typ"));
+        assert!(registered_paths.contains(&"core/data_tags.typ"));
+
+        // Garante que nenhum dos módulos estáticos embutidos está vazio
+        for (path, content) in CANONICAL_TYPST_STATIC_SOURCES {
+            assert!(
+                !content.trim().is_empty(),
+                "O módulo Typst {path} não deve estar vazio"
+            );
+        }
+    }
+
+    #[test]
+    fn test_modular_core_templates_render_via_facade_and_direct_imports() {
+        let template = r##"
+        #import "asppibra_layout.typ": *
+
+        #set page(
+          paper: standard_paper,
+          margin: margins_abnt_legal,
+          header: asppibra_header_running(
+              doc_number: "2026-TEST/MODULAR",
+              doc_title: "Documento de Teste Modular",
+          ),
+          footer: asppibra_footer(doc_number: "2026-TEST/MODULAR", auth_code: "AUTH-MOD-01"),
+        )
+
+        #asppibra_header_first_page(doc_number: "2026-TEST/MODULAR")
+
+        #section_heading("TESTE MODULAR INSTITUCIONAL")
+
+        Entidade: #asppibra_razao_social \
+        CNPJ Oficial: #asppibra_cnpj \
+        Sigla: #asppibra_sigla \
+        Tag Teste: #asppibra_tag("CAMPO_OBRIGATORIO", "Valor Preenchido")
+        "##;
+
+        let options = TypstCompileOptions {
+            template_source: template,
+            fonts: &[ROBOTO_REGULAR, ROBOTO_BOLD],
+            string_inputs: HashMap::new(),
+            static_sources: CANONICAL_TYPST_STATIC_SOURCES,
+        };
+
+        let pdf_bytes = compile_typst_document(options)
+            .expect("Compilação via facade modular asppibra_layout.typ deve funcionar");
+
+        assert_valid_rendered(&RenderedDocument::new(pdf_bytes));
+    }
+
+    #[test]
+    fn test_direct_core_modules_imports_without_facade() {
+        let template = r##"
+        #import "core/branding.typ": asppibra_razao_social, asppibra_cnpj, asppibra_sigla, color_gold
+        #import "core/typography.typ": font_family_base, section_heading, font_size_title
+        #import "core/page_abnt.typ": standard_paper, margins_institutional_contract
+        #import "core/header_footer.typ": asppibra_header_first_page, asppibra_footer
+        #import "core/data_tags.typ": asppibra_tag
+
+        #set page(
+          paper: standard_paper,
+          margin: margins_institutional_contract,
+          footer: asppibra_footer(doc_number: "2026-DIRECT/01", auth_code: "AUTH-01"),
+        )
+
+        #asppibra_header_first_page(doc_number: "2026-DIRECT/01")
+        #section_heading("IMPORTAÇÃO DIRETA DOS MÓDULOS")
+
+        Entidade: #asppibra_razao_social \
+        CNPJ: #asppibra_cnpj \
+        Sigla: #asppibra_sigla \
+        Campo: #asppibra_tag("PROPRIETARIO", "Associado Direto")
+        "##;
+
+        let options = TypstCompileOptions {
+            template_source: template,
+            fonts: &[ROBOTO_REGULAR, ROBOTO_BOLD],
+            string_inputs: HashMap::new(),
+            static_sources: CANONICAL_TYPST_STATIC_SOURCES,
+        };
+
+        let pdf_bytes = compile_typst_document(options)
+            .expect("Compilação com importação direta dos módulos core/ deve funcionar");
+
+        assert_valid_rendered(&RenderedDocument::new(pdf_bytes));
+    }
+
+    #[test]
+    fn test_transitive_nested_imports_multi_tier() {
+        // Testa a cadeia transitiva:
+        // Documento -> asppibra_layout.typ -> core/header_footer.typ -> branding.typ / typography.typ
+        let template = r##"
+        #import "asppibra_layout.typ": asppibra_header_first_page, asppibra_footer, asppibra_tag, margins_contract, standard_paper
+
+        #set page(
+          paper: standard_paper,
+          margin: margins_contract,
+          footer: asppibra_footer(doc_number: "2026-TIER/01", auth_code: "HASH-OK"),
+        )
+
+        #asppibra_header_first_page(doc_number: "2026-TIER/01")
+        #asppibra_tag("VALIDACAO_TRANSITIVA", "Sucesso em Memória")
+        "##;
+
+        let options = TypstCompileOptions {
+            template_source: template,
+            fonts: &[ROBOTO_REGULAR, ROBOTO_BOLD],
+            string_inputs: HashMap::new(),
+            static_sources: CANONICAL_TYPST_STATIC_SOURCES,
+        };
+
+        let pdf_bytes = compile_typst_document(options)
+            .expect("Cadeia transitiva completa em memória deve compilar perfeitamente");
+
+        assert_valid_rendered(&RenderedDocument::new(pdf_bytes));
+    }
+
+    #[test]
+    fn test_page_abnt_profiles_and_backward_compatibility_aliases() {
+        let template = r##"
+        #import "core/page_abnt.typ": *
+
+        #let c1 = margins_institutional_contract
+        #let c2 = margins_contract
+        #let c3 = margins_abnt_legal
+
+        #let f1 = margins_institutional_financial
+        #let f2 = margins_financial
+
+        #let t1 = margins_institutional_territorial
+        #let t2 = margins_territorial
+        #let t3 = margins_report
+
+        #set page(paper: standard_paper, margin: c1)
+        [Perfis de Margens Verificados: Contratual, Financeiro e Territorial]
+        "##;
+
+        let options = TypstCompileOptions {
+            template_source: template,
+            fonts: &[ROBOTO_REGULAR, ROBOTO_BOLD],
+            string_inputs: HashMap::new(),
+            static_sources: CANONICAL_TYPST_STATIC_SOURCES,
+        };
+
+        let pdf_bytes = compile_typst_document(options)
+            .expect("Perfis institucionais de margens e aliases devem compilar corretamente");
+
+        assert_valid_rendered(&RenderedDocument::new(pdf_bytes));
+    }
+
+    #[test]
+    fn test_footer_does_not_claim_icp_brasil_authentication() {
+        // Garante que o template do rodapé em core/header_footer.typ
+        // NÃO alega autenticação ICP-Brasil
+        let footer_source = include_str!("../../../templates/core/header_footer.typ");
+        assert!(
+            !footer_source.contains("ICP-Brasil"),
+            "O rodapé não deve conter alegação indevida de certificação ICP-Brasil"
+        );
+        assert!(
+            footer_source.contains("Registro Nº"),
+            "O rodapé deve conter a identificação explícita do número de registro"
+        );
+        assert!(
+            footer_source.contains("DevOS"),
+            "O rodapé deve refletir a identificação do sistema emissor DevOS"
+        );
+    }
+
+    #[test]
+    fn test_footer_rejects_none_empty_and_whitespace_only_parameters() {
+        let invalid_cases = [
+            ("doc_number: none", "auth_code: \"2026-X7Y9\""),
+            ("doc_number: \"\"", "auth_code: \"2026-X7Y9\""),
+            ("doc_number: \"   \"", "auth_code: \"2026-X7Y9\""),
+            ("doc_number: \"2026-0001/CP\"", "auth_code: none"),
+            ("doc_number: \"2026-0001/CP\"", "auth_code: \"\""),
+            ("doc_number: \"2026-0001/CP\"", "auth_code: \"   \""),
+        ];
+
+        for (doc_part, auth_part) in invalid_cases {
+            let template = format!(
+                r##"
+                #import "core/header_footer.typ": asppibra_footer
+                #asppibra_footer({doc_part}, {auth_part})
+                "##
+            );
+            let options = TypstCompileOptions {
+                template_source: &template,
+                fonts: &[],
+                string_inputs: HashMap::new(),
+                static_sources: CANONICAL_TYPST_STATIC_SOURCES,
+            };
+            assert!(
+                compile_typst_document(options).is_err(),
+                "asppibra_footer deve falhar para {doc_part}, {auth_part}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_header_rejects_none_empty_and_whitespace_only_parameters() {
+        // 1. First page header: doc_number rejeita none, "" e "   "
+        for invalid_doc in ["none", "\"\"", "\"   \""] {
+            let template = format!(
+                r##"
+                #import "core/header_footer.typ": asppibra_header_first_page
+                #asppibra_header_first_page(doc_number: {invalid_doc})
+                "##
+            );
+            let options = TypstCompileOptions {
+                template_source: &template,
+                fonts: &[],
+                string_inputs: HashMap::new(),
+                static_sources: CANONICAL_TYPST_STATIC_SOURCES,
+            };
+            assert!(
+                compile_typst_document(options).is_err(),
+                "asppibra_header_first_page deve falhar para doc_number={invalid_doc}"
+            );
+        }
+
+        // 2. Running header: doc_number e doc_title rejeitam none, "" e "   "
+        let invalid_cases = [
+            ("doc_number: none", "doc_title: \"Contrato de Posse\""),
+            ("doc_number: \"\"", "doc_title: \"Contrato de Posse\""),
+            ("doc_number: \"   \"", "doc_title: \"Contrato de Posse\""),
+            ("doc_number: \"2026-0001/CP\"", "doc_title: none"),
+            ("doc_number: \"2026-0001/CP\"", "doc_title: \"\""),
+            ("doc_number: \"2026-0001/CP\"", "doc_title: \"   \""),
+        ];
+
+        for (doc_part, title_part) in invalid_cases {
+            let template = format!(
+                r##"
+                #import "core/header_footer.typ": asppibra_header_running
+                #asppibra_header_running({doc_part}, {title_part})
+                "##
+            );
+            let options = TypstCompileOptions {
+                template_source: &template,
+                fonts: &[],
+                string_inputs: HashMap::new(),
+                static_sources: CANONICAL_TYPST_STATIC_SOURCES,
+            };
+            assert!(
+                compile_typst_document(options).is_err(),
+                "asppibra_header_running deve falhar para {doc_part}, {title_part}"
+            );
+        }
     }
 }
