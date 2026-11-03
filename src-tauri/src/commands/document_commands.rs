@@ -5,7 +5,8 @@ use std::path::{Component, Path, PathBuf};
 
 use crate::modules::documents::models::DocumentError;
 use crate::modules::documents::{
-    default_documents_service, DocumentKind, DocumentMetadata, DocumentRequest, DocumentScope,
+    DocumentKind, DocumentMetadata, DocumentRequest, DocumentScope, active_document_scope,
+    documents_service_with_scope,
 };
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -42,13 +43,22 @@ fn resolve_download_dir() -> PathBuf {
         .unwrap_or_else(std::env::temp_dir)
 }
 
-/// Gera e exporta o documento para o diretório especificado.
+/// Gera e exporta o documento para o diretório especificado usando o escopo ativo da aplicação.
 ///
-/// A função é privada para que os testes possam usar um diretório isolado,
-/// sem modificar a interface pública do comando Tauri.
-fn generate_document_in_directory(
+/// Visível internamente ao crate (`pub(crate)`) para que testes unitários e de integração
+/// possam utilizar um diretório temporário isolado sem modificar a interface pública do comando Tauri.
+pub(crate) fn generate_document_in_directory(
     payload: GenerateDocumentPayload,
     download_dir: &Path,
+) -> Result<GenerateDocumentResult, String> {
+    generate_document_in_directory_with_scope(payload, download_dir, active_document_scope())
+}
+
+/// Gera e exporta o documento para o diretório especificado sob um escopo de edição explícito.
+pub(crate) fn generate_document_in_directory_with_scope(
+    payload: GenerateDocumentPayload,
+    download_dir: &Path,
+    active_scope: DocumentScope,
 ) -> Result<GenerateDocumentResult, String> {
     let GenerateDocumentPayload {
         request,
@@ -58,8 +68,6 @@ fn generate_document_in_directory(
 
     let kind = request.kind();
 
-    validate_document_scope(kind.required_scope())?;
-
     // Validar o nome antes de compilar o documento evita processamento
     // desnecessário quando a entrada é inválida.
     let file_name = match target_file_name {
@@ -67,7 +75,7 @@ fn generate_document_in_directory(
         None => default_file_name(kind),
     };
 
-    let service = default_documents_service();
+    let service = documents_service_with_scope(active_scope);
 
     let output = service
         .generate_document(request)
@@ -108,21 +116,6 @@ fn public_document_error(error: DocumentError) -> String {
             format!("Os dados fornecidos para o documento são inválidos: {detail}")
         }
         _ => error.public_message().to_string(),
-    }
-}
-
-/// Atualmente, apenas os documentos universais são aceitos.
-///
-/// Os escopos específicos exigem uma fonte confiável que identifique a
-/// edição do aplicativo. Até essa integração existir, falhamos de forma
-/// segura em vez de aceitar silenciosamente escopos restritos.
-fn validate_document_scope(scope: DocumentScope) -> Result<(), String> {
-    match scope {
-        DocumentScope::Universal => Ok(()),
-        DocumentScope::CockpitOnly | DocumentScope::NodeOnly => Err(
-            "O escopo específico deste documento ainda não está configurado para a edição atual."
-                .to_string(),
-        ),
     }
 }
 
@@ -522,10 +515,11 @@ mod tests {
         });
         let res1 = serde_json::from_value::<GenerateDocumentPayload>(missing_doc_num);
         assert!(res1.is_err());
-        assert!(res1
-            .unwrap_err()
-            .to_string()
-            .contains("missing field `document_number`"));
+        assert!(
+            res1.unwrap_err()
+                .to_string()
+                .contains("missing field `document_number`")
+        );
 
         // 2. auth_code ausente
         let missing_auth = serde_json::json!({
@@ -538,9 +532,96 @@ mod tests {
         });
         let res2 = serde_json::from_value::<GenerateDocumentPayload>(missing_auth);
         assert!(res2.is_err());
-        assert!(res2
-            .unwrap_err()
-            .to_string()
-            .contains("missing field `auth_code`"));
+        assert!(
+            res2.unwrap_err()
+                .to_string()
+                .contains("missing field `auth_code`")
+        );
+    }
+
+    #[test]
+    fn test_generate_document_command_enforces_edition_scope_for_cockpit_and_node() {
+        let directory = TestDirectory::new();
+
+        let cessao_payload = GenerateDocumentPayload {
+            request: DocumentRequest::CessaoPosse(
+                crate::modules::documents::models::CessaoPossePayload {
+                    document_number: "2026-0001/CP".to_string(),
+                    auth_code: "2026-X7Y9".to_string(),
+                    data: json!({"cedenteNome": "JOÃO SILVA", "cessionarioNome": "MARIA SOUZA"}),
+                },
+            ),
+            open_after_export: Some(false),
+            target_file_name: Some("cessao_cockpit.pdf".to_string()),
+        };
+
+        // 1. CockpitOnly -> CessaoPosse é autorizado e gera PDF
+        let cockpit_res = generate_document_in_directory_with_scope(
+            cessao_payload.clone(),
+            directory.path(),
+            DocumentScope::CockpitOnly,
+        )
+        .expect("Cockpit deve autorizar geração de CessaoPosse");
+        assert_valid_result(&cockpit_res, DocumentKind::CessaoPosse, directory.path());
+
+        // 2. NodeOnly -> CessaoPosse é rejeitado com mensagem pública de escopo não autorizado
+        let node_res = generate_document_in_directory_with_scope(
+            cessao_payload,
+            directory.path(),
+            DocumentScope::NodeOnly,
+        );
+        assert!(node_res.is_err());
+        assert_eq!(
+            node_res.unwrap_err(),
+            "Esta edição do aplicativo não está autorizada a gerar este documento."
+        );
+
+        let reconciliation_payload = GenerateDocumentPayload {
+            request: DocumentRequest::RealEstateReconciliation(
+                crate::modules::documents::models::RealEstateReconciliationPayload {
+                    data: json!({
+                        "generatedAt": "31/10/2026 13:00:00",
+                        "stats": {
+                            "totalProperties": 1,
+                            "totalIdentifiers": 1,
+                            "totalAddresses": 1,
+                            "totalBatches": 1,
+                            "openFindingsCount": 0,
+                            "pendingProposalsCount": 0
+                        },
+                        "batches": [],
+                        "findings": [],
+                        "properties": []
+                    }),
+                },
+            ),
+            open_after_export: Some(false),
+            target_file_name: Some("reconciliation_cockpit.pdf".to_string()),
+        };
+
+        // 3. CockpitOnly -> RealEstateReconciliation é autorizado e gera PDF
+        let rec_cockpit = generate_document_in_directory_with_scope(
+            reconciliation_payload.clone(),
+            directory.path(),
+            DocumentScope::CockpitOnly,
+        )
+        .expect("Cockpit deve autorizar geração de RealEstateReconciliation");
+        assert_valid_result(
+            &rec_cockpit,
+            DocumentKind::RealEstateReconciliation,
+            directory.path(),
+        );
+
+        // 4. NodeOnly -> RealEstateReconciliation é rejeitado
+        let rec_node = generate_document_in_directory_with_scope(
+            reconciliation_payload,
+            directory.path(),
+            DocumentScope::NodeOnly,
+        );
+        assert!(rec_node.is_err());
+        assert_eq!(
+            rec_node.unwrap_err(),
+            "Esta edição do aplicativo não está autorizada a gerar este documento."
+        );
     }
 }

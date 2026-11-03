@@ -18,7 +18,7 @@
         columns: (1fr, 1.5fr, 1fr, 1.5fr),
         align: (left, center, center, right),
         text(size: 6.5pt, fill: rgb("#718096"))[Gerado em: #data.meta.generated_at],
-        text(size: 6.5pt, fill: rgb("#718096"))[Confidencial • Hash D1: #data.meta.audit_hash],
+        text(size: 6.5pt, fill: rgb("#718096"))[Confidencial • Cód. Rastreio: #data.meta.audit_hash],
         text(size: 7pt, weight: "bold", fill: rgb("#10B981"))[Página #i de #n],
         text(size: 6.5pt, fill: rgb("#718096"))[Documento Oficial ASPPIBRA DAO],
       )
@@ -191,7 +191,7 @@
 
 #v(10pt)
 
-// 5. AVISO LEGAL
+// 5. AVISO DE RASTREABILIDADE E CONTROLE INTERNO
 #rect(
   width: 100%,
   radius: 3pt,
@@ -200,7 +200,7 @@
   inset: 8pt,
 )[
   #text(size: 6.5pt, fill: rgb("#718096"))[
-    #text(weight: "bold", fill: rgb("#2D3748"))[AVISO LEGAL: ]
-    Este documento foi gerado eletronicamente pelos sistemas da ASPPIBRA DAO no DevOS Cockpit e reflete os registros processados durante o período de referência. As informações apresentadas constituem demonstrativo informativo das operações vinculadas à execução contratual e poderão ser utilizadas como elemento de prova eletrônica, nos termos da Medida Provisória nº 2.200-2/2001, da Lei nº 14.063/2020 e da legislação aplicável. O conteúdo é confidencial e destinado exclusivamente ao titular da conta e às partes autorizadas.
+    #text(weight: "bold", fill: rgb("#2D3748"))[CONTROLE DOCUMENTAL INTERNO: ]
+    Este documento foi gerado pelo sistema DevOS Desktop da ASPPIBRA DAO e reflete os registros administrativos e financeiros processados durante o período de referência. As informações apresentadas constituem demonstrativo interno informativo das operações vinculadas ao cadastro do associado. O conteúdo é confidencial e destinado exclusivamente ao titular da conta e às partes autorizadas.
   ]
 ]

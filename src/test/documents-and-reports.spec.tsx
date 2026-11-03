@@ -1,5 +1,17 @@
-import { it, expect, describe } from 'vitest';
+import React from 'react';
+import { MemoryRouter } from 'react-router';
+import { it, vi, expect, describe } from 'vitest';
+import { renderToString } from 'react-dom/server';
 
+import { toast } from 'src/shared/components/snackbar';
+import { DefaultHeader, DefaultFooter } from 'src/shared/components/abnt-document';
+
+import {
+  CessaoPosseView,
+  exportCessaoPossePdf,
+} from 'src/sections/cessao-de-posse/CessaoPosseView';
+
+import { ipcHandlers } from './setup';
 import { mockIpcResponse } from './test-utils';
 import { generateDocument } from '../modules/documents';
 import { ReportCompilerService } from '../modules/reports/services/report-compiler-service';
@@ -135,5 +147,93 @@ describe('Módulos Documents & Reports — Geração e Compilação Nativa', () 
     expect(result.metadata.document_kind).toBe('real_estate_reconciliation');
     expect(result.metadata.template_id).toBe('real_estate_reconciliation.typ');
     expect(result.metadata.sha256_checksum).toHaveLength(64);
+  });
+
+  it('DefaultHeader, DefaultFooter e CessaoPosseView não utilizam fallbacks fictícios nem alegações ICP-Brasil/Lei 14.063/2020 no rodapé', () => {
+    const headerFooterHtml = renderToString(
+      <div>
+        <DefaultHeader />
+        <DefaultFooter />
+      </div>
+    );
+
+    expect(headerFooterHtml).toContain('NÃO INFORMADO');
+    expect(headerFooterHtml).not.toContain('2026-0001/CP');
+    expect(headerFooterHtml).not.toContain('2026-X7Y9');
+    expect(headerFooterHtml).not.toContain('ICP-Brasil');
+    expect(headerFooterHtml).not.toContain('14.063/2020');
+    expect(headerFooterHtml).toContain('Controle Documental DevOS');
+
+    const viewHtml = renderToString(
+      <MemoryRouter>
+        <CessaoPosseView />
+      </MemoryRouter>
+    );
+    expect(viewHtml).not.toContain('2026-0001/CP');
+    expect(viewHtml).not.toContain('2026-X7Y9');
+    expect(viewHtml).toContain('Nº do Documento Oficial');
+    expect(viewHtml).toContain('Código de Controle / Rastreabilidade');
+  });
+
+  it('exportCessaoPossePdf bloqueia exportação sem identificadores explícitos e não envia 2026-0001/CP ou 2026-X7Y9 como fallback', async () => {
+    const ipcSpy = vi.fn();
+    ipcHandlers.set('generate_document', ipcSpy);
+    const toastErrorSpy = vi.spyOn(toast, 'error');
+
+    const resEmpty = await exportCessaoPossePdf({ documentNumber: '', authCode: '' });
+    expect(resEmpty).toBe(false);
+    expect(ipcSpy).not.toHaveBeenCalled();
+    expect(toastErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Informe o Nº do Documento Oficial e o Código de Controle')
+    );
+
+    const resWhitespace = await exportCessaoPossePdf({
+      documentNumber: '   ',
+      authCode: '   ',
+    });
+    expect(resWhitespace).toBe(false);
+    expect(ipcSpy).not.toHaveBeenCalled();
+  });
+
+  it('exportCessaoPossePdf envia document_number e auth_code explícitos ao generateDocument quando preenchidos', async () => {
+    let capturedArgs: Record<string, unknown> | undefined;
+    ipcHandlers.set('generate_document', (args) => {
+      capturedArgs = args;
+      return {
+        success: true,
+        file_path: '/tmp/Contrato_Cessao_Posse.pdf',
+        file_name: 'Contrato_Cessao_Posse.pdf',
+        message: 'Documento gerado e salvo com sucesso.',
+        metadata: {
+          document_kind: 'cessao_posse',
+          generated_at_utc: '2026-10-31T14:00:00Z',
+          sha256_checksum: 'a'.repeat(64),
+          byte_size: 20480,
+          template_id: 'contrato_cessao_posse.typ',
+        },
+      };
+    });
+
+    const exported = await exportCessaoPossePdf({
+      documentNumber: '  2026-OFICIAL-777/CP  ',
+      authCode: '  CTRL-ASPPIBRA-9988  ',
+    });
+
+    expect(exported).toBe(true);
+    expect(capturedArgs).toBeDefined();
+
+    const payload = (
+      capturedArgs as {
+        payload: {
+          request: {
+            kind: string;
+            payload: { document_number: string; auth_code: string };
+          };
+        };
+      }
+    ).payload;
+    expect(payload.request.kind).toBe('cessao_posse');
+    expect(payload.request.payload.document_number).toBe('2026-OFICIAL-777/CP');
+    expect(payload.request.payload.auth_code).toBe('CTRL-ASPPIBRA-9988');
   });
 });

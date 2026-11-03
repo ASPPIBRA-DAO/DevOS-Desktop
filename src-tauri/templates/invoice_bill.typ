@@ -1,9 +1,22 @@
 // ASPPIBRA DAO - Template Oficial de Recibo e Fatura Associativa (Typst)
 #let data = json(bytes(sys.inputs.data))
+#let subtotal_amount = calc.round(data.invoice.amount, digits: 2)
+#let taxes_amount = if "taxes" in data.invoice and data.invoice.taxes != none {
+  calc.round(data.invoice.taxes, digits: 2)
+} else {
+  0.0
+}
+#let discount_amount = if "discount" in data.invoice and data.invoice.discount != none {
+  calc.round(data.invoice.discount, digits: 2)
+} else {
+  0.0
+}
+#let final_total = calc.round(subtotal_amount + taxes_amount - discount_amount, digits: 2)
 
 #set document(
   title: "Fatura_" + str(data.invoice.id),
   author: "ASPPIBRA DAO",
+  description: "Subtotal: R$ " + str(subtotal_amount) + " | Tributos: R$ " + str(taxes_amount) + " | Desconto: R$ " + str(discount_amount) + " | Total: R$ " + str(final_total),
 )
 
 #set page(
@@ -19,7 +32,7 @@
         align: (left, center, right),
         text(size: 6.5pt, fill: rgb("#718096"))[ASPPIBRA DAO • CNPJ: 26.325.396/0001-30],
         text(size: 7pt, weight: "bold", fill: rgb("#10B981"))[Página #i de #n],
-        text(size: 6.5pt, fill: rgb("#718096"))[Autenticação Edge Cloudflare D1],
+        text(size: 6.5pt, fill: rgb("#718096"))[Controle Documental DevOS],
       )
     ]
   }
@@ -121,12 +134,12 @@
         ],
         text(size: 7.5pt, fill: rgb("#718096"))[Método:],
         text(size: 7.5pt, weight: "bold", fill: rgb("#1A202C"))[#data.invoice.payment_method],
-        text(size: 7.5pt, fill: rgb("#718096"))[Protocolo D1:],
+        text(size: 7.5pt, fill: rgb("#718096"))[Protocolo Interno:],
         text(size: 6.5pt, fill: rgb("#4A5568"))[
           #if "d1_protocol" in data.invoice and data.invoice.d1_protocol != none [
             #data.invoice.d1_protocol
           ] else [
-            D1-LEDGER-#data.invoice.id
+            FATURA-#data.invoice.id
           ]
         ],
       )
@@ -183,25 +196,25 @@
       row-gutter: 4pt,
       align: (left, right),
       text(size: 7.5pt, fill: rgb("#718096"))[Subtotal:],
-      text(size: 8pt, weight: "bold", fill: rgb("#2D3748"))[R\$ #calc.round(data.invoice.amount, digits: 2)],
+      text(size: 8pt, weight: "bold", fill: rgb("#2D3748"))[R\$ #subtotal_amount],
       
-      ..(if "taxes" in data.invoice and data.invoice.taxes != none and data.invoice.taxes > 0 {
+      ..(if taxes_amount > 0 {
         (
           text(size: 7.5pt, fill: rgb("#718096"))[Tributos / Taxas:],
-          text(size: 8pt, fill: rgb("#2D3748"))[R\$ #calc.round(data.invoice.taxes, digits: 2)],
+          text(size: 8pt, fill: rgb("#2D3748"))[R\$ #taxes_amount],
         )
       } else { () }),
-      ..(if "discount" in data.invoice and data.invoice.discount != none and data.invoice.discount > 0 {
+      ..(if discount_amount > 0 {
         (
           text(size: 7.5pt, fill: rgb("#718096"))[Desconto:],
-          text(size: 8pt, fill: rgb("#16A34A"))[- R\$ #calc.round(data.invoice.discount, digits: 2)],
+          text(size: 8pt, fill: rgb("#16A34A"))[- R\$ #discount_amount],
         )
       } else { () }),
       
       grid.hline(stroke: 1pt + rgb("#CBD5E1")),
       text(size: 9pt, weight: "bold", fill: rgb("#0F172A"))[VALOR TOTAL:],
       text(size: 11pt, weight: "bold", fill: if data.invoice.status == "paid" { rgb("#15803D") } else { rgb("#0F172A") })[
-        R\$ #calc.round(data.invoice.amount, digits: 2)
+        R\$ #final_total
       ],
     )
   ]
@@ -209,7 +222,7 @@
 
 #v(14pt)
 
-// 5. PROTOCOLO CRIPTOGRÁFICO D1 & AUTENTICAÇÃO
+// 5. QUADRO DE RASTREABILIDADE E CONTROLE INTERNO
 #rect(
   width: 100%,
   radius: 4pt,
@@ -217,14 +230,14 @@
   stroke: (paint: rgb("#CBD5E1"), dash: "dashed", thickness: 0.8pt),
   inset: 8pt,
   [
-    #text(size: 7pt, weight: "bold", fill: rgb("#334155"))[AUTENTICAÇÃO CRIPTOGRÁFICA D1 LEDGER] \
+    #text(size: 7pt, weight: "bold", fill: rgb("#334155"))[RASTREABILIDADE E CONTROLE DOCUMENTAL INTERNO (DEVOS)] \
     #v(2pt)
     #text(size: 6.5pt, font: ("Roboto", "Courier"), fill: rgb("#475569"))[
-      HASH: 05d4084730d36b1073d62c37ab83e9c425d795b5ff34ed949083cdbf02fd7b33::#data.invoice.id
+      IDENTIFICADOR INTERNO: FATURA-#data.invoice.id | COMPETÊNCIA: #data.invoice.reference_month
     ] \
     #v(2pt)
     #text(size: 6.5pt, fill: rgb("#64748B"))[
-      Transação registrada imutavelmente na infraestrutura edge Cloudflare D1 da ASPPIBRA DAO.
+      Documento emitido pelo sistema DevOS Desktop para controle administrativo e financeiro interno da ASPPIBRA DAO.
     ]
   ]
 )

@@ -215,7 +215,7 @@ export function DigitalSignature({ title, name, field, color = 'info' }: Digital
             }}
           >
             <Iconify icon={'solar:danger-triangle-bold' as any} width={12} />
-            AGUARDANDO ASSINATURA ELETRÔNICA
+            AGUARDANDO ASSINATURA
           </Typography>
         </Stack>
       )}

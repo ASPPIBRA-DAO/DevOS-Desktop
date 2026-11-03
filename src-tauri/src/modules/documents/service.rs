@@ -130,7 +130,10 @@ mod tests {
     use serde_json::json;
 
     fn create_test_service() -> DocumentsService {
-        DocumentsService::new_with_renderer(TypstDocumentRenderer::new())
+        DocumentsService::with_scope(
+            std::sync::Arc::new(TypstDocumentRenderer::new()),
+            DocumentScope::CockpitOnly,
+        )
     }
 
     fn assert_valid_document_output(output: &DocumentOutput, expected_kind: DocumentKind) {
@@ -585,5 +588,99 @@ mod tests {
 
         // Renderizador nunca é invocado em caso de violação de autorização
         assert_eq!(mock.invocations(), 0);
+    }
+
+    #[test]
+    fn test_documents_service_enforces_cockpit_and_node_scopes_for_all_document_kinds() {
+        let all_kinds = vec![
+            DocumentKind::CitizenLedger,
+            DocumentKind::InvoiceBill,
+            DocumentKind::CessaoPosse,
+            DocumentKind::RealEstateReconciliation,
+        ];
+        let mock = std::sync::Arc::new(MockRenderer::new(all_kinds));
+
+        let ledger_req = DocumentRequest::CitizenLedger(CitizenLedgerPayload {
+            associate_id: Some("ASSOC-01".to_string()),
+            data: json!({"meta": {}}),
+        });
+        let invoice_req = DocumentRequest::InvoiceBill(InvoiceReportPayload {
+            id: "FAT-SCOPE-02".to_string(),
+            member_name: "Associado Escopo".to_string(),
+            member_doc: "111.222.333-44".to_string(),
+            member_email: None,
+            member_address: None,
+            description: "Fatura Escopo".to_string(),
+            reference_month: "2026-10".to_string(),
+            amount: 100.0,
+            due_date: "2026-10-31".to_string(),
+            settled_date: None,
+            payment_method: "Pix".to_string(),
+            status: "pending".to_string(),
+            items: vec![InvoiceReportItem {
+                id: "it-1".to_string(),
+                description: "Item".to_string(),
+                service: None,
+                quantity: 1.0,
+                price: 100.0,
+                total: 100.0,
+            }],
+            taxes: None,
+            discount: None,
+            d1_protocol: None,
+        });
+        let cessao_req =
+            DocumentRequest::CessaoPosse(crate::modules::documents::models::CessaoPossePayload {
+                document_number: "2026-0001/CP".to_string(),
+                auth_code: "2026-X7Y9".to_string(),
+                data: json!({"cedenteNome": "Cedente"}),
+            });
+        let reconciliation_req = DocumentRequest::RealEstateReconciliation(
+            crate::modules::documents::models::RealEstateReconciliationPayload {
+                data: json!({"stats": {}}),
+            },
+        );
+
+        // 1. Edição Cockpit (CockpitOnly): aceita Universal e CockpitOnly
+        let cockpit_service =
+            DocumentsService::with_scope(mock.clone(), DocumentScope::CockpitOnly);
+        assert!(
+            cockpit_service
+                .generate_document(ledger_req.clone())
+                .is_ok()
+        );
+        assert!(
+            cockpit_service
+                .generate_document(invoice_req.clone())
+                .is_ok()
+        );
+        assert!(
+            cockpit_service
+                .generate_document(cessao_req.clone())
+                .is_ok()
+        );
+        assert!(
+            cockpit_service
+                .generate_document(reconciliation_req.clone())
+                .is_ok()
+        );
+        assert_eq!(mock.invocations(), 4);
+
+        // 2. Edição Node (NodeOnly): aceita Universal (CitizenLedger, InvoiceBill),
+        // mas rejeita documentos restritos ao Cockpit (CessaoPosse, RealEstateReconciliation)
+        let node_service = DocumentsService::with_scope(mock.clone(), DocumentScope::NodeOnly);
+        assert!(node_service.generate_document(ledger_req).is_ok());
+        assert!(node_service.generate_document(invoice_req).is_ok());
+        assert_eq!(mock.invocations(), 6);
+
+        assert!(matches!(
+            node_service.generate_document(cessao_req),
+            Err(DocumentError::UnauthorizedScope(_))
+        ));
+        assert!(matches!(
+            node_service.generate_document(reconciliation_req),
+            Err(DocumentError::UnauthorizedScope(_))
+        ));
+        assert_eq!(mock.invocations(), 6);
     }
 }

@@ -72,8 +72,8 @@ impl DocumentKind {
         match self {
             DocumentKind::CitizenLedger => DocumentScope::Universal,
             DocumentKind::InvoiceBill => DocumentScope::Universal,
-            DocumentKind::CessaoPosse => DocumentScope::Universal,
-            DocumentKind::RealEstateReconciliation => DocumentScope::Universal,
+            DocumentKind::CessaoPosse => DocumentScope::CockpitOnly,
+            DocumentKind::RealEstateReconciliation => DocumentScope::CockpitOnly,
         }
     }
 
@@ -88,6 +88,9 @@ impl DocumentKind {
     }
 }
 
+pub const COCKPIT_APP_IDENTIFIER: &str = "br.aspp.devos.cockpit";
+pub const NODE_APP_IDENTIFIER: &str = "br.aspp.devos.node";
+
 /// Escopo de segurança e permissão por edição da aplicação.
 ///
 /// A declaração do escopo não substitui a verificação de autorização
@@ -98,6 +101,20 @@ pub enum DocumentScope {
     CockpitOnly,
     NodeOnly,
     Universal,
+}
+
+impl DocumentScope {
+    /// Resolve o escopo documental da edição ativa a partir do `identifier` da aplicação Tauri.
+    ///
+    /// Caso o identificador não corresponda ao Cockpit (`br.aspp.devos.cockpit`),
+    /// aplica por segurança o perfil restrito `NodeOnly` (princípio do menor privilégio).
+    pub fn from_app_identifier(identifier: &str) -> Self {
+        match identifier.trim() {
+            COCKPIT_APP_IDENTIFIER => Self::CockpitOnly,
+            NODE_APP_IDENTIFIER => Self::NodeOnly,
+            _ => Self::NodeOnly,
+        }
+    }
 }
 
 /// Metadados de rastreabilidade gerados para cada emissão.
@@ -166,14 +183,16 @@ impl InvoiceReportItem {
             )));
         }
         if !self.quantity.is_finite() || self.quantity <= 0.0 {
-            return Err(DocumentError::ValidationError(
-                format!("O item {} da fatura possui quantidade inválida (deve ser finita e maior que zero).", num),
-            ));
+            return Err(DocumentError::ValidationError(format!(
+                "O item {} da fatura possui quantidade inválida (deve ser finita e maior que zero).",
+                num
+            )));
         }
         if !self.price.is_finite() || self.price < 0.0 {
-            return Err(DocumentError::ValidationError(
-                format!("O item {} da fatura possui preço unitário inválido (deve ser finito e não negativo).", num),
-            ));
+            return Err(DocumentError::ValidationError(format!(
+                "O item {} da fatura possui preço unitário inválido (deve ser finito e não negativo).",
+                num
+            )));
         }
         if !self.total.is_finite() || self.total < 0.0 {
             return Err(DocumentError::ValidationError(format!(
@@ -181,11 +200,24 @@ impl InvoiceReportItem {
                 num
             )));
         }
+        let expected_total = self.quantity * self.price;
+        if (expected_total - self.total).abs() > 1e-2 {
+            return Err(DocumentError::ValidationError(format!(
+                "O item {} da fatura possui total ({:.2}) divergente de quantidade × preço unitário ({:.2}).",
+                num, self.total, expected_total
+            )));
+        }
         Ok(())
     }
 }
 
 /// Dados de entrada canônicos para a geração de uma fatura associativa.
+///
+/// Semântica financeira oficial:
+/// - `amount`: subtotal bruto da fatura (soma dos totais dos itens quando `items` não está vazio).
+/// - `taxes`: tributos/taxas adicionais opcionais (>= 0).
+/// - `discount`: desconto opcional concedido (>= 0 e <= `amount + taxes`).
+/// - `final_total()`: valor líquido final da fatura (`amount + taxes - discount`).
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct InvoiceReportPayload {
     pub id: String,
@@ -207,6 +239,13 @@ pub struct InvoiceReportPayload {
 }
 
 impl InvoiceReportPayload {
+    /// Calcula o valor líquido final da fatura (`amount + taxes - discount`), arredondado em 2 casas decimais.
+    pub fn final_total(&self) -> f64 {
+        let taxes = self.taxes.unwrap_or(0.0);
+        let discount = self.discount.unwrap_or(0.0);
+        ((self.amount + taxes - discount) * 100.0).round() / 100.0
+    }
+
     /// Valida as invariantes estruturais e numéricas da fatura antes da emissão.
     pub fn validate(&self) -> Result<(), DocumentError> {
         if self.id.trim().is_empty() {
@@ -221,28 +260,51 @@ impl InvoiceReportPayload {
         }
         if !self.amount.is_finite() || self.amount < 0.0 {
             return Err(DocumentError::ValidationError(
-                "O valor total da fatura (amount) deve ser um número finito e não negativo."
+                "O subtotal da fatura (amount) deve ser um número finito e não negativo."
                     .to_string(),
             ));
         }
-        if let Some(taxes) = self.taxes {
-            if !taxes.is_finite() || taxes < 0.0 {
-                return Err(DocumentError::ValidationError(
-                    "O valor de tributos (taxes) deve ser um número finito e não negativo."
-                        .to_string(),
-                ));
+        let taxes_val = match self.taxes {
+            Some(taxes) => {
+                if !taxes.is_finite() || taxes < 0.0 {
+                    return Err(DocumentError::ValidationError(
+                        "O valor de tributos (taxes) deve ser um número finito e não negativo."
+                            .to_string(),
+                    ));
+                }
+                taxes
             }
-        }
-        if let Some(discount) = self.discount {
-            if !discount.is_finite() || discount < 0.0 {
-                return Err(DocumentError::ValidationError(
-                    "O valor de desconto (discount) deve ser um número finito e não negativo."
-                        .to_string(),
-                ));
+            None => 0.0,
+        };
+        let discount_val = match self.discount {
+            Some(discount) => {
+                if !discount.is_finite() || discount < 0.0 {
+                    return Err(DocumentError::ValidationError(
+                        "O valor de desconto (discount) deve ser um número finito e não negativo."
+                            .to_string(),
+                    ));
+                }
+                discount
             }
+            None => 0.0,
+        };
+        if discount_val - (self.amount + taxes_val) > 1e-2 {
+            return Err(DocumentError::ValidationError(
+                "O valor de desconto (discount) não pode exceder o subtotal acrescido de tributos."
+                    .to_string(),
+            ));
         }
         for (i, item) in self.items.iter().enumerate() {
             item.validate(i)?;
+        }
+        if !self.items.is_empty() {
+            let items_sum: f64 = self.items.iter().map(|item| item.total).sum();
+            if (items_sum - self.amount).abs() > 1e-2 {
+                return Err(DocumentError::ValidationError(format!(
+                    "A soma dos itens da fatura ({:.2}) diverge do subtotal informado em amount ({:.2}).",
+                    items_sum, self.amount
+                )));
+            }
         }
         Ok(())
     }
@@ -399,11 +461,47 @@ mod tests {
         );
 
         assert_eq!(
+            DocumentKind::CessaoPosse.required_scope(),
+            DocumentScope::CockpitOnly
+        );
+
+        assert_eq!(
+            DocumentKind::RealEstateReconciliation.required_scope(),
+            DocumentScope::CockpitOnly
+        );
+
+        assert_eq!(
             DocumentKind::CitizenLedger.template_id(),
             "extrato_citizen_ledger.typ"
         );
 
         assert_eq!(DocumentKind::InvoiceBill.template_id(), "invoice_bill.typ");
+
+        assert_eq!(
+            DocumentKind::CessaoPosse.template_id(),
+            "contrato_cessao_posse.typ"
+        );
+
+        assert_eq!(
+            DocumentKind::RealEstateReconciliation.template_id(),
+            "real_estate_reconciliation.typ"
+        );
+    }
+
+    #[test]
+    fn document_scope_resolves_from_app_identifier() {
+        assert_eq!(
+            DocumentScope::from_app_identifier("br.aspp.devos.cockpit"),
+            DocumentScope::CockpitOnly
+        );
+        assert_eq!(
+            DocumentScope::from_app_identifier("br.aspp.devos.node"),
+            DocumentScope::NodeOnly
+        );
+        assert_eq!(
+            DocumentScope::from_app_identifier("unknown.edition"),
+            DocumentScope::NodeOnly
+        );
     }
 
     #[test]
@@ -533,16 +631,22 @@ mod tests {
         };
 
         // 1. Valor positivo válido -> OK
-        assert!(DocumentRequest::InvoiceBill(base_invoice.clone())
-            .validate()
-            .is_ok());
+        assert!(
+            DocumentRequest::InvoiceBill(base_invoice.clone())
+                .validate()
+                .is_ok()
+        );
 
-        // 2. Valor zero -> OK
+        // 2. Valor zero -> OK (com item gratuito coerente)
         let mut zero_invoice = base_invoice.clone();
         zero_invoice.amount = 0.0;
-        assert!(DocumentRequest::InvoiceBill(zero_invoice)
-            .validate()
-            .is_ok());
+        zero_invoice.items[0].price = 0.0;
+        zero_invoice.items[0].total = 0.0;
+        assert!(
+            DocumentRequest::InvoiceBill(zero_invoice)
+                .validate()
+                .is_ok()
+        );
 
         // 3. Valor negativo -> Err
         let mut negative_invoice = base_invoice.clone();
@@ -728,9 +832,11 @@ mod tests {
 
         let mut zero_discount = base_invoice;
         zero_discount.discount = Some(0.0);
-        assert!(DocumentRequest::InvoiceBill(zero_discount)
-            .validate()
-            .is_ok());
+        assert!(
+            DocumentRequest::InvoiceBill(zero_discount)
+                .validate()
+                .is_ok()
+        );
     }
 
     #[test]
@@ -789,9 +895,10 @@ mod tests {
                 "Deveria rejeitar price: {invalid_price}"
             );
         }
-        // Preço zero -> Ok (itens gratuitos ou cortesias institucionais)
+        // Preço e total zero -> Ok (itens gratuitos ou cortesias institucionais)
         let mut zero_price = base_item.clone();
         zero_price.price = 0.0;
+        zero_price.total = 0.0;
         assert!(zero_price.validate(0).is_ok());
 
         // 6. Total: negativo, NaN, +Inf, -Inf -> Err
@@ -803,10 +910,92 @@ mod tests {
                 "Deveria rejeitar total: {invalid_total}"
             );
         }
-        // Total zero -> Ok
-        let mut zero_total = base_item.clone();
-        zero_total.total = 0.0;
-        assert!(zero_total.validate(0).is_ok());
+        // Total divergente de quantity * price -> Err
+        let mut mismatched_total = base_item;
+        mismatched_total.total = 99.0;
+        assert!(matches!(
+            mismatched_total.validate(0),
+            Err(DocumentError::ValidationError(_))
+        ));
+    }
+
+    #[test]
+    fn test_invoice_financial_calculation_and_consistency_validation() {
+        let base_invoice = InvoiceReportPayload {
+            id: "INV-FIN-01".to_string(),
+            member_name: "Associado Financeiro".to_string(),
+            member_doc: "123.456.789-00".to_string(),
+            member_email: None,
+            member_address: None,
+            description: "Fatura Mensal".to_string(),
+            reference_month: "2026-10".to_string(),
+            amount: 100.0,
+            due_date: "2026-10-31".to_string(),
+            settled_date: None,
+            payment_method: "Pix".to_string(),
+            status: "pending".to_string(),
+            items: vec![
+                InvoiceReportItem {
+                    id: "it-1".to_string(),
+                    description: "Item A".to_string(),
+                    service: None,
+                    quantity: 1.0,
+                    price: 60.0,
+                    total: 60.0,
+                },
+                InvoiceReportItem {
+                    id: "it-2".to_string(),
+                    description: "Item B".to_string(),
+                    service: None,
+                    quantity: 2.0,
+                    price: 20.0,
+                    total: 40.0,
+                },
+            ],
+            taxes: None,
+            discount: None,
+            d1_protocol: None,
+        };
+
+        // 1. Sem tributos e sem desconto
+        assert!(base_invoice.validate().is_ok());
+        assert_eq!(base_invoice.final_total(), 100.0);
+
+        // 2. Com tributos
+        let mut with_taxes = base_invoice.clone();
+        with_taxes.taxes = Some(15.5);
+        assert!(with_taxes.validate().is_ok());
+        assert_eq!(with_taxes.final_total(), 115.5);
+
+        // 3. Com desconto
+        let mut with_discount = base_invoice.clone();
+        with_discount.discount = Some(20.0);
+        assert!(with_discount.validate().is_ok());
+        assert_eq!(with_discount.final_total(), 80.0);
+
+        // 4. Com tributos e desconto
+        let mut with_taxes_and_discount = base_invoice.clone();
+        with_taxes_and_discount.taxes = Some(15.5);
+        with_taxes_and_discount.discount = Some(20.0);
+        assert!(with_taxes_and_discount.validate().is_ok());
+        assert_eq!(with_taxes_and_discount.final_total(), 95.5);
+
+        // 5. Desconto excessivo (> amount + taxes) -> ValidationError
+        let mut excessive_discount = base_invoice.clone();
+        excessive_discount.taxes = Some(10.0);
+        excessive_discount.discount = Some(115.0);
+        assert!(matches!(
+            excessive_discount.validate(),
+            Err(DocumentError::ValidationError(_))
+        ));
+
+        // 6. Soma dos itens divergente de amount -> ValidationError
+        let mut mismatched_subtotal = base_invoice;
+        mismatched_subtotal.amount = 150.0;
+        assert!(matches!(
+            mismatched_subtotal.validate(),
+            Err(DocumentError::ValidationError(_))
+        ));
     }
 
     #[test]

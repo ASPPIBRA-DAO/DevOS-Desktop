@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::modules::documents::models::{DocumentError, DocumentKind, DocumentRequest};
 use crate::modules::documents::ports::{DocumentRenderer, RenderedDocument};
-use crate::platform::typst_engine::{compile_typst_document, TypstCompileOptions};
+use crate::platform::typst_engine::{TypstCompileOptions, compile_typst_document};
 
 static CITIZEN_TEMPLATE: &str = include_str!("../../../templates/extrato_citizen_ledger.typ");
 
@@ -68,8 +68,6 @@ impl DocumentRenderer for TypstDocumentRenderer {
     }
 
     fn render(&self, request: DocumentRequest) -> Result<RenderedDocument, DocumentError> {
-        let kind = request.kind();
-
         let (template_source, json_payload) = match request {
             DocumentRequest::CitizenLedger(payload) => {
                 let json_str = serde_json::to_string(&payload.data)
@@ -107,16 +105,8 @@ impl DocumentRenderer for TypstDocumentRenderer {
         let mut string_inputs = HashMap::new();
         string_inputs.insert("data", json_payload);
 
-        let merged_template;
-        let final_template_source = if matches!(kind, DocumentKind::CessaoPosse) {
-            merged_template = format!("{ASPPIBRA_LAYOUT}\n{template_source}");
-            &merged_template
-        } else {
-            template_source
-        };
-
         let options = TypstCompileOptions {
-            template_source: final_template_source,
+            template_source,
             fonts: &[ROBOTO_REGULAR, ROBOTO_BOLD],
             string_inputs,
             static_sources: CANONICAL_TYPST_STATIC_SOURCES,
@@ -537,6 +527,186 @@ mod tests {
             assert!(
                 compile_typst_document(options).is_err(),
                 "asppibra_header_running deve falhar para {doc_part}, {title_part}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_cessao_posse_template_rejects_missing_empty_or_whitespace_metadata() {
+        let renderer = TypstDocumentRenderer::new();
+
+        for (doc_num, auth_code) in [
+            ("", "2026-X7Y9"),
+            ("   ", "2026-X7Y9"),
+            ("2026-0001/CP", ""),
+            ("2026-0001/CP", "   "),
+        ] {
+            let payload = CessaoPossePayload {
+                document_number: doc_num.to_string(),
+                auth_code: auth_code.to_string(),
+                data: json!({"cedenteNome": "Teste"}),
+            };
+
+            let result = renderer.render(DocumentRequest::CessaoPosse(payload));
+            assert!(
+                result.is_err(),
+                "O template contrato_cessao_posse.typ deve rejeitar document_number='{doc_num}' e auth_code='{auth_code}'"
+            );
+        }
+
+        // Também valida JSON bruto sem document_number ou sem auth_code (ausência total da chave)
+        for raw_json in [
+            json!({"auth_code": "2026-X7Y9", "data": {}}),
+            json!({"document_number": "2026-0001/CP", "data": {}}),
+            json!({"data": {}}),
+        ] {
+            let mut string_inputs = HashMap::new();
+            string_inputs.insert("data", raw_json.to_string());
+
+            let options = TypstCompileOptions {
+                template_source: CONTRATO_CESSAO_TEMPLATE,
+                fonts: &[ROBOTO_REGULAR, ROBOTO_BOLD],
+                string_inputs,
+                static_sources: CANONICAL_TYPST_STATIC_SOURCES,
+            };
+
+            assert!(
+                compile_typst_document(options).is_err(),
+                "O template contrato_cessao_posse.typ deve falhar quando document_number ou auth_code estão ausentes no JSON"
+            );
+        }
+    }
+
+    #[test]
+    fn test_cessao_posse_template_uses_canonical_import_and_has_no_duplicate_section_heading() {
+        assert!(
+            CONTRATO_CESSAO_TEMPLATE.contains("#import \"asppibra_layout.typ\": *"),
+            "contrato_cessao_posse.typ deve importar canonicamente asppibra_layout.typ"
+        );
+        assert!(
+            !CONTRATO_CESSAO_TEMPLATE.contains("#let section_heading"),
+            "contrato_cessao_posse.typ não deve redeclarar section_heading localmente"
+        );
+        assert!(
+            !CONTRATO_CESSAO_TEMPLATE.contains("2026-0001/CP"),
+            "contrato_cessao_posse.typ não deve conter fallback hardcoded 2026-0001/CP"
+        );
+        assert!(
+            !CONTRATO_CESSAO_TEMPLATE.contains("2026-X7Y9"),
+            "contrato_cessao_posse.typ não deve conter fallback hardcoded 2026-X7Y9"
+        );
+    }
+
+    #[test]
+    fn test_templates_do_not_contain_unverified_legal_or_d1_claims() {
+        let templates = [
+            ("extrato_citizen_ledger.typ", CITIZEN_TEMPLATE),
+            ("invoice_bill.typ", INVOICE_TEMPLATE),
+            ("contrato_cessao_posse.typ", CONTRATO_CESSAO_TEMPLATE),
+            ("real_estate_reconciliation.typ", RECONCILIATION_TEMPLATE),
+            ("core/header_footer.typ", CORE_HEADER_FOOTER),
+        ];
+
+        let forbidden_system_claims = [
+            "CHANCELA DIGITAL DE AUDITORIA",
+            "Autenticação digital sob a Lei Federal nº 14.063/2020",
+            "protocolo criptográfico com carimbo do tempo",
+            "VERIFICADO ✓",
+            "Cloudflare D1",
+            "Protocolo D1",
+            "Hash D1",
+            "AUTENTICAÇÃO CRIPTOGRÁFICA D1 LEDGER",
+            "poderão ser utilizadas como elemento de prova eletrônica",
+            "05d4084730d36b1073d62c37ab83e9c425d795b5ff34ed949083cdbf02fd7b33",
+        ];
+
+        for (name, source) in templates {
+            for forbidden in forbidden_system_claims {
+                assert!(
+                    !source.contains(forbidden),
+                    "O template {name} não deve conter a alegação de sistema não implementada '{forbidden}'"
+                );
+            }
+        }
+
+        // Templates não contratuais e componentes de cabeçalho/rodapé não devem mencionar ICP-Brasil ou Lei 14.063/2020
+        for (name, source) in [
+            ("extrato_citizen_ledger.typ", CITIZEN_TEMPLATE),
+            ("invoice_bill.typ", INVOICE_TEMPLATE),
+            ("real_estate_reconciliation.typ", RECONCILIATION_TEMPLATE),
+            ("core/header_footer.typ", CORE_HEADER_FOOTER),
+        ] {
+            for term in ["ICP-Brasil", "14.063/2020", "carimbo do tempo"] {
+                assert!(
+                    !source.contains(term),
+                    "O template {name} não deve conter '{term}'"
+                );
+            }
+        }
+
+        // Garante que as cláusulas jurídicas materiais 16.1 e 16.2 do contrato foram preservadas
+        assert!(
+            CONTRATO_CESSAO_TEMPLATE
+                .contains("16.1. As partes reconhecem a plena eficácia da assinatura eletrônica"),
+            "A cláusula contratual material 16.1 deve ser preservada"
+        );
+        assert!(
+            CONTRATO_CESSAO_TEMPLATE.contains(
+                "16.2. São válidas assinaturas simples, avançadas ou qualificadas ICP-Brasil."
+            ),
+            "A cláusula contratual material 16.2 deve ser preservada"
+        );
+    }
+
+    #[test]
+    fn test_invoice_bill_template_renders_exact_final_total_across_scenarios() {
+        let renderer = TypstDocumentRenderer::new();
+
+        let scenarios = [
+            // (amount, taxes, discount, expected_total_str)
+            (150.0, None, None, "Total: R$ 150"),
+            (150.0, Some(15.5), None, "Total: R$ 165.5"),
+            (150.0, None, Some(20.0), "Total: R$ 130"),
+            (150.0, Some(15.5), Some(20.0), "Total: R$ 145.5"),
+        ];
+
+        for (amount, taxes, discount, expected_total_marker) in scenarios {
+            let payload = InvoiceReportPayload {
+                id: "FAT-CALC-TEST".to_string(),
+                member_name: "Associado Financeiro".to_string(),
+                member_doc: "123.456.789-00".to_string(),
+                member_email: None,
+                member_address: None,
+                description: "Fatura Teste Cálculo".to_string(),
+                reference_month: "2026-10".to_string(),
+                amount,
+                due_date: "2026-10-31".to_string(),
+                settled_date: None,
+                payment_method: "Pix".to_string(),
+                status: "pending".to_string(),
+                items: vec![InvoiceReportItem {
+                    id: "item-1".to_string(),
+                    description: "Serviço Associativo".to_string(),
+                    service: None,
+                    quantity: 1.0,
+                    price: amount,
+                    total: amount,
+                }],
+                taxes,
+                discount,
+                d1_protocol: None,
+            };
+
+            let rendered = renderer
+                .render(DocumentRequest::InvoiceBill(payload))
+                .expect("Renderização da fatura deve compilar com sucesso");
+
+            assert_valid_rendered(&rendered);
+
+            let pdf_lossy = String::from_utf8_lossy(&rendered.pdf_bytes);
+            assert!(
+                pdf_lossy.contains(expected_total_marker),
+                "PDF da fatura deve conter '{expected_total_marker}' para amount={amount}, taxes={taxes:?}, discount={discount:?}"
             );
         }
     }

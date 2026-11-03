@@ -110,6 +110,10 @@ pub fn run() {
 
     let context = tauri::generate_context!();
     let is_cockpit = context.config().identifier == COCKPIT_IDENTIFIER;
+    let active_scope = modules::documents::DocumentScope::from_app_identifier(
+        &context.config().identifier,
+    );
+    modules::documents::configure_active_document_scope(active_scope);
 
     let builder = tauri::Builder::default()
         .setup(move |app| {

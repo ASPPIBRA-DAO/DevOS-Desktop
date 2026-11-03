@@ -1,5 +1,9 @@
-use super::models::{CitizenLedgerPayload, InvoiceReportPayload};
-use crate::modules::documents::{default_documents_service, DocumentRequest};
+use super::models::{
+    CessaoPossePayload, CitizenLedgerPayload, InvoiceReportPayload, RealEstateReconciliationPayload,
+};
+use crate::modules::documents::{
+    DocumentRequest, DocumentScope, active_document_scope, documents_service_with_scope,
+};
 
 /// Compila o PDF do Livro-Razão do Cidadão em memória.
 ///
@@ -19,11 +23,35 @@ pub fn compile_invoice_pdf(payload: &InvoiceReportPayload) -> Result<Vec<u8>, St
     compile_document_pdf(request)
 }
 
-/// Executa o fluxo de compilação comum aos adaptadores legados.
+/// Compila o PDF do Contrato de Cessão de Posse em memória,
+/// passando obrigatoriamente pelas validações e autorizações do `DocumentsService`.
+pub fn compile_cessao_posse_pdf(payload: &CessaoPossePayload) -> Result<Vec<u8>, String> {
+    let request = DocumentRequest::CessaoPosse(payload.clone());
+    compile_document_pdf(request)
+}
+
+/// Compila o PDF do Relatório de Reconciliação Imobiliária em memória,
+/// passando obrigatoriamente pelas validações e autorizações do `DocumentsService`.
+pub fn compile_real_estate_reconciliation_pdf(
+    payload: &RealEstateReconciliationPayload,
+) -> Result<Vec<u8>, String> {
+    let request = DocumentRequest::RealEstateReconciliation(payload.clone());
+    compile_document_pdf(request)
+}
+
+/// Executa o fluxo de compilação comum aos adaptadores legados usando o escopo ativo.
 ///
 /// A conversão para String é mantida para preservar a API existente.
 fn compile_document_pdf(request: DocumentRequest) -> Result<Vec<u8>, String> {
-    default_documents_service()
+    compile_document_pdf_with_scope(request, active_document_scope())
+}
+
+/// Executa o fluxo de compilação delegando ao `DocumentsService` com escopo explícito.
+pub fn compile_document_pdf_with_scope(
+    request: DocumentRequest,
+    scope: DocumentScope,
+) -> Result<Vec<u8>, String> {
+    documents_service_with_scope(scope)
         .generate_document(request)
         .map(|output| output.pdf_bytes)
         .map_err(|error| error.to_string())
@@ -125,5 +153,65 @@ mod tests {
         });
 
         assert_valid_pdf(&bytes, "Fatura Associativa");
+    }
+
+    #[test]
+    fn test_reports_engine_enforces_validation_and_scope_via_documents_service() {
+        // 1. Rejeita fatura inválida (id vazio ou desconto excessivo)
+        let invalid_invoice = InvoiceReportPayload {
+            id: "   ".to_string(),
+            member_name: "Associado Teste".to_string(),
+            member_doc: "000.000.000-00".to_string(),
+            member_email: None,
+            member_address: None,
+            description: "Fatura Inválida".to_string(),
+            reference_month: "2026-10".to_string(),
+            amount: 100.0,
+            due_date: "2026-10-31".to_string(),
+            settled_date: None,
+            payment_method: "Pix".to_string(),
+            status: "pending".to_string(),
+            items: vec![],
+            taxes: None,
+            discount: None,
+            d1_protocol: None,
+        };
+        assert!(compile_invoice_pdf(&invalid_invoice).is_err());
+
+        // 2. Rejeita CessaoPosse sem document_number ou sem auth_code
+        let invalid_cessao = CessaoPossePayload {
+            document_number: "".to_string(),
+            auth_code: "2026-X7Y9".to_string(),
+            data: json!({"cedenteNome": "Teste"}),
+        };
+        assert!(compile_cessao_posse_pdf(&invalid_cessao).is_err());
+
+        let invalid_auth = CessaoPossePayload {
+            document_number: "2026-0001/CP".to_string(),
+            auth_code: "   ".to_string(),
+            data: json!({"cedenteNome": "Teste"}),
+        };
+        assert!(compile_cessao_posse_pdf(&invalid_auth).is_err());
+
+        // 3. Rejeita escopo não autorizado (CessaoPosse em NodeOnly)
+        let valid_cessao = CessaoPossePayload {
+            document_number: "2026-0001/CP".to_string(),
+            auth_code: "2026-X7Y9".to_string(),
+            data: json!({"cedenteNome": "JOÃO SILVA", "cessionarioNome": "MARIA SOUZA"}),
+        };
+        assert!(
+            compile_document_pdf_with_scope(
+                DocumentRequest::CessaoPosse(valid_cessao.clone()),
+                DocumentScope::NodeOnly
+            )
+            .is_err()
+        );
+
+        let valid_bytes = compile_document_pdf_with_scope(
+            DocumentRequest::CessaoPosse(valid_cessao),
+            DocumentScope::CockpitOnly,
+        )
+        .expect("CockpitOnly deve autorizar CessaoPosse pelo adaptador de reports");
+        assert_valid_pdf(&valid_bytes, "Contrato de Cessão de Posse");
     }
 }

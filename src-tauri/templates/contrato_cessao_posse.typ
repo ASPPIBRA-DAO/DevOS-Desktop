@@ -1,10 +1,12 @@
 // ASPPIBRA DAO - Template Oficial Unificado do Contrato de Cessão de Posse (Typst)
 // Minuta Extensa Completa (18 Capítulos) - Única Fonte de Verdade
+#import "asppibra_layout.typ": *
+
 #let raw_input = sys.inputs.at("data", default: "{}")
 #let data = json(bytes(raw_input))
 
-#let doc_number = data.at("document_number", default: "2026-0001/CP")
-#let auth_code = data.at("auth_code", default: "2026-X7Y9")
+#let doc_number = data.at("document_number", default: none)
+#let auth_code = data.at("auth_code", default: none)
 #let cdata = data.at("data", default: (:))
 
 #let get_val(key, default_val) = {
@@ -21,13 +23,17 @@
 }
 
 #set document(
-  title: "Contrato_Cessao_Posse_" + doc_number,
-  author: "ASPPIBRA DAO",
+  title: if type(doc_number) == str and doc_number.trim() != "" {
+    "Contrato_Cessao_Posse_" + doc_number.trim()
+  } else {
+    "Contrato_Cessao_Posse"
+  },
+  author: asppibra_sigla,
 )
 
 #set page(
-  paper: "a4",
-  margin: (top: 2.5cm, bottom: 2.2cm, left: 3cm, right: 2cm),
+  paper: standard_paper,
+  margin: margins_institutional_contract,
   header: context {
     let i = counter(page).get().first()
     if i > 1 {
@@ -38,23 +44,17 @@
 )
 
 #set text(
-  font: ("Roboto", "Liberation Sans", "Arial"),
-  size: 8.5pt,
-  fill: rgb("#1F2937"),
+  font: font_family_base,
+  size: font_size_body,
+  fill: color_primary_text,
   lang: "pt",
 )
 
 #set par(
   justify: true,
-  leading: 0.6em,
-  first-line-indent: 1.25cm,
+  leading: leading_body,
+  first-line-indent: first_line_indent_abnt,
 )
-
-#let section_heading(title) = {
-  v(8pt)
-  align(center)[#text(weight: "bold", size: 9pt, fill: rgb("#111827"))[#title]]
-  v(3pt)
-}
 
 // ====================================================================
 // CABEÇALHO OFICIAL PRINCIPAL (1ª Página)
@@ -65,7 +65,7 @@
 
 // TÍTULO DO INSTRUMENTO
 #align(center)[
-  #text(size: 11pt, weight: "bold", fill: rgb("#111827"))[
+  #text(size: font_size_heading, weight: "bold", fill: color_primary)[
     INSTRUMENTO PARTICULAR DE CESSÃO DE POSSE DE IMÓVEL
   ]
 ]
@@ -89,7 +89,7 @@
 
 1.5. *DA ASPPIBRA – ADMINISTRAÇÃO CONTRATUAL, COORDENAÇÃO OPERACIONAL, COBRANÇA, RECEBIMENTO E REPASSE*
 
-1.5.1. *Da condição e finalidade de atuação.* A *ASPPIBRA – ASSOCIAÇÃO DOS PROPRIETÁRIOS E POSSEIROS DE IMÓVEIS NO BRASIL*, pessoa jurídica de direito privado constituída sob a forma de associação civil sem fins lucrativos, inscrita no CNPJ sob o nº 26.325.396/0001-30, com sede em #get_val("asppibraEnderecoSede", "endereço completo da sede da ASPPIBRA, com CEP"), neste ato representada na forma de seu Estatuto Social por #get_val("asppibraRepresentanteNome", "representante legal"), #get_val("asppibraRepresentanteCargo", "cargo estatutário"), portador(a) do RG nº #get_val("asppibraRepresentanteRg", "RG"), inscrito(a) no CPF sob o nº #get_val("asppibraRepresentanteCpf", "CPF"), doravante denominada "*ASPPIBRA*", intervém neste instrumento na qualidade de *INTERVENIENTE ADMINISTRADORA, COORDENADORA OPERACIONAL E MANDATÁRIA CONTRATUAL*, nos limites deste instrumento, de seu Estatuto Social e da legislação aplicável.
+1.5.1. *Da condição e finalidade de atuação.* A *#asppibra_razao_social*, pessoa jurídica de direito privado constituída sob a forma de associação civil sem fins lucrativos, inscrita no CNPJ sob o nº #asppibra_cnpj, com sede em #get_val("asppibraEnderecoSede", "endereço completo da sede da ASPPIBRA, com CEP"), neste ato representada na forma de seu Estatuto Social por #get_val("asppibraRepresentanteNome", "representante legal"), #get_val("asppibraRepresentanteCargo", "cargo estatutário"), portador(a) do RG nº #get_val("asppibraRepresentanteRg", "RG"), inscrito(a) no CPF sob o nº #get_val("asppibraRepresentanteCpf", "CPF"), doravante denominada "*ASPPIBRA*", intervém neste instrumento na qualidade de *INTERVENIENTE ADMINISTRADORA, COORDENADORA OPERACIONAL E MANDATÁRIA CONTRATUAL*, nos limites deste instrumento, de seu Estatuto Social e da legislação aplicável.
 
 1.5.2. A atuação da ASPPIBRA compreende a administração operacional deste contrato, a coordenação das providências administrativas relacionadas à sua execução, a organização documental, o acompanhamento dos procedimentos de regularização fundiária e registral, a articulação entre as partes e os profissionais envolvidos e a administração operacional do fluxo de pagamentos, inclusive cobrança, recebimento, conciliação, retenções autorizadas, repasses e prestação de contas.
 
@@ -134,8 +134,8 @@
         row-gutter: 4pt,
         text(weight: "bold", size: 7.5pt)[Instituição / Banco:], text(size: 7.5pt)[#get_val("asppibraBanco", "403 - Cora SCD")],
         text(weight: "bold", size: 7.5pt)[Agência e Conta:], text(size: 7.5pt)[Agência: #get_val("asppibraAgencia", "0001") | Conta: #get_val("asppibraConta", "6193441-3")],
-        text(weight: "bold", size: 7.5pt)[Titular / CNPJ:], text(size: 7.5pt)[ASPPIBRA (CNPJ: 26.325.396/0001-30)],
-        text(weight: "bold", size: 7.5pt)[Chave Pix Oficial:], text(size: 7.5pt, font: "monospace", weight: "bold", fill: rgb("#111827"))[#get_val("asppibraChavePix", "26.325.396/0001-30 (CNPJ)")],
+        text(weight: "bold", size: 7.5pt)[Titular / CNPJ:], text(size: 7.5pt)[ASPPIBRA (CNPJ: #asppibra_cnpj)],
+        text(weight: "bold", size: 7.5pt)[Chave Pix Oficial:], text(size: 7.5pt, font: "monospace", weight: "bold", fill: rgb("#111827"))[#get_val("asppibraChavePix", asppibra_cnpj + " (CNPJ)")],
       )
     ]
   ]
@@ -580,8 +580,8 @@
 
 #v(14pt)
 
-// BLOCO DE ASSINATURAS E VALIDAÇÃO DIGITAL
-#section_heading("ASSINATURAS E VALIDAÇÃO DIGITAL")
+// BLOCO DE ASSINATURAS DAS PARTES
+#section_heading("ASSINATURAS DAS PARTES")
 
 #v(6pt)
 
@@ -608,7 +608,7 @@
     [
       #line(length: 95%, stroke: 0.8pt + rgb("#111827"))
       #text(weight: "bold", size: 8pt)[INTERVENIENTE ASPPIBRA (ADMINISTRADORA)] \
-      #text(size: 7pt, fill: rgb("#6B7280"))[CNPJ: 26.325.396/0001-30]
+      #text(size: 7pt, fill: rgb("#6B7280"))[CNPJ: #asppibra_cnpj]
     ]
   )
 ]
@@ -646,7 +646,7 @@
   
   #v(14pt)
   
-  // CHANCELA DE SEGURANÇA E REGISTRO D1
+  // QUADRO DE RASTREABILIDADE E CONTROLE DOCUMENTAL
   #rect(
     fill: rgb("#F9FAFB"),
     stroke: 1pt + rgb("#D4AF37"),
@@ -658,9 +658,9 @@
         columns: (1fr, auto),
         align: (left + horizon, right + horizon),
         [
-          #text(weight: "bold", size: 7.5pt, fill: rgb("#0A3B18"))[CHANCELA DIGITAL DE AUDITORIA E INTEGRIDADE (DEVOS CORE)] \
-          #text(size: 6.5pt, fill: rgb("#4B5563"))[Autenticação digital sob a Lei Federal nº 14.063/2020 e protocolo criptográfico com carimbo do tempo.] \
-          #text(size: 6.5pt, font: "monospace", fill: rgb("#111827"))[Protocolo: ASPPIBRA-DOC-#{auth_code}-SECURE]
+          #text(weight: "bold", size: 7.5pt, fill: rgb("#0A3B18"))[QUADRO DE RASTREABILIDADE E CONTROLE DOCUMENTAL (DEVOS)] \
+          #text(size: 6.5pt, fill: rgb("#4B5563"))[Documento emitido pelo sistema DevOS Desktop para controle administrativo e institucional interno.] \
+          #text(size: 6.5pt, font: "monospace", fill: rgb("#111827"))[Doc. Nº: #{doc_number} | Cód. Controle: #{auth_code}]
         ],
         [
           #rect(
@@ -668,7 +668,7 @@
             stroke: 1pt + rgb("#0A3B18"),
             radius: 2pt,
             inset: (x: 6pt, y: 3pt),
-            text(size: 6.5pt, weight: "bold", fill: rgb("#0A3B18"))[VERIFICADO ✓]
+            text(size: 6.5pt, weight: "bold", fill: rgb("#0A3B18"))[EMISSÃO REGISTRADA]
           )
         ]
       )

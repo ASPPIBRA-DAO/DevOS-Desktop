@@ -22,8 +22,9 @@ export function DefaultFooter({
 }: DefaultFooterProps = {}) {
   const data = useDocumentData();
 
-  const finalAuthCode =
-    authCode || (data?.authCode as string) || (data?.trackingNumber as string) || '2026-X7Y9';
+  const rawAuthCode =
+    authCode || (data?.authCode as string) || (data?.trackingNumber as string) || '';
+  const finalAuthCode = rawAuthCode.trim() || 'NÃO INFORMADO';
 
   return (
     <Box
@@ -81,7 +82,7 @@ export function DefaultFooter({
               lineHeight: 1.1,
             }}
           >
-            Autenticação Digital
+            Controle Documental DevOS
           </Typography>
           <Typography
             variant="caption"
@@ -93,7 +94,7 @@ export function DefaultFooter({
               mt: 0.2,
             }}
           >
-            Lei Federal 14.063/2020 • ICP-Brasil / DAO
+            Governança Institucional • Rastreabilidade Documental
           </Typography>
         </Box>
       </Box>

@@ -22,13 +22,13 @@ export function DefaultHeader({
 }: DefaultHeaderProps = {}) {
   const contextData = useDocumentData();
 
-  // Busca dinâmica do número de controle com fallback integrado do sistema
-  const finalDocNumber =
+  // Busca dinâmica do número de controle sem utilizar identificador oficial fictício
+  const rawDocNumber =
     documentNumber ||
     (contextData?.documentNumber as string) ||
     (contextData?.trackingNumber as string) ||
-    (contextData?.authCode as string) ||
-    '2026-0001/CP';
+    '';
+  const finalDocNumber = rawDocNumber.trim() || 'NÃO INFORMADO';
 
   // Cabeçalho corrido leve para páginas seguintes (> 1)
   if (isSubsequentPage) {
