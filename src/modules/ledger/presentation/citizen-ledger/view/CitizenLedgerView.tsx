@@ -5,6 +5,7 @@ import { useState } from 'react';
 
 import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
+import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import Typography from '@mui/material/Typography';
@@ -21,13 +22,10 @@ import { PdfViewerLayout } from 'src/shared/components/pdf-viewer';
 
 import { useGetCitizenLedger } from '../../hooks/treasury-hooks';
 import { AssociateSearchCard } from '../components/associate-search-card';
-import { FinancialHistoryPrint } from '../components/financial-history-print';
-import { BLANK_FINANCIAL_PROFILE } from '../../../domain/ledger-canonical-data';
 import { FinancialSummaryHeader } from '../components/financial-summary-header';
 import { FinancialTransactionsTable } from '../components/financial-transactions-table';
 import {
   exportCitizenLedgerPdf,
-  printCitizenLedgerHtml,
   previewCitizenLedgerPdf,
   exportPreviewedCitizenLedgerPdf,
   type ExportCitizenLedgerPdfPayload,
@@ -43,19 +41,20 @@ export function CitizenLedgerView() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [pdfPreview, setPdfPreview] = useState<DocumentPreviewResult | null>(null);
 
-  const [selectedCitizenId, setSelectedCitizenId] = useState<string | null>('10');
+  const [selectedCitizenId, setSelectedCitizenId] = useState<string | null>(null);
 
-  const { profile, profileLoading } = useGetCitizenLedger(selectedCitizenId);
+  const { profile, profileLoading, profileError } = useGetCitizenLedger(selectedCitizenId);
 
   const handleSelectProfile = (id: string | null) => {
     setSelectedCitizenId(id);
+    setPdfPreview(null);
   };
 
-  const profileToRender = profile || BLANK_FINANCIAL_PROFILE;
+  const transactions = profile?.transactions || [];
 
   const transactionYears = Array.from<string>(
     new Set(
-      profileToRender.transactions.map((tx: any) =>
+      transactions.map((tx: any) =>
         new Date(tx.created_at).getFullYear().toString()
       )
     )
@@ -63,7 +62,7 @@ export function CitizenLedgerView() {
 
   const availableYears = transactionYears.length > 0 ? ['Todos', ...transactionYears] : ['Todos'];
 
-  const dataFiltered = profileToRender.transactions
+  const dataFiltered = transactions
     .filter((tx: any) => {
       const txYear = tx.created_at ? tx.created_at.substring(0, 4) : '';
       const matchesYear = selectedYear === 'Todos' || txYear === selectedYear;
@@ -86,31 +85,35 @@ export function CitizenLedgerView() {
     });
 
   const buildLedgerPayload = (): ExportCitizenLedgerPdfPayload => {
+    if (!profile) {
+      throw new Error('Nenhum associado selecionado para emissão.');
+    }
+
     const totalInflow = dataFiltered
       .filter((tx: any) => tx.direction === 'inbound' || tx.type === 'income')
       .reduce((acc: number, tx: any) => acc + (Number(tx.amount) || 0), 0);
 
-    const contractTotal = profile?.contract?.contractedAmount || 65000;
-    const totalPaid = profile?.contract?.paidAmount ?? totalInflow;
-    const outstandingBalance = profile?.contract?.openAmount ?? Math.max(0, contractTotal - totalPaid);
+    const contractTotal = profile.contract?.contractedAmount ?? 0;
+    const totalPaid = profile.contract?.paidAmount ?? totalInflow;
+    const outstandingBalance = profile.contract?.openAmount ?? Math.max(0, contractTotal - totalPaid);
 
     return {
-      associate_id: profile?.associate.id,
+      associate_id: profile.associate.id,
       open_after_export: true,
       data: {
         meta: {
-          generated_at: fDate(new Date(), 'DD/MM/YYYY'),
-          reference_period: fDate(new Date(), 'YYYY-MM-A4'),
-          audit_hash: `d1_sha256_${profile?.associate.id || 'extrato'}_ledger`,
+          generated_at: fDate(new Date(), 'DD/MM/YYYY HH:mm'),
+          reference_period: selectedYear === 'Todos' ? fDate(new Date(), 'YYYY-MM') : selectedYear,
+          audit_hash: '',
         },
         associate: {
-          id: profile?.associate.id || '10',
-          name: profile?.associate.name || 'ANDRESSA DE LIMA FERREIRA',
-          cpf: profile?.associate.cpf || '173.793.567-80',
-          email: profile?.associate.email || 'contato@asppibra.org.br',
-          avatar_letter: profile?.associate.name?.charAt(0) || 'A',
-          address_line1: 'Rua Palmira F. De Carvalho, lote 05, Quadra D',
-          address_line2: 'São José de Imbassaí, Maricá - RJ, 24912-000',
+          id: profile.associate.id,
+          name: profile.associate.name,
+          cpf: profile.associate.cpf || '',
+          email: profile.associate.email || '',
+          avatar_letter: profile.associate.name?.charAt(0) || 'A',
+          address_line1: (profile.associate as any).address_line1 || 'Endereço não informado',
+          address_line2: (profile.associate as any).address_line2 || '',
         },
         summary: {
           total_contracted: fNumber(contractTotal),
@@ -154,13 +157,15 @@ export function CitizenLedgerView() {
     if (!profile) return;
     setOpenPreview(true);
     setPreviewLoading(true);
+    setPdfPreview(null);
     try {
       const payload = buildLedgerPayload();
       const res = await previewCitizenLedgerPdf(payload);
       setPdfPreview(res);
       toast.success('Visualização nativa do PDF compilada via Typst Engine!');
     } catch (err: any) {
-      console.warn('Fallback para visualização ABNT:', err);
+      const msg = err instanceof Error ? err.message : 'Falha ao compilar extrato em PDF';
+      toast.error(msg);
     } finally {
       setPreviewLoading(false);
     }
@@ -179,7 +184,7 @@ export function CitizenLedgerView() {
       }
 
       const payload = buildLedgerPayload();
-      const result = await exportCitizenLedgerPdf(payload, profileToRender, dataFiltered);
+      const result = await exportCitizenLedgerPdf(payload, profile, dataFiltered);
       toast.success(`Relatório compilado com sucesso! Arquivo: ${result.file_name || result.file_path}`);
     } catch (err: any) {
       toast.error(err.message || 'Falha ao compilar relatório em PDF');
@@ -241,7 +246,33 @@ export function CitizenLedgerView() {
           </Box>
         )}
 
-        {!profileLoading && (
+        {profileError && (
+          <Alert severity="warning" sx={{ my: 3 }}>
+            Serviço financeiro indisponível. Não foi possível consultar os dados oficiais do associado.
+          </Alert>
+        )}
+
+        {!selectedCitizenId && !profileLoading && !profileError && (
+          <Box
+            sx={{
+              p: 4,
+              textAlign: 'center',
+              bgcolor: 'background.paper',
+              borderRadius: 2,
+              border: (theme) => `1px dashed ${theme.palette.divider}`,
+              my: 2,
+            }}
+          >
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5 }}>
+              Nenhum associado selecionado
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Utilize o campo de busca acima para localizar um associado e consultar seu histórico contábil oficial.
+            </Typography>
+          </Box>
+        )}
+
+        {!profileLoading && profile && (
           <>
             <FinancialSummaryHeader
               years={availableYears as string[]}
@@ -249,7 +280,7 @@ export function CitizenLedgerView() {
               onSelectYear={setSelectedYear}
               onSearch={setSearchQuery}
               searchQuery={searchQuery}
-              profile={profileToRender}
+              profile={profile}
             />
 
             <Grid container spacing={3}>
@@ -264,14 +295,7 @@ export function CitizenLedgerView() {
         )}
       </Box>
 
-      {/* Extrato Oficial Fiduciário A4 Padrão (Garante que a impressão e PDF gerem sempre a folha A4 e nunca a interface) */}
-      <FinancialHistoryPrint
-        transactions={dataFiltered}
-        profile={profileToRender}
-        preview={false}
-      />
-
-      {/* Modal de Pré-Visualização do Relatório Oficial em Alta Fidelidade */}
+      {/* Modal de Visualização Nativa do PDF Oficial */}
       <Dialog
         open={openPreview}
         onClose={() => setOpenPreview(false)}
@@ -304,72 +328,44 @@ export function CitizenLedgerView() {
             <Iconify icon={'solar:document-text-bold' as any} width={24} sx={{ color: 'primary.main' }} />
             <Box>
               <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
-                Pré-Visualização do Relatório Oficial • Extrato Contábil D1
+                Visualização do Documento Oficial • Extrato Financeiro do Associado
               </Typography>
               <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
-                Documento A4 Padrão ABNT / ASPPIBRA DAO Cockpit
+                ASPPIBRA Citizen Ledger • Renderização Nativa Typst
               </Typography>
             </Box>
           </Box>
 
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <Button
-              variant="outlined"
-              color="inherit"
-              startIcon={<Iconify icon={'solar:printer-bold' as any} />}
-              onClick={() => printCitizenLedgerHtml()}
-              sx={{ borderRadius: 1.5 }}
-            >
-              Imprimir Folha A4
-            </Button>
-
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={
-                exporting ? (
-                  <CircularProgress size={16} color="inherit" />
-                ) : (
-                  <Iconify icon={'eva:file-text-fill' as any} />
-                )
-              }
-              onClick={handleExportPdf}
-              disabled={exporting || !profile}
-              sx={{ borderRadius: 1.5 }}
-            >
-              {exporting ? 'Compilando via Typst...' : 'Exportar PDF Oficial'}
-            </Button>
-
-            <IconButton onClick={() => setOpenPreview(false)} sx={{ color: 'text.secondary' }}>
-              <Iconify icon={'eva:close-fill' as any} />
-            </IconButton>
-          </Box>
+          <IconButton onClick={() => setOpenPreview(false)} sx={{ color: 'text.secondary' }}>
+            <Iconify icon={'eva:close-fill' as any} />
+          </IconButton>
         </DialogTitle>
 
         <DialogContent
           sx={{
             flex: 1,
-            p: 3,
-            overflowY: 'auto',
+            p: 0,
+            overflowY: 'hidden',
             bgcolor: (theme) => (theme.palette.mode === 'dark' ? '#0b0f19' : '#e2e8f0'),
           }}
         >
-          {pdfPreview ? (
+          {previewLoading ? (
+            <Box sx={{ p: 4, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 2 }}>
+              <CircularProgress />
+              <Typography variant="body2" color="text.secondary">
+                Compilando demonstrativo oficial via Typst Engine nativo...
+              </Typography>
+            </Box>
+          ) : (
             <PdfViewerLayout
-              documentTitle={`Extrato_${profile?.associate.id || 'Associado'}`}
+              documentTitle={`Extrato_${profile?.associate.id || 'associado'}`}
               preview={pdfPreview}
               onBack={() => setOpenPreview(false)}
               onExport={handleExportPdf}
               isExporting={exporting}
+              viewButtonText="Atualizar"
+              exportButtonText="Exportar PDF Oficial"
             />
-          ) : (
-            <Box sx={{ maxWidth: 860, mx: 'auto', my: 2 }}>
-              <FinancialHistoryPrint
-                transactions={dataFiltered}
-                profile={profileToRender}
-                preview
-              />
-            </Box>
           )}
         </DialogContent>
       </Dialog>

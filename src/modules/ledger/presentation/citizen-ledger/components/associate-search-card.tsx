@@ -5,6 +5,7 @@ import { useState } from 'react';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
+import Alert from '@mui/material/Alert';
 import { alpha } from '@mui/material/styles';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
@@ -24,7 +25,7 @@ type Props = {
 
 export function AssociateSearchCard({ onSelectAssociate, selectedAssociateId, selectedProfile }: Props) {
   const [inputValue, setInputValue] = useState('');
-  const { citizens, citizensLoading } = useGetCitizens();
+  const { citizens, citizensLoading, citizensError } = useGetCitizens();
 
   const handleSelect = (event: SyntheticEvent, newValue: any | null) => {
     onSelectAssociate(newValue ? String(newValue.id) : null);
@@ -36,9 +37,16 @@ export function AssociateSearchCard({ onSelectAssociate, selectedAssociateId, se
         CONSULTAR ASSOCIADO
       </Typography>
 
+      {citizensError && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          Serviço financeiro indisponível. Não foi possível consultar os dados oficiais de associados.
+        </Alert>
+      )}
+
       <Autocomplete
         options={citizens}
         loading={citizensLoading}
+        noOptionsText={citizensError ? 'Base de associados indisponível' : 'Nenhum associado encontrado'}
         getOptionLabel={(option) => `${option.name} - ID: ${option.aspId}`}
         isOptionEqualToValue={(option, value) => String(option.id) === String(value?.id)}
         value={citizens.find((c) => String(c.id) === String(selectedAssociateId)) || null}
@@ -110,7 +118,7 @@ export function AssociateSearchCard({ onSelectAssociate, selectedAssociateId, se
               {selectedProfile.associate.name}
             </Typography>
             <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              ASP-{selectedProfile.associate.id} | CPF {selectedProfile.associate.cpf.replace(/^(\d{3}).*/, '$1.***.***-**')} | Status: {selectedProfile.associate.status === 'active' ? 'Ativo' : 'Suspenso'}
+              ASP-{selectedProfile.associate.id} | CPF {selectedProfile.associate.cpf ? selectedProfile.associate.cpf.replace(/^(\d{3}).*/, '$1.***.***-**') : 'Não informado'} | Status: {selectedProfile.associate.status === 'active' ? 'Ativo' : 'Inativo'}
             </Typography>
           </Box>
         </Box>

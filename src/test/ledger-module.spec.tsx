@@ -1,33 +1,30 @@
 import React from 'react';
+import { it, expect, describe } from 'vitest';
 import { isTauri } from '@tauri-apps/api/core';
-import { it, vi, expect, describe } from 'vitest';
 
 import { mockIpcResponse } from './test-utils';
 import {
+  TEST_LEDGER_ACCOUNTS,
+  TEST_FINANCIAL_PROFILES,
+} from './fixtures/ledger-fixtures';
+import {
   LedgerView,
-  LEDGER_ACCOUNTS,
-  LEDGER_METADATA,
   CitizenLedgerView,
   DoubleEntryChartCard,
-  FinancialHistoryPrint,
   exportCitizenLedgerPdf,
-  MOCK_FINANCIAL_PROFILES,
-  BLANK_FINANCIAL_PROFILE,
 } from '../modules/ledger';
 
 describe('Módulo Livro-Razão (Double-Entry & Citizen Ledger)', () => {
-  it('deve possuir os dados canônicos do Balanço D1 V16 consolidados', () => {
-    expect(LEDGER_METADATA.reservaGenesis).toBe('R$ 1.000.000,00');
-    expect(LEDGER_METADATA.transacoesConcluidas).toBe(42);
-    expect(LEDGER_ACCOUNTS.length).toBeGreaterThanOrEqual(4);
+  it('deve validar estrutura das contas contábeis de teste', () => {
+    expect(TEST_LEDGER_ACCOUNTS.length).toBeGreaterThanOrEqual(2);
 
-    const treasuryAccount = LEDGER_ACCOUNTS.find((acc) => acc.accountId === 1);
+    const treasuryAccount = TEST_LEDGER_ACCOUNTS.find((acc) => acc.accountId === 1);
     expect(treasuryAccount).toBeDefined();
     expect(treasuryAccount?.accountName).toBe('DAO Treasury Account');
   });
 
-  it('deve conter perfis mockados canônicos com integridade contábil e transações', () => {
-    const andressaProfile = MOCK_FINANCIAL_PROFILES.find((p) => p.associate.id === '10');
+  it('deve conter perfis de teste com integridade contábil e transações', () => {
+    const andressaProfile = TEST_FINANCIAL_PROFILES.find((p) => p.associate.id === '10');
     expect(andressaProfile).toBeDefined();
     expect(andressaProfile?.associate.name).toBe('Andressa de Lima Ferreira');
     expect(andressaProfile?.contract.contractedAmount).toBe(65000);
@@ -41,23 +38,10 @@ describe('Módulo Livro-Razão (Double-Entry & Citizen Ledger)', () => {
     expect(percentQuitado).toBe(56);
   });
 
-  it('deve possuir perfil em branco seguro para estados sem seleção', () => {
-    expect(BLANK_FINANCIAL_PROFILE.associate.id).toBe('--');
-    expect(BLANK_FINANCIAL_PROFILE.contract.contractedAmount).toBe(0);
-    expect(BLANK_FINANCIAL_PROFILE.transactions).toEqual([]);
-  });
-
   it('deve instanciar componentes React do módulo com assinaturas válidas', () => {
     expect(React.isValidElement(<LedgerView />)).toBe(true);
     expect(React.isValidElement(<CitizenLedgerView />)).toBe(true);
     expect(React.isValidElement(<DoubleEntryChartCard />)).toBe(true);
-
-    const profile = MOCK_FINANCIAL_PROFILES[0];
-    expect(
-      React.isValidElement(
-        <FinancialHistoryPrint transactions={profile.transactions} profile={profile} preview />
-      )
-    ).toBe(true);
   });
 
   it('deve executar exportCitizenLedgerPdf via motor nativo Typst em ambiente Desktop (Tauri)', async () => {
@@ -76,7 +60,7 @@ describe('Módulo Livro-Razão (Double-Entry & Citizen Ledger)', () => {
     };
     mockIpcResponse('generate_document', mockOutput);
 
-    const profile = MOCK_FINANCIAL_PROFILES[0];
+    const profile = TEST_FINANCIAL_PROFILES[0];
     const result = await exportCitizenLedgerPdf({
       associate_id: profile.associate.id,
       open_after_export: true,
@@ -108,15 +92,10 @@ describe('Módulo Livro-Razão (Double-Entry & Citizen Ledger)', () => {
     expect(result.file_name).toBe('extrato_associado_10.pdf');
   });
 
-  it('deve executar exportCitizenLedgerPdf com fallback gracioso em ambiente Web', async () => {
-    (isTauri as unknown as ReturnType<typeof vi.fn>).mockReturnValueOnce(false);
+  it('deve executar exportCitizenLedgerPdf com retorno estruturado em ambiente Web', async () => {
+    (isTauri as unknown as { mockReturnValueOnce: (val: boolean) => void }).mockReturnValueOnce(false);
 
-    const originalWindow = globalThis.window;
-    const printMock = vi.fn();
-    // @ts-expect-error mock temporario para ambiente Node
-    globalThis.window = { print: printMock };
-
-    const profile = MOCK_FINANCIAL_PROFILES[0];
+    const profile = TEST_FINANCIAL_PROFILES[0];
 
     const result = await exportCitizenLedgerPdf({
       associate_id: profile.associate.id,
@@ -146,9 +125,6 @@ describe('Módulo Livro-Razão (Double-Entry & Citizen Ledger)', () => {
     });
 
     expect(result.success).toBe(true);
-    expect(result.file_name).toContain('extrato_associado_10.pdf');
-    expect(printMock).toHaveBeenCalled();
-
-    globalThis.window = originalWindow;
+    expect(result.file_name).toBe('extrato_associado_10.pdf');
   });
 });

@@ -1,14 +1,16 @@
 import axios from 'axios';
 
+import { CONFIG } from 'src/global-config';
+
 // ----------------------------------------------------------------------
 
 const axiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_SERVER_URL || '',
+  baseURL: import.meta.env.VITE_SERVER_URL || CONFIG.serverUrl,
 });
 
 axiosInstance.interceptors.response.use(
   (response) => response,
-  (error) => Promise.reject((error.response && error.response.data) || 'Erro na requisição')
+  (error) => Promise.reject((error.response && error.response.data) || error.message || 'Erro na requisição')
 );
 
 export default axiosInstance;
@@ -16,14 +18,9 @@ export default axiosInstance;
 // ----------------------------------------------------------------------
 
 export const fetcher = async (args: string | [string, Record<string, unknown>]) => {
-  try {
-    const [url, config] = Array.isArray(args) ? args : [args];
-    const res = await axiosInstance.get(url, { ...config });
-    return res.data;
-  } catch {
-    // Se a chamada falhar ou API não estiver online localmente, retorna null para ativar o fallback gracioso
-    return null;
-  }
+  const [url, config] = Array.isArray(args) ? args : [args];
+  const res = await axiosInstance.get(url, { ...config });
+  return res.data;
 };
 
 // ----------------------------------------------------------------------

@@ -4,22 +4,20 @@ import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Chip from '@mui/material/Chip';
 import Grid from '@mui/material/Grid';
+import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
 import Typography from '@mui/material/Typography';
 import ButtonGroup from '@mui/material/ButtonGroup';
 import { alpha, useTheme } from '@mui/material/styles';
+import LinearProgress from '@mui/material/LinearProgress';
 
 import { fCurrency } from 'src/shared/utils';
 import { Iconify } from 'src/shared/components/iconify';
 import { Chart, useChart } from 'src/shared/components/chart';
 
-import {
-  PERIOD_DATA,
-  LEDGER_ACCOUNTS,
-  LEDGER_METADATA,
-} from '../../domain/ledger-canonical-data';
+import { useGetTreasuryAnalytics } from '../hooks/treasury-hooks';
 
 // ----------------------------------------------------------------------
 
@@ -34,6 +32,8 @@ export function DoubleEntryChartCard({ onOpenCitizenLedger }: DoubleEntryChartCa
   const [chartMode, setChartMode] = useState<ChartMode>('flow');
   const containerRef = useRef<HTMLDivElement>(null);
 
+  const { analytics, analyticsLoading, analyticsError, analyticsEmpty } = useGetTreasuryAnalytics();
+
   // Redesenha o gráfico quando a barra lateral expande/recolhe
   useEffect(() => {
     const el = containerRef.current;
@@ -45,53 +45,56 @@ export function DoubleEntryChartCard({ onOpenCitizenLedger }: DoubleEntryChartCa
     return () => observer.disconnect();
   }, []);
 
+  const categories = useMemo(() => {
+    if (!analytics) return [];
+    if (chartMode === 'accounts') {
+      return (analytics.distribution || []).map((d) => d.label);
+    }
+    return (analytics.monthlyTrend || []).map((m) => m.month);
+  }, [analytics, chartMode]);
+
   const series = useMemo(() => {
+    if (!analytics) return [];
+
     if (chartMode === 'flow') {
       return [
         {
-          name: 'Créditos Contábeis (Entradas)',
+          name: 'Entradas Contábeis',
           type: 'column',
-          data: PERIOD_DATA.credits,
-        },
-        {
-          name: 'Débitos Contábeis (Saídas)',
-          type: 'column',
-          data: PERIOD_DATA.debits,
-        },
-        {
-          name: 'Saldo Líquido Periódico',
-          type: 'line',
-          data: PERIOD_DATA.netBalance,
+          data: (analytics.monthlyTrend || []).map((m) => m.total),
         },
       ];
     }
 
     if (chartMode === 'cumulative') {
+      let run = 0;
+      const cumulativeData = (analytics.monthlyTrend || []).map((m) => {
+        run += m.total;
+        return run;
+      });
+
       return [
         {
-          name: 'Reserva Canônica Cumulativa (D1)',
+          name: 'Reserva Cumulativa Oficial',
           type: 'area',
-          data: PERIOD_DATA.cumulativeReserves,
+          data: cumulativeData,
         },
       ];
     }
 
-    // Modo accounts: Distribuição dos saldos das contas D1
+    // Modo accounts: Distribuição
     return [
       {
-        name: 'Saldo Conciliado D1',
+        name: 'Distribuição Contábil',
         type: 'bar',
-        data: LEDGER_ACCOUNTS.map((acc) => {
-          const raw = acc.saldoDisponivel.replace('R$ ', '').replace(/,/g, '');
-          return parseFloat(raw) || 0;
-        }),
+        data: (analytics.distribution || []).map((d) => d.value),
       },
     ];
-  }, [chartMode]);
+  }, [analytics, chartMode]);
 
   const chartColors = useMemo(() => {
-    if (chartMode === 'flow') return ['#00A76F', '#FF5630', '#0284C7'];
-    if (chartMode === 'cumulative') return ['#00A76F'];
+    if (chartMode === 'flow') return ['#00A76F'];
+    if (chartMode === 'cumulative') return ['#0284C7'];
     return ['#6366F1'];
   }, [chartMode]);
 
@@ -105,7 +108,7 @@ export function DoubleEntryChartCard({ onOpenCitizenLedger }: DoubleEntryChartCa
       zoom: { enabled: false },
     },
     stroke: {
-      width: chartMode === 'flow' ? [0, 0, 2.5] : chartMode === 'cumulative' ? [2] : [0],
+      width: chartMode === 'flow' ? [0] : chartMode === 'cumulative' ? [2] : [0],
       curve: 'smooth',
     },
     plotOptions: {
@@ -126,10 +129,7 @@ export function DoubleEntryChartCard({ onOpenCitizenLedger }: DoubleEntryChartCa
       },
     },
     xaxis: {
-      categories:
-        chartMode === 'accounts'
-          ? LEDGER_ACCOUNTS.map((acc) => `Conta #${acc.accountId} • ${acc.accountName.split(' ')[0]}`)
-          : PERIOD_DATA.categories,
+      categories,
       tickPlacement: 'on',
       labels: {
         rotate: -35,
@@ -170,22 +170,6 @@ export function DoubleEntryChartCard({ onOpenCitizenLedger }: DoubleEntryChartCa
       markers: { shape: 'circle' },
       itemMargin: { horizontal: 6, vertical: 2 },
     },
-    responsive: [
-      {
-        breakpoint: 1280,
-        options: {
-          legend: { position: 'top', horizontalAlign: 'center' },
-          xaxis: { labels: { rotate: -45, style: { fontSize: '9px' } } },
-        },
-      },
-      {
-        breakpoint: 768,
-        options: {
-          legend: { position: 'bottom', horizontalAlign: 'center' },
-          xaxis: { labels: { rotate: -45, style: { fontSize: '9px' } } },
-        },
-      },
-    ],
   });
 
   return (
@@ -221,10 +205,10 @@ export function DoubleEntryChartCard({ onOpenCitizenLedger }: DoubleEntryChartCa
                 fontSize: { xs: '0.95rem', sm: '1.1rem' },
               }}
             >
-              Balanço Dinâmico & Auditoria Contábil D1
+              Balanço Geral & Auditoria de Tesouraria
             </Typography>
             <Chip
-              label="TEMPO REAL • V16"
+              label="BASE OFICIAL DAO"
               size="small"
               color="primary"
               variant="outlined"
@@ -240,7 +224,7 @@ export function DoubleEntryChartCard({ onOpenCitizenLedger }: DoubleEntryChartCa
               lineHeight: 1.3,
             }}
           >
-            Fluxo analítico de débitos e créditos sincronizado com a escrituração canônica SQLite Cloudflare D1
+            Demonstrativo contábil consultado diretamente na API oficial da ASPPIBRA DAO
           </Typography>
         </Box>
 
@@ -267,7 +251,7 @@ export function DoubleEntryChartCard({ onOpenCitizenLedger }: DoubleEntryChartCa
             onClick={() => setChartMode('flow')}
             startIcon={<Iconify icon={'solar:chart-2-bold' as any} width={15} />}
           >
-            Débito vs Crédito
+            Fluxo Mensal
           </Button>
 
           <Button
@@ -285,7 +269,7 @@ export function DoubleEntryChartCard({ onOpenCitizenLedger }: DoubleEntryChartCa
             onClick={() => setChartMode('accounts')}
             startIcon={<Iconify icon={'solar:wallet-money-bold' as any} width={15} />}
           >
-            Plano de Contas
+            Distribuição
           </Button>
 
           {onOpenCitizenLedger && (
@@ -307,111 +291,143 @@ export function DoubleEntryChartCard({ onOpenCitizenLedger }: DoubleEntryChartCa
         </ButtonGroup>
       </Stack>
 
+      {analyticsLoading && (
+        <Box sx={{ width: '100%', my: 3 }}>
+          <LinearProgress color="primary" />
+        </Box>
+      )}
+
+      {analyticsError && (
+        <Alert severity="warning" sx={{ my: 2 }}>
+          Serviço financeiro indisponível. Não foi possível consultar os dados oficiais do Balanço Geral.
+        </Alert>
+      )}
+
       {/* 2. KPIS CONSOLIDADOS */}
-      <Grid container spacing={1.25} sx={{ mb: 1.5 }}>
-        <Grid size={{ xs: 12, sm: 6, md: 6, xl: 3 }}>
-          <Box
-            sx={{
-              p: 1.25,
-              borderRadius: 1.25,
-              bgcolor: alpha(theme.palette.primary.main, 0.05),
-              border: `1px solid ${alpha(theme.palette.primary.main, 0.15)}`,
-              minWidth: 0,
-            }}
-          >
-            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700, textTransform: 'uppercase', fontSize: '0.65rem', display: 'block' }}>
-              Reserva Gênesis (Conta #1)
-            </Typography>
-            <Typography variant="subtitle1" sx={{ fontWeight: 800, color: 'text.primary', fontFamily: 'monospace', fontSize: { xs: '1rem', sm: '1.1rem' }, my: 0.25 }}>
-              {LEDGER_METADATA.reservaGenesis}
-            </Typography>
-            <Typography variant="caption" sx={{ color: 'success.main', fontWeight: 600, fontSize: '0.68rem' }}>
-              ● 100% Lastreado Fiduciário
-            </Typography>
-          </Box>
-        </Grid>
+      {!analyticsLoading && !analyticsError && analytics && (
+        <>
+          <Grid container spacing={1.25} sx={{ mb: 1.5 }}>
+            <Grid size={{ xs: 12, sm: 6, md: 6, xl: 3 }}>
+              <Box
+                sx={{
+                  p: 1.25,
+                  borderRadius: 1.25,
+                  bgcolor: alpha(theme.palette.primary.main, 0.05),
+                  border: `1px solid ${alpha(theme.palette.primary.main, 0.15)}`,
+                  minWidth: 0,
+                }}
+              >
+                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700, textTransform: 'uppercase', fontSize: '0.65rem', display: 'block' }}>
+                  Volume Arrecadado
+                </Typography>
+                <Typography variant="subtitle1" sx={{ fontWeight: 800, color: 'text.primary', fontFamily: 'monospace', fontSize: { xs: '1rem', sm: '1.1rem' }, my: 0.25 }}>
+                  {fCurrency(analytics.summary.totalInflow || 0)}
+                </Typography>
+                <Typography variant="caption" sx={{ color: 'success.main', fontWeight: 600, fontSize: '0.68rem' }}>
+                  ● Consulta Oficial
+                </Typography>
+              </Box>
+            </Grid>
 
-        <Grid size={{ xs: 12, sm: 6, md: 6, xl: 3 }}>
-          <Box
-            sx={{
-              p: 1.25,
-              borderRadius: 1.25,
-              bgcolor: alpha(theme.palette.success.main, 0.05),
-              border: `1px solid ${alpha(theme.palette.success.main, 0.15)}`,
-              minWidth: 0,
-            }}
-          >
-            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700, textTransform: 'uppercase', fontSize: '0.65rem', display: 'block' }}>
-              Volume Movimentado
-            </Typography>
-            <Typography variant="subtitle1" sx={{ fontWeight: 800, color: 'success.main', fontFamily: 'monospace', fontSize: { xs: '1rem', sm: '1.1rem' }, my: 0.25 }}>
-              {LEDGER_METADATA.volumeTotal}
-            </Typography>
-            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, fontSize: '0.68rem' }}>
-              42 transações liquidadas
-            </Typography>
-          </Box>
-        </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 6, xl: 3 }}>
+              <Box
+                sx={{
+                  p: 1.25,
+                  borderRadius: 1.25,
+                  bgcolor: alpha(theme.palette.success.main, 0.05),
+                  border: `1px solid ${alpha(theme.palette.success.main, 0.15)}`,
+                  minWidth: 0,
+                }}
+              >
+                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700, textTransform: 'uppercase', fontSize: '0.65rem', display: 'block' }}>
+                  Transações Liquidadas
+                </Typography>
+                <Typography variant="subtitle1" sx={{ fontWeight: 800, color: 'success.main', fontFamily: 'monospace', fontSize: { xs: '1rem', sm: '1.1rem' }, my: 0.25 }}>
+                  {analytics.summary.count || 0}
+                </Typography>
+                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, fontSize: '0.68rem' }}>
+                  Lançamentos confirmados
+                </Typography>
+              </Box>
+            </Grid>
 
-        <Grid size={{ xs: 12, sm: 6, md: 6, xl: 3 }}>
-          <Box
-            sx={{
-              p: 1.25,
-              borderRadius: 1.25,
-              bgcolor: alpha(theme.palette.info.main, 0.05),
-              border: `1px solid ${alpha(theme.palette.info.main, 0.15)}`,
-              minWidth: 0,
-            }}
-          >
-            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700, textTransform: 'uppercase', fontSize: '0.65rem', display: 'block' }}>
-              Tesouraria Consolidada
-            </Typography>
-            <Typography variant="subtitle1" sx={{ fontWeight: 800, color: 'text.primary', fontFamily: 'monospace', fontSize: { xs: '1rem', sm: '1.1rem' }, my: 0.25 }}>
-              R$ 36.623,00
-            </Typography>
-            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, fontSize: '0.68rem' }}>
-              Conta #11 • Ref: PM4
-            </Typography>
-          </Box>
-        </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 6, xl: 3 }}>
+              <Box
+                sx={{
+                  p: 1.25,
+                  borderRadius: 1.25,
+                  bgcolor: alpha(theme.palette.info.main, 0.05),
+                  border: `1px solid ${alpha(theme.palette.info.main, 0.15)}`,
+                  minWidth: 0,
+                }}
+              >
+                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700, textTransform: 'uppercase', fontSize: '0.65rem', display: 'block' }}>
+                  Ticket Médio
+                </Typography>
+                <Typography variant="subtitle1" sx={{ fontWeight: 800, color: 'text.primary', fontFamily: 'monospace', fontSize: { xs: '1rem', sm: '1.1rem' }, my: 0.25 }}>
+                  {fCurrency(analytics.summary.avgTicket || 0)}
+                </Typography>
+                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, fontSize: '0.68rem' }}>
+                  Por associado adimplente
+                </Typography>
+              </Box>
+            </Grid>
 
-        <Grid size={{ xs: 12, sm: 6, md: 6, xl: 3 }}>
-          <Box
-            sx={{
-              p: 1.25,
-              borderRadius: 1.25,
-              bgcolor: alpha(theme.palette.warning.main, 0.05),
-              border: `1px solid ${alpha(theme.palette.warning.main, 0.15)}`,
-              minWidth: 0,
-            }}
-          >
-            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700, textTransform: 'uppercase', fontSize: '0.65rem', display: 'block' }}>
-              Auditoria D1 Canônica
-            </Typography>
-            <Typography variant="subtitle1" sx={{ fontWeight: 800, color: 'warning.main', fontFamily: 'monospace', fontSize: { xs: '1rem', sm: '1.1rem' }, my: 0.25 }}>
-              43 Lançamentos
-            </Typography>
-            <Typography variant="caption" sx={{ color: 'success.main', fontWeight: 600, fontSize: '0.68rem' }}>
-              ● 0 Inconsistências
-            </Typography>
-          </Box>
-        </Grid>
-      </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 6, xl: 3 }}>
+              <Box
+                sx={{
+                  p: 1.25,
+                  borderRadius: 1.25,
+                  bgcolor: alpha(theme.palette.warning.main, 0.05),
+                  border: `1px solid ${alpha(theme.palette.warning.main, 0.15)}`,
+                  minWidth: 0,
+                }}
+              >
+                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700, textTransform: 'uppercase', fontSize: '0.65rem', display: 'block' }}>
+                  Destinatário Principal
+                </Typography>
+                <Typography variant="subtitle1" sx={{ fontWeight: 800, color: 'warning.main', fontSize: { xs: '0.85rem', sm: '0.95rem' }, my: 0.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {analytics.summary.topRecipient || 'Tesouraria ASPPIBRA'}
+                </Typography>
+                <Typography variant="caption" sx={{ color: 'success.main', fontWeight: 600, fontSize: '0.68rem' }}>
+                  ● Conta Verificada
+                </Typography>
+              </Box>
+            </Grid>
+          </Grid>
 
-      <Divider sx={{ borderStyle: 'dashed', my: 1 }} />
+          <Divider sx={{ borderStyle: 'dashed', my: 1 }} />
 
-      {/* 3. GRÁFICO APEXCHARTS */}
-      <Box sx={{ width: '100%', minWidth: 0, overflow: 'hidden', pt: 0.5 }}>
-        <Chart
-          type={chartMode === 'accounts' ? 'bar' : chartMode === 'cumulative' ? 'area' : 'line'}
-          series={series}
-          options={chartOptions}
-          sx={{
-            height: { xs: 240, sm: 260, md: 280, xl: 310 },
-            width: '100%',
-          }}
-        />
-      </Box>
+          {/* 3. GRÁFICO APEXCHARTS */}
+          {series.length > 0 && categories.length > 0 ? (
+            <Box sx={{ width: '100%', minWidth: 0, overflow: 'hidden', pt: 0.5 }}>
+              <Chart
+                type={chartMode === 'accounts' ? 'bar' : chartMode === 'cumulative' ? 'area' : 'line'}
+                series={series}
+                options={chartOptions}
+                sx={{
+                  height: { xs: 240, sm: 260, md: 280, xl: 310 },
+                  width: '100%',
+                }}
+              />
+            </Box>
+          ) : (
+            <Box sx={{ p: 4, textAlign: 'center' }}>
+              <Typography variant="body2" color="text.secondary">
+                Nenhum dado analítico disponível para exibição no gráfico.
+              </Typography>
+            </Box>
+          )}
+        </>
+      )}
+
+      {analyticsEmpty && !analyticsLoading && !analyticsError && (
+        <Box sx={{ p: 4, textAlign: 'center' }}>
+          <Typography variant="body2" color="text.secondary">
+            Nenhum registro financeiro disponível na base oficial.
+          </Typography>
+        </Box>
+      )}
     </Card>
   );
 }

@@ -9,11 +9,6 @@ import { useMemo } from 'react';
 
 import { fetcher, endpoints } from 'src/lib/axios';
 
-import {
-  MOCK_CITIZENS,
-  MOCK_FINANCIAL_PROFILES,
-} from '../../domain/ledger-canonical-data';
-
 // ----------------------------------------------------------------------
 
 export function useGetTreasuryAnalytics(year?: string) {
@@ -21,7 +16,7 @@ export function useGetTreasuryAnalytics(year?: string) {
     ? `${endpoints.platform.treasury.analytics}?year=${year}`
     : endpoints.platform.treasury.analytics;
 
-  const { data, error, isLoading, isValidating } = useSWR<{ data: ITreasuryAnalytics }>(
+  const { data, error, isLoading, isValidating } = useSWR<{ success?: boolean; data: ITreasuryAnalytics }>(
     url,
     fetcher
   );
@@ -43,33 +38,22 @@ export function useGetTreasuryAnalytics(year?: string) {
 export function useGetCitizenLedger(citizenId: string | number | null) {
   const url = citizenId ? `${endpoints.platform.treasury.root}/citizen/${citizenId}/ledger` : '';
 
-  const { data, error, isLoading, isValidating } = useSWR<{ success: boolean; data: IFinancialProfile }>(
+  const { data, error, isLoading, isValidating } = useSWR<{ success?: boolean; data: IFinancialProfile }>(
     url || null,
     fetcher
   );
 
-  const fallbackProfile = useMemo(() => {
-    if (!citizenId) return null;
-    return (
-      MOCK_FINANCIAL_PROFILES.find((p) => String(p.associate.id) === String(citizenId)) ||
-      MOCK_FINANCIAL_PROFILES.find((p) =>
-        p.associate.name.toLowerCase().includes(String(citizenId).toLowerCase())
-      ) ||
-      null
-    );
-  }, [citizenId]);
-
-  const resolvedProfile = data?.data || fallbackProfile;
+  const profile = data?.data || null;
 
   const memoizedValue = useMemo(
     () => ({
-      profile: resolvedProfile,
-      profileLoading: isLoading && !fallbackProfile,
+      profile,
+      profileLoading: isLoading,
       profileError: error,
       profileValidating: isValidating,
-      profileEmpty: !isLoading && !resolvedProfile,
+      profileEmpty: !isLoading && !profile,
     }),
-    [resolvedProfile, fallbackProfile, error, isLoading, isValidating]
+    [profile, error, isLoading, isValidating]
   );
 
   return memoizedValue;
@@ -78,19 +62,20 @@ export function useGetCitizenLedger(citizenId: string | number | null) {
 export function useGetCitizens() {
   const url = endpoints.platform.identity.citizens;
 
-  const { data, error, isLoading, isValidating } = useSWR<{ success: boolean; data: ICitizenSummary[] }>(
+  const { data, error, isLoading, isValidating } = useSWR<{ success?: boolean; data: ICitizenSummary[] }>(
     url,
     fetcher
   );
 
-  const citizens = data?.data || MOCK_CITIZENS;
+  const citizens = useMemo(() => data?.data || [], [data?.data]);
 
   const memoizedValue = useMemo(
     () => ({
       citizens,
-      citizensLoading: isLoading && !citizens.length,
+      citizensLoading: isLoading,
       citizensError: error,
       citizensValidating: isValidating,
+      citizensEmpty: !isLoading && !citizens.length,
     }),
     [citizens, error, isLoading, isValidating]
   );
