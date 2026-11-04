@@ -15,14 +15,14 @@ import { useRouter } from 'src/app/router/hooks';
 
 import { toast } from 'src/shared/components/snackbar';
 import { Iconify } from 'src/shared/components/iconify';
-
-import { pdfjsLib } from './pdf-engine';
-import { PdfPageCanvas } from './pdf-page-canvas';
 import {
   isValidPdfHeader,
   computeSha256Hex,
   base64ToUint8Array,
-} from './pdf-binary-utils';
+} from 'src/shared/utils/pdf-binary-utils';
+
+import { pdfjsLib } from './pdf-engine';
+import { PdfPageCanvas } from './PdfPageCanvas';
 
 export type PdfViewerLayoutProps = {
   children?: React.ReactNode;

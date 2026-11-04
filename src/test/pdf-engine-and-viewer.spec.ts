@@ -1,12 +1,12 @@
 import { it, expect, describe } from 'vitest';
 
-import { pdfjsLib } from '../shared/components/abnt-document/pdf-engine';
+import { pdfjsLib } from '../shared/components/pdf-viewer/pdf-engine';
 import {
   computeSha256Hex,
   isValidPdfHeader,
   base64ToUint8Array,
   uint8ArrayToBase64,
-} from '../shared/components/abnt-document/pdf-binary-utils';
+} from '../shared/utils/pdf-binary-utils';
 
 // Estrutura PDF canônica mínima válida (PDF-1.4 compatível)
 const MINIMAL_VALID_PDF =

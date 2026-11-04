@@ -17,7 +17,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import { fDate, fNumber } from 'src/shared/utils';
 import { toast } from 'src/shared/components/snackbar';
 import { Iconify } from 'src/shared/components/iconify';
-import { PdfViewerLayout } from 'src/shared/components/abnt-document';
+import { PdfViewerLayout } from 'src/shared/components/pdf-viewer';
 
 import { useGetCitizenLedger } from '../../hooks/treasury-hooks';
 import { AssociateSearchCard } from '../components/associate-search-card';

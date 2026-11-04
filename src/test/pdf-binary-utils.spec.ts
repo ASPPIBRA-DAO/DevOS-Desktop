@@ -6,7 +6,7 @@ import {
   base64ToUint8Array,
   uint8ArrayToBase64,
   createPdfBlobSession,
-} from '../shared/components/abnt-document/pdf-binary-utils';
+} from '../shared/utils/pdf-binary-utils';
 
 describe('PDF Binary Utils — Manipulação e Validação', () => {
   it('deve realizar roundtrip fiel entre Base64 e Uint8Array', () => {

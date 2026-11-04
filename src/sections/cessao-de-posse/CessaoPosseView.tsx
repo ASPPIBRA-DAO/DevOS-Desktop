@@ -13,11 +13,11 @@ import {
 } from 'src/platform/tauri';
 
 import { toast } from 'src/shared/components/snackbar';
+import { PdfViewerLayout } from 'src/shared/components/pdf-viewer';
 import {
   A4Page,
   DefaultHeader,
   DefaultFooter,
-  PdfViewerLayout,
   DocumentDataProvider,
 } from 'src/shared/components/abnt-document';
 

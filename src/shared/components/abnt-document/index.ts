@@ -1,13 +1,13 @@
 export * from './a4-page';
 export * from './data-tag';
 export * from './abnt-text';
-export * from './pdf-engine';
+// Reexportações transitórias de compatibilidade para componentes migrados
+export * from '../pdf-viewer';
 export * from './section-title';
 export * from './document-title';
 export * from './default-header';
 export * from './default-footer';
-export * from './pdf-page-canvas';
 export * from './document-context';
-export * from './pdf-binary-utils';
+
 export * from './digital-signature';
-export * from './pdf-viewer-layout';
+export * from 'src/shared/utils/pdf-binary-utils';

@@ -1,1 +1,1 @@
-export * from './citizen-ledger-view';
+export * from './CitizenLedgerView';
