@@ -1,7 +1,8 @@
 import type { Theme, Breakpoint } from '@mui/material/styles';
 import type { NavSectionProps } from 'src/components/nav-section';
+import type { RouteConfig, EditionNavigationGroup } from 'src/app/editions/types';
 
-import { useEffect } from 'react';
+import { useMemo, useEffect } from 'react';
 import { Outlet } from 'react-router';
 import { useBoolean } from 'minimal-shared/hooks';
 import { varAlpha, mergeClasses } from 'minimal-shared/utils';
@@ -32,174 +33,40 @@ import { MainSection, layoutClasses, HeaderSection, LayoutSection } from '../cor
 
 type Props = {
   children?: React.ReactNode;
-  navData?: NavSectionProps['data'];
+  navigation: EditionNavigationGroup[];
+  productName: string;
+  routes: RouteConfig[];
 };
 
-export function createDevosNavData(): NavSectionProps['data'] {
-  return [
-    {
-      subheader: 'FINANCEIRO',
-      items: [
-        {
-          title: 'Tesouraria',
-          path: paths.devos.dao,
-          icon: <Iconify icon={'solar:shield-star-bold' as any} />,
-        },
-        {
-          title: 'Carteiras',
-          path: paths.devos.wallets,
-          icon: <Iconify icon={'solar:wallet-bold' as any} />,
-        },
-        {
-          title: 'Livro-Razão',
-          path: paths.devos.ledger,
-          icon: <Iconify icon={'solar:book-bookmark-bold' as any} />,
-        },
-        {
-          title: 'Faturas',
-          path: paths.devos.invoices,
-          icon: <Iconify icon={'solar:bill-list-bold' as any} />,
-        },
-      ],
-    },
-    {
-      subheader: 'OPERAÇÕES',
-      items: [
-        {
-          title: 'Banco Imobiliário',
-          path: paths.devos.cadastre,
-          icon: <Iconify icon={'solar:city-bold' as any} />,
-        },
-        {
-          title: 'Cessão de Posse',
-          path: paths.devos.cessaoPosse,
-          icon: <Iconify icon={'solar:document-text-bold' as any} />,
-        },
-        {
-          title: 'Hub Analítico',
-          path: paths.devos.analytics,
-          icon: <Iconify icon={'solar:chart-square-bold' as any} />,
-        },
-        {
-          title: 'Blog',
-          path: paths.devos.blog,
-          icon: <Iconify icon={'solar:document-text-bold' as any} />,
-        },
-      ],
-    },
-    {
-      subheader: 'CONTROL PLANE',
-      items: [
-        {
-          title: 'Observability',
-          path: paths.devos.root,
-          icon: <Iconify icon={'solar:graph-up-bold' as any} />,
-        },
-        {
-          title: 'Armazenamento IPFS',
-          path: paths.devos.ipfs,
-          icon: <Iconify icon={'solar:server-path-bold-duotone' as any} />,
-        },
-        {
-          title: 'Database Explorer',
-          path: paths.devos.database,
-          icon: <Iconify icon={'solar:database-bold' as any} />,
-        },
-        {
-          title: 'Notificações',
-          path: paths.devos.notifications.root,
-          icon: <Iconify icon={'solar:bell-bing-bold' as any} />,
-        },
-      ],
-    },
-    {
-      subheader: 'SECURITY',
-      items: [
-        {
-          title: 'Security',
-          path: paths.devos.security,
-          icon: <Iconify icon={'solar:shield-keyhole-bold' as any} />,
-        },
-        {
-          title: 'Audit',
-          path: paths.devos.audit,
-          icon: <Iconify icon={'solar:document-text-bold' as any} />,
-        },
-      ],
-    },
-    {
-      subheader: 'INFRASTRUCTURE',
-      items: [
-        {
-          title: 'APIs',
-          path: paths.devos.apis,
-          icon: <Iconify icon={'solar:key-square-bold' as any} />,
-        },
-        {
-          title: 'Infrastructure',
-          path: paths.devos.infrastructure,
-          icon: <Iconify icon={'solar:server-square-bold' as any} />,
-        },
-      ],
-    },
-  ];
+export function toNavSectionData(groups: EditionNavigationGroup[]): NavSectionProps['data'] {
+  return groups.map((group) => ({
+    subheader: group.subheader,
+    items: group.items.map((item) => ({
+      title: item.title,
+      path: item.path,
+      icon: <Iconify icon={item.icon as any} />,
+    })),
+  }));
 }
 
-export const DEVOS_NAV_DATA = createDevosNavData();
+export function getSectionTitle(
+  pathname: string,
+  routes: RouteConfig[] = [],
+  fallbackTitle = 'DevOS'
+): string {
+  const exactMatch = routes.find((r) => r.path === pathname);
+  if (exactMatch) {
+    return exactMatch.label;
+  }
 
-export function getSectionTitle(pathname: string): string {
-  if (pathname === paths.devos.root || pathname === `${paths.devos.root}/`) {
-    return 'Observability';
+  const prefixMatch = routes
+    .filter((r) => r.path !== '/')
+    .find((r) => pathname.startsWith(r.path));
+  if (prefixMatch) {
+    return prefixMatch.label;
   }
-  if (pathname.startsWith(paths.devos.ipfs)) {
-    return 'Armazenamento IPFS & DePIN';
-  }
-  if (
-    pathname.startsWith(paths.devos.cadastre) ||
-    pathname.startsWith('/real-estate')
-  ) {
-    return 'Banco de Dados Imobiliário';
-  }
-  if (pathname.startsWith(paths.devos.cessaoPosse)) {
-    return 'Instrumento de Cessão de Posse';
-  }
-  if (pathname.startsWith(paths.devos.database)) {
-    return 'Banco de Dados Imobiliário (Explorer)';
-  }
-  if (pathname.startsWith(paths.devos.dao)) {
-    return 'Tesouraria';
-  }
-  if (pathname.startsWith(paths.devos.wallets) || pathname.startsWith('/banking')) {
-    return 'Carteiras & Banco Digital';
-  }
-  if (pathname.startsWith(paths.devos.ledger)) {
-    return 'Livro-Razão';
-  }
-  if (pathname.startsWith(paths.devos.invoices)) {
-    return 'Faturas';
-  }
-  if (pathname.startsWith(paths.devos.analytics)) {
-    return 'Hub Analítico';
-  }
-  if (pathname.startsWith(paths.devos.blog)) {
-    return 'Blog';
-  }
-  if (pathname.startsWith(paths.devos.notifications.root)) {
-    return 'Notificações';
-  }
-  if (pathname.startsWith(paths.devos.security)) {
-    return 'Security';
-  }
-  if (pathname.startsWith(paths.devos.audit)) {
-    return 'Audit';
-  }
-  if (pathname.startsWith(paths.devos.apis)) {
-    return 'APIs';
-  }
-  if (pathname.startsWith(paths.devos.infrastructure)) {
-    return 'Infrastructure';
-  }
-  return 'DevOS Cockpit';
+
+  return fallbackTitle;
 }
 
 function devosLayoutVars(theme: Theme) {
@@ -296,11 +163,11 @@ const NavRoot = styled('div', {
 
 // ----------------------------------------------------------------------
 
-export function DevOSLayout({ children, navData: userNavData }: Props) {
+export function DevOSLayout({ children, navigation, productName, routes }: Props) {
   const theme = useTheme();
   const pathname = usePathname();
   const { lock } = useBootstrap();
-  const navData = userNavData ?? DEVOS_NAV_DATA;
+  const navData = useMemo(() => toNavSectionData(navigation), [navigation]);
 
   const isNavMini = useBoolean(false);
   const mobileNav = useBoolean(false);
@@ -308,8 +175,8 @@ export function DevOSLayout({ children, navData: userNavData }: Props) {
   const layoutQuery: Breakpoint = 'md';
 
   useEffect(() => {
-    document.title = 'DevOS — v2.2.3';
-  }, []);
+    document.title = productName;
+  }, [productName]);
 
   useEffect(() => {
     if (mobileNav.value) {
@@ -318,7 +185,7 @@ export function DevOSLayout({ children, navData: userNavData }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
-  const currentSection = getSectionTitle(pathname);
+  const currentSection = getSectionTitle(pathname, routes, productName);
 
   // --------------------------------------------------------------------
   // 1. CABEÇALHO SUPERIOR (GLASSMORPHIC FLOATING CARD)
@@ -481,7 +348,7 @@ export function DevOSLayout({ children, navData: userNavData }: Props) {
       {isNavMini.value ? (
         <>
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 2.5, flexShrink: 0 }}>
-            <Logo href={paths.devos.root} />
+            <Logo href={paths.dashboard.root} />
           </Box>
 
           <NavSectionMini
@@ -511,7 +378,7 @@ export function DevOSLayout({ children, navData: userNavData }: Props) {
               flexShrink: 0,
             }}
           >
-            <Logo href={paths.devos.root} sx={{ width: 34, height: 34 }} />
+            <Logo href={paths.dashboard.root} sx={{ width: 34, height: 34 }} />
             <Box sx={{ minWidth: 0 }}>
               <Typography variant="subtitle2" noWrap sx={{ fontWeight: 800, fontSize: '0.85rem', lineHeight: 1.2 }}>
                 ASPPIBRA - DAO
@@ -580,41 +447,8 @@ export function DevOSLayout({ children, navData: userNavData }: Props) {
           >
             <NavSectionVertical
               data={navData}
-              sx={{ px: 1.25, flex: '1 0 auto' }}
+              sx={{ px: 1.25, pb: 1.5, flex: '1 0 auto' }}
             />
-
-            <Box sx={{ px: 1.25, pb: 1.5, pt: 1, flexShrink: 0, mt: 'auto' }}>
-              <Box
-                sx={{
-                  p: 1.25,
-                  borderRadius: 1.25,
-                  bgcolor: varAlpha(theme.vars.palette.grey['500Channel'], 0.08),
-                  border: '1px solid',
-                  borderColor: 'divider',
-                }}
-              >
-                <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 0.5 }}>
-                  <Box
-                    sx={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: '50%',
-                      bgcolor: 'success.main',
-                      boxShadow: `0 0 6px ${theme.vars.palette.success.main}`,
-                    }}
-                  />
-                  <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.primary' }}>
-                    mock-node-alpha
-                  </Typography>
-                </Stack>
-                <Typography
-                  variant="caption"
-                  sx={{ color: 'text.secondary', display: 'block', fontSize: '0.68rem' }}
-                >
-                  Control Plane Sandbox • Mocks Ativos
-                </Typography>
-              </Box>
-            </Box>
           </Box>
         </>
       )}
@@ -643,13 +477,13 @@ export function DevOSLayout({ children, navData: userNavData }: Props) {
       }}
     >
       <Box sx={{ pl: 1.5, pt: 1, pb: 2, display: 'flex', alignItems: 'center', gap: 1.5 }}>
-        <Logo href={paths.devos.root} />
+        <Logo href={paths.dashboard.root} />
         <Box>
           <Typography variant="subtitle2" sx={{ fontWeight: 800, lineHeight: 1.2 }}>
             ASPPIBRA DevOS
           </Typography>
           <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 700 }}>
-            Control Plane
+            {productName}
           </Typography>
         </Box>
       </Box>
@@ -693,38 +527,6 @@ export function DevOSLayout({ children, navData: userNavData }: Props) {
           data={navData}
           sx={{ px: 1, flex: '1 0 auto' }}
         />
-      </Box>
-
-      <Box sx={{ pt: 1 }}>
-        <Box
-          sx={{
-            p: 1.5,
-            borderRadius: 1.5,
-            bgcolor: varAlpha(theme.vars.palette.grey['500Channel'], 0.08),
-            border: '1px solid',
-            borderColor: 'divider',
-          }}
-        >
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 0.5 }}>
-            <Box
-              sx={{
-                width: 8,
-                height: 8,
-                borderRadius: '50%',
-                bgcolor: 'success.main',
-              }}
-            />
-            <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.primary' }}>
-              mock-node-alpha
-            </Typography>
-          </Stack>
-          <Typography
-            variant="caption"
-            sx={{ color: 'text.secondary', display: 'block', fontSize: '0.68rem' }}
-          >
-            Control Plane Sandbox • Mocks Ativos
-          </Typography>
-        </Box>
       </Box>
     </Drawer>
   );
@@ -782,7 +584,7 @@ export function DevOSLayout({ children, navData: userNavData }: Props) {
       className="no-print"
       sx={{
         px: 3,
-        py: 2,
+        py: 1.5,
         mt: 'auto',
         borderTop: '1px solid',
         borderColor: 'divider',
@@ -798,10 +600,7 @@ export function DevOSLayout({ children, navData: userNavData }: Props) {
         sx={{ alignItems: 'center', justifyContent: 'space-between' }}
       >
         <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
-          ASPPIBRA DAO • Architecture Baseline v2.2.2 • Control Plane Sandbox (v2.2.3)
-        </Typography>
-        <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
-          Safety Status: INV-001 through INV-017 Enforced • In-Memory Mocks Active
+          ASPPIBRA DAO • {productName}
         </Typography>
       </Stack>
     </Box>

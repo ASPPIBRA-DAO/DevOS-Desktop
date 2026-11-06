@@ -80,7 +80,15 @@ export function AppRouter() {
         }
       />
 
-      <Route element={<DevOSLayout />}>
+      <Route
+        element={
+          <DevOSLayout
+            navigation={currentEdition.navigation}
+            productName={currentEdition.name}
+            routes={currentEdition.routes}
+          />
+        }
+      >
         {currentEdition.routes.map((r) => {
           const Component = r.component;
           return <Route key={r.path} path={r.path} element={<Component />} />;
