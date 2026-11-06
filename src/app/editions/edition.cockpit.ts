@@ -14,6 +14,67 @@ export const currentEdition: EditionConfig = {
   name: 'DevOS Admin',
   subtitle: 'Administração Institucional & Fundadores',
   bundleId: 'br.aspp.devos.cockpit',
+  navigation: [
+    {
+      id: 'overview',
+      subheader: 'VISÃO GERAL',
+      items: [
+        {
+          title: 'Dashboard Institucional',
+          path: '/',
+          icon: 'solar:widget-5-bold-duotone',
+        },
+      ],
+    },
+    {
+      id: 'financial',
+      subheader: 'FINANCEIRO',
+      items: [
+        {
+          title: 'Tesouraria & Livro-Razão',
+          path: paths.devos.ledger,
+          icon: 'solar:book-bookmark-bold',
+        },
+        {
+          title: 'Carteiras & Banco Digital',
+          path: paths.devos.wallets,
+          icon: 'solar:wallet-bold',
+        },
+      ],
+    },
+    {
+      id: 'operations',
+      subheader: 'OPERAÇÕES',
+      items: [
+        {
+          title: 'Banco Imobiliário',
+          path: paths.devos.cadastre,
+          icon: 'solar:city-bold',
+        },
+        {
+          title: 'Cessão de Posse',
+          path: paths.devos.cessaoPosse,
+          icon: 'solar:document-text-bold-duotone',
+        },
+      ],
+    },
+    {
+      id: 'infrastructure',
+      subheader: 'INFRAESTRUTURA',
+      items: [
+        {
+          title: 'Armazenamento IPFS',
+          path: paths.devos.ipfs,
+          icon: 'solar:server-path-bold-duotone',
+        },
+        {
+          title: 'Infraestrutura',
+          path: paths.devos.infrastructure,
+          icon: 'solar:server-square-bold',
+        },
+      ],
+    },
+  ],
   routes: [
     {
       path: '/',

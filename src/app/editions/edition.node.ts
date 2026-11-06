@@ -11,6 +11,35 @@ export const currentEdition: EditionConfig = {
   name: 'DevOS Node',
   subtitle: 'Operador de Nós & Armazenamento DePIN',
   bundleId: 'br.aspp.devos.node',
+  navigation: [
+    {
+      id: 'overview',
+      subheader: 'VISÃO GERAL',
+      items: [
+        {
+          title: 'Painel do Nó',
+          path: '/',
+          icon: 'solar:server-square-bold-duotone',
+        },
+      ],
+    },
+    {
+      id: 'infrastructure',
+      subheader: 'INFRAESTRUTURA',
+      items: [
+        {
+          title: 'Armazenamento IPFS',
+          path: paths.devos.ipfs,
+          icon: 'solar:server-path-bold-duotone',
+        },
+        {
+          title: 'Infraestrutura',
+          path: paths.devos.infrastructure,
+          icon: 'solar:server-square-bold',
+        },
+      ],
+    },
+  ],
   routes: [
     {
       path: '/',

@@ -1,5 +1,9 @@
 import type React from 'react';
 
+import type { EditionNavigationGroup } from './navigation-types';
+
+export type { EditionNavigationItem, EditionNavigationGroup } from './navigation-types';
+
 export interface RouteConfig {
   path: string;
   label: string;
@@ -13,4 +17,5 @@ export interface EditionConfig {
   subtitle: string;
   bundleId: string;
   routes: RouteConfig[];
+  navigation: EditionNavigationGroup[];
 }
