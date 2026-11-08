@@ -3,6 +3,10 @@ import { MemoryRouter } from 'react-router';
 import { renderToString } from 'react-dom/server';
 import { it, vi, expect, describe } from 'vitest';
 
+import { ThemeProvider } from '@mui/material/styles';
+
+import { createTheme } from 'src/theme/create-theme';
+
 import { currentEdition as nodeEdition } from '../app/editions/edition.node';
 import { currentEdition as cockpitEdition } from '../app/editions/edition.cockpit';
 import {
@@ -17,6 +21,8 @@ vi.mock('src/app/bootstrap', () => ({
     lock: vi.fn(),
   }),
 }));
+
+const theme = createTheme();
 
 describe('DevOSLayout & Navigation Adapter', () => {
   describe('toNavSectionData (adaptador visual)', () => {
@@ -55,15 +61,17 @@ describe('DevOSLayout & Navigation Adapter', () => {
   describe('Renderização com DevOSLayout', () => {
     it('deve renderizar o layout do DevOS Node sem exibir menus administrativos nem termos de mock', () => {
       const html = renderToString(
-        <MemoryRouter initialEntries={['/']}>
-          <DevOSLayout
-            navigation={nodeEdition.navigation}
-            productName={nodeEdition.name}
-            routes={nodeEdition.routes}
-          >
-            <div>Conteúdo do Nó</div>
-          </DevOSLayout>
-        </MemoryRouter>
+        <ThemeProvider theme={theme}>
+          <MemoryRouter initialEntries={['/']}>
+            <DevOSLayout
+              navigation={nodeEdition.navigation}
+              productName={nodeEdition.name}
+              routes={nodeEdition.routes}
+            >
+              <div>Conteúdo do Nó</div>
+            </DevOSLayout>
+          </MemoryRouter>
+        </ThemeProvider>
       );
 
       // Conteúdo esperado
@@ -85,15 +93,17 @@ describe('DevOSLayout & Navigation Adapter', () => {
 
     it('deve renderizar o layout do DevOS Cockpit exibindo Operações e Cadastro Imobiliário', () => {
       const html = renderToString(
-        <MemoryRouter initialEntries={['/']}>
-          <DevOSLayout
-            navigation={cockpitEdition.navigation}
-            productName={cockpitEdition.name}
-            routes={cockpitEdition.routes}
-          >
-            <div>Conteúdo do Cockpit</div>
-          </DevOSLayout>
-        </MemoryRouter>
+        <ThemeProvider theme={theme}>
+          <MemoryRouter initialEntries={['/']}>
+            <DevOSLayout
+              navigation={cockpitEdition.navigation}
+              productName={cockpitEdition.name}
+              routes={cockpitEdition.routes}
+            >
+              <div>Conteúdo do Cockpit</div>
+            </DevOSLayout>
+          </MemoryRouter>
+        </ThemeProvider>
       );
 
       // Conteúdo esperado no Cockpit

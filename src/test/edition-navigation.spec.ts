@@ -1,7 +1,7 @@
 import { it, expect, describe } from 'vitest';
 
-import { currentEdition as nodeEdition } from '../app/editions/edition.node';
 import { validateEdition } from '../app/editions/validate-edition';
+import { currentEdition as nodeEdition } from '../app/editions/edition.node';
 import { currentEdition as cockpitEdition } from '../app/editions/edition.cockpit';
 
 describe('Editions Navigation & Architecture Validation', () => {

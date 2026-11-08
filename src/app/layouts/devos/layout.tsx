@@ -2,8 +2,8 @@ import type { Theme, Breakpoint } from '@mui/material/styles';
 import type { NavSectionProps } from 'src/components/nav-section';
 import type { RouteConfig, EditionNavigationGroup } from 'src/app/editions/types';
 
-import { useMemo, useEffect } from 'react';
 import { Outlet } from 'react-router';
+import { useMemo, useEffect } from 'react';
 import { useBoolean } from 'minimal-shared/hooks';
 import { varAlpha, mergeClasses } from 'minimal-shared/utils';
 
