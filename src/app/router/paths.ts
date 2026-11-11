@@ -80,6 +80,7 @@ export const paths = {
     root: ROOTS.DEVOS,
     cadastre: `${ROOTS.DEVOS}/cadastre`,
     cessaoPosse: `${ROOTS.DEVOS}/cessao-posse`,
+    documents: `${ROOTS.DEVOS}/documents`,
     dao: `${ROOTS.DEVOS}/dao`,
     wallets: `${ROOTS.DEVOS}/wallets`,
     ledger: `${ROOTS.DEVOS}/ledger`,

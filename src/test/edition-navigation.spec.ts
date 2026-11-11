@@ -49,9 +49,10 @@ describe('Editions Navigation & Architecture Validation', () => {
     expect(cockpitPaths).toContain('/devos/wallets');
     expect(cockpitPaths).toContain('/devos/cadastre');
     expect(cockpitPaths).toContain('/devos/cessao-posse');
+    expect(cockpitPaths).toContain('/devos/documents');
     expect(cockpitPaths).toContain('/devos/ipfs');
     expect(cockpitPaths).toContain('/devos/infrastructure');
-    expect(cockpitPaths).toHaveLength(7);
+    expect(cockpitPaths).toHaveLength(8);
 
     // O menu do Cockpit NÃO deve ter duplicação de /devos/dao (está unificado em /devos/ledger)
     expect(cockpitPaths).not.toContain('/devos/dao');

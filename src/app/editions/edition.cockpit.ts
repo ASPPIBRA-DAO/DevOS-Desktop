@@ -6,6 +6,7 @@ import { LedgerView } from '../../modules/ledger';
 import { WalletsLandingView } from '../../modules/wallets';
 import { RealEstateView } from '../../modules/real-estate';
 import { CessaoPosseView } from '../../sections/cessao-de-posse';
+import { DocumentTemplatesGalleryView } from '../../modules/documents';
 import { CockpitDashboardPage } from './cockpit/cockpit-dashboard-page';
 import { InfrastructurePage } from '../../pages/devos/infrastructure-page';
 
@@ -55,6 +56,11 @@ export const currentEdition: EditionConfig = {
           title: 'Cessão de Posse',
           path: paths.devos.cessaoPosse,
           icon: 'solar:document-text-bold-duotone',
+        },
+        {
+          title: 'Catálogo de Modelos',
+          path: paths.devos.documents,
+          icon: 'solar:documents-bold',
         },
       ],
     },
@@ -111,6 +117,12 @@ export const currentEdition: EditionConfig = {
       label: 'Cessão de Posse (Contrato)',
       icon: 'solar:document-text-bold-duotone',
       component: CessaoPosseView,
+    },
+    {
+      path: paths.devos.documents,
+      label: 'Catálogo de Modelos',
+      icon: 'solar:documents-bold',
+      component: DocumentTemplatesGalleryView,
     },
     {
       path: paths.devos.database,

@@ -90,15 +90,88 @@
 
 #v(8pt)
 
-// Título Principal do Instrumento
-#block(width: 100%, above: 4pt, below: 12pt)[
-  #set par(first-line-indent: 0pt)
-  #align(center)[
-    #text(size: font_size_heading, weight: "bold", fill: color_primary)[
-      INSTRUMENTO PARTICULAR DE CESSÃO DE POSSE DE IMÓVEL
+#let is_blank_sheet = if type(contract_data) == dictionary and "is_blank_sheet" in contract_data and contract_data.is_blank_sheet == true {
+  true
+} else if "is_blank_sheet" in raw_input and raw_input.is_blank_sheet == true {
+  true
+} else {
+  false
+}
+
+#if is_blank_sheet [
+  #block(width: 100%, above: 4pt, below: 12pt)[
+    #set par(first-line-indent: 0pt)
+    #align(center)[
+      #text(size: font_size_heading, weight: "bold", fill: color_primary)[
+        #contract_data.at("sheet_title", default: "FOLHA A4 ABNT INSTITUCIONAL (CANÔNICA)")
+      ] \
+      #v(3pt)
+      #text(size: font_size_subtitle, fill: color_secondary_text)[
+        Padrão Canônico ABNT NBR 14724 • Infraestrutura Documental ASPPIBRA-DAO
+      ]
     ]
   ]
-]
+
+  #v(8pt)
+
+  #block(
+    width: 100%,
+    stroke: 0.6pt + color_border,
+    inset: 12pt,
+    radius: 4pt,
+    fill: color_bg_box,
+  )[
+    #text(weight: "bold", size: 9pt, fill: color_primary)[ESPECIFICAÇÕES DA GEOMETRIA DESTA FOLHA (ABNT NBR 14724)] \ \
+    #grid(
+      columns: (1fr, 1fr),
+      row-gutter: 6pt,
+      [#text(size: 8pt)[*Formato Físico:* A4 (210 × 297 mm)]],
+      [#text(size: 8pt)[*Orientação:* Retrato (Portrait)]],
+      [#text(size: 8pt)[*Margem Superior:* 2,5 cm]],
+      [#text(size: 8pt)[*Margem Inferior:* 2,2 cm]],
+      [#text(size: 8pt)[*Margem Esquerda:* 3,0 cm (Encadernação / Livro-Tombo)]],
+      [#text(size: 8pt)[*Margem Direita:* 2,0 cm]],
+    )
+  ]
+
+  #v(14pt)
+
+  #text(weight: "bold", size: 9.5pt, fill: color_primary)[ÁREA ÚTIL DIAGRAMADA DA FOLHA]
+
+  #v(6pt)
+
+  #rect(
+    width: 100%,
+    height: 12.5cm,
+    stroke: (paint: color_primary.lighten(40%), dash: "dashed", thickness: 1pt),
+    radius: 4pt,
+    fill: color_bg_box.lighten(70%),
+  )[
+    #align(center + horizon)[
+      #stack(spacing: 8pt)[
+        #text(size: 11pt, weight: "bold", fill: color_primary_text)[
+          Área Livre para Redação Documental
+        ]
+        #text(size: 8.5pt, fill: luma(120))[
+          (Espaço canônico reservado para inserção de cláusulas, deliberações e minutas oficiais)
+        ]
+        #v(6pt)
+        #text(size: 7.5pt, font: font_family_mono, fill: luma(140))[
+          Margens oficiais aplicadas • Recuo ABNT de 1,25 cm • Entrelinhas 1,5
+        ]
+      ]
+    ]
+  ]
+] else [
+  // Título Principal do Instrumento
+  #block(width: 100%, above: 4pt, below: 12pt)[
+    #set par(first-line-indent: 0pt)
+    #align(center)[
+      #text(size: font_size_heading, weight: "bold", fill: color_primary)[
+        INSTRUMENTO PARTICULAR DE CESSÃO DE POSSE DE IMÓVEL
+      ]
+    ]
+  ]
 
 // ============================================================================
 // CAPÍTULO I – DAS PARTES
@@ -1029,4 +1102,5 @@ Parágrafo único. As partes buscarão, de boa-fé, substituir a disposição af
       ]
     ],
   )
+]
 ]

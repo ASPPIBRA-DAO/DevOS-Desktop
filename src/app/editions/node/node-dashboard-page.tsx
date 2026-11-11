@@ -1,198 +1,94 @@
-import type {
-  VaultStatus,
-  IpfsDaemonStatus,
-  DeviceStatusResponse,
-} from '../../../platform/tauri';
-
-import React, { useState, useEffect, useCallback } from 'react';
+import React from 'react';
 
 import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
-import Typography from '@mui/material/Typography';
-import CircularProgress from '@mui/material/CircularProgress';
+import Grid from '@mui/material/Grid';
 
-import { formatAsppbr } from 'src/shared/utils';
-import { Card, MetricBox, StatusBadge } from 'src/shared/components/data-display';
-
-import { colors } from 'src/theme';
-
-import { VaultStatusMetric } from '../../../modules/wallets';
-import { HostIntegrityCard } from '../../../modules/identity';
-import { StorageProofCard, IpfsDaemonMetric } from '../../../modules/ipfs';
+import { useUserProfile } from './hooks/use-user-profile';
+import { AppMyActions } from './components/app-my-actions';
+import { AppOnboarding } from './components/app-onboarding';
+import { AppOpportunities } from './components/app-opportunities';
+import { AppCommunityFeed } from './components/app-community-feed';
+import { AppActiveProjects } from './components/app-active-projects';
+import { AppPriorityAlerts } from './components/app-priority-alerts';
+import { AppUpcomingEvents } from './components/app-upcoming-events';
+import { AppChatHubSummary } from './components/app-chat-hub-summary';
+import { AppWeeklyRecognition } from './components/app-weekly-recognition';
+import { AppGovernanceHighlight } from './components/app-governance-highlight';
+import { AppCommunicationCarousel } from './components/app-communication-carousel';
+import { AppNetworkGrowth, AppEcosystemNumbers } from './components/app-ecosystem-numbers';
 import {
-  IpfsBridge,
-  SystemBridge,
-  WalletBridge,
-  isTauriDesktop,
-} from '../../../platform/tauri';
+  _homeMetrics,
+  _homeCommunityFeed,
+  _homeOpportunities,
+  _homeActiveProjects,
+  _homePendingActions,
+  _homePriorityAlerts,
+  _homeUpcomingEvents,
+  _homeCommunications,
+  _homeWeeklyRecognition,
+  _homeGovernanceHighlight,
+} from './_mock/home-mock';
 
 export function NodeDashboardPage() {
-  const [loading, setLoading] = useState(true);
-  const [deviceStatus, setDeviceStatus] = useState<DeviceStatusResponse | null>(null);
-  const [vaultStatus, setVaultStatus] = useState<VaultStatus | null>(null);
-  const [ipfsStatus, setIpfsStatus] = useState<IpfsDaemonStatus | null>(null);
-  const [lastCheck, setLastCheck] = useState<string>('');
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  const isDesktop = isTauriDesktop();
-
-  const loadMetrics = useCallback(async () => {
-    setLoading(true);
-    setErrorMessage(null);
-    try {
-      if (isDesktop) {
-        const [devRes, vaultRes, ipfsRes] = await Promise.all([
-          SystemBridge.getDeviceStatus(),
-          WalletBridge.getVaultStatus().catch(() => ({
-            is_initialized: false,
-            is_unlocked: false,
-            dao_wallets_count: 0,
-            client_wallets_count: 0,
-          })),
-          IpfsBridge.getDaemonStatus(),
-        ]);
-        setDeviceStatus(devRes);
-        setVaultStatus(vaultRes);
-        setIpfsStatus(ipfsRes);
-      } else {
-        // Fallback ilustrativo quando aberto no navegador web comum fora do Tauri
-        setDeviceStatus({ enrolled: false, status: 'WEB_PREVIEW' });
-        setVaultStatus({
-          is_initialized: true,
-          is_unlocked: false,
-          dao_wallets_count: 1,
-          client_wallets_count: 0,
-        });
-        setIpfsStatus({ running: true, peers_count: 18, repo_size_bytes: 4294967296 });
-      }
-      setLastCheck(new Date().toLocaleTimeString());
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setErrorMessage(msg);
-    } finally {
-      setLoading(false);
-    }
-  }, [isDesktop]);
-
-  useEffect(() => {
-    loadMetrics();
-  }, [loadMetrics]);
+  const user = useUserProfile();
+  const isGuestOrNew = !user || user.roles?.includes('guest');
+  const isCollaborator = user?.roles?.some((r: string) =>
+    ['moderator', 'admin', 'coordinator', 'holder'].includes(r)
+  );
 
   return (
-    <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: 1400, mx: 'auto' }}>
-      {/* Header do Nó */}
-      <Box
-        sx={{
-          display: 'flex',
-          flexDirection: { xs: 'column', sm: 'row' },
-          alignItems: { xs: 'flex-start', sm: 'center' },
-          justifyContent: 'space-between',
-          gap: 2,
-          mb: 4,
-          pb: 3,
-          borderBottom: `1px solid ${colors.background.border}`,
-        }}
-      >
-        <Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.75 }}>
-            <Typography variant="h3" sx={{ fontWeight: 800, letterSpacing: '-0.02em' }}>
-              DevOS Node
-            </Typography>
-            <StatusBadge
-              status={isDesktop ? 'ACTIVE' : 'SYNCING'}
-              label={isDesktop ? 'Motor Nativo Ativo' : 'Navegador Preview'}
-            />
-          </Box>
-          <Typography variant="body2" sx={{ color: colors.text.secondary }}>
-            Painel Operacional do Nó DePIN • ASPPIBRA Storage Network (Kubo + Tauri v2)
-          </Typography>
-        </Box>
+    <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1400, mx: 'auto' }}>
+      <Grid container spacing={3}>
+        {/* Banner Carrossel Topo - Destaques e Comunicações */}
+        <Grid size={{ xs: 12 }}>
+          <AppCommunicationCarousel list={_homeCommunications} />
+        </Grid>
 
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          {lastCheck && (
-            <Typography variant="caption" sx={{ color: colors.text.secondary }}>
-              Último ping: {lastCheck}
-            </Typography>
-          )}
-          <Button
-            variant="outlined"
-            onClick={loadMetrics}
-            disabled={loading}
-            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : undefined}
-            sx={{
-              borderColor: colors.primary.main,
-              color: colors.primary.main,
-              '&:hover': {
-                borderColor: colors.primary.light,
-                backgroundColor: 'rgba(0, 240, 255, 0.08)',
-              },
-            }}
-          >
-            {loading ? 'Consultando Rust...' : 'Sincronizar Motor'}
-          </Button>
-        </Box>
-      </Box>
+        {/* Coluna Principal (Esquerda - 8 colunas) */}
+        <Grid size={{ xs: 12, md: 8 }} sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          {/* Alertas de Alta Prioridade */}
+          <AppPriorityAlerts alerts={_homePriorityAlerts} />
 
-      {/* Alerta de Erro se houver */}
-      {errorMessage && (
-        <Card sx={{ mb: 3, borderColor: colors.error.main, backgroundColor: 'rgba(239, 68, 68, 0.1)' }}>
-          <Typography variant="body2" sx={{ color: colors.error.light, fontWeight: 600 }}>
-            {errorMessage}
-          </Typography>
-        </Card>
-      )}
+          {/* Minhas Ações Pendentes */}
+          <AppMyActions actions={_homePendingActions} />
 
-      {/* Grid de Métricas Principais */}
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: {
-            xs: '1fr',
-            sm: '1fr 1fr',
-            md: 'repeat(4, 1fr)',
-          },
-          gap: 2.5,
-          mb: 4,
-        }}
-      >
-        <MetricBox
-          label="Stake Operacional"
-          value={formatAsppbr(50000)}
-          subtext="Garantia de custódia e pinning do nó"
-          accentColor={colors.primary.main}
-        />
+          {/* Onboarding se for novo usuário */}
+          {isGuestOrNew && <AppOnboarding />}
 
-        <MetricBox
-          label="Recompensa de Época"
-          value={formatAsppbr(1450)}
-          subtext="Distribuído após verificação de SLA"
-          accentColor={colors.success.main}
-        />
+          {/* Oportunidades no fluxo principal para colaboradores */}
+          {isCollaborator && <AppOpportunities list={_homeOpportunities} />}
 
-        {/* Métrica do Módulo de Carteiras / Cofre */}
-        <VaultStatusMetric status={vaultStatus} />
+          {/* Feed da Comunidade */}
+          <AppCommunityFeed posts={_homeCommunityFeed} />
+        </Grid>
 
-        {/* Métrica do Módulo IPFS */}
-        <IpfsDaemonMetric status={ipfsStatus} />
-      </Box>
+        {/* Barra Lateral Direita (4 colunas) */}
+        <Grid size={{ xs: 12, md: 4 }} sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          {/* Números do Ecossistema */}
+          <AppEcosystemNumbers metrics={_homeMetrics} />
 
-      {/* Painéis Detalhados */}
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: {
-            xs: '1fr',
-            md: '1fr 1fr',
-          },
-          gap: 2.5,
-        }}
-      >
-        {/* Painel do Dispositivo Host (Módulo Identity) */}
-        <HostIntegrityCard deviceStatus={deviceStatus} isDesktop={isDesktop} />
+          {/* Crescimento da Comunidade */}
+          <AppNetworkGrowth metrics={_homeMetrics} />
 
-        {/* Protocolo de Prova DePIN (Módulo IPFS) */}
-        <StorageProofCard />
-      </Box>
+          {/* Destaque de Governança */}
+          <AppGovernanceHighlight highlight={_homeGovernanceHighlight} />
+
+          {/* Acesso Rápido ao Chat / Canais */}
+          <AppChatHubSummary />
+
+          {/* Projetos em Evidência */}
+          <AppActiveProjects projects={_homeActiveProjects} />
+
+          {/* Próximos Eventos */}
+          <AppUpcomingEvents events={_homeUpcomingEvents} />
+
+          {/* Reconhecimento da Semana */}
+          <AppWeeklyRecognition recognitions={_homeWeeklyRecognition} />
+
+          {/* Oportunidades se não exibido na esquerda */}
+          {!isCollaborator && <AppOpportunities list={_homeOpportunities} />}
+        </Grid>
+      </Grid>
     </Box>
   );
 }
@@ -200,3 +96,4 @@ export function NodeDashboardPage() {
 // Alias de compatibilidade com nomenclatura anterior
 export const NodeDashboardView = NodeDashboardPage;
 
+export default NodeDashboardPage;

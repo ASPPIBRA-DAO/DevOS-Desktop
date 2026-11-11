@@ -1,3 +1,7 @@
+export * from './presentation/catalog/data/document-templates-registry';
+
+export { DocumentTemplatesGalleryView } from './presentation/catalog/DocumentTemplatesGalleryView';
+
 // ASPPIBRA DevOS — Motor Documental Nativo (Typst Engine & Tauri IPC)
 export {
   previewDocument,
@@ -5,7 +9,6 @@ export {
   DocumentBridgeError,
   exportPreviewedDocument,
 } from '../../platform/tauri';
-
 export type {
   DocumentKind,
   DocumentRequest,
