@@ -2,6 +2,7 @@ use app_lib::modules::reports::engine::{compile_citizen_ledger_pdf, compile_invo
 use app_lib::modules::reports::models::{
     CitizenLedgerPayload, InvoiceReportItem, InvoiceReportPayload,
 };
+use rust_decimal_macros::dec;
 use serde_json::json;
 use std::fs;
 
@@ -85,7 +86,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         description: "Mensalidade e Custódia de Ativos Descentralizados - Ciclo 2026-10"
             .to_string(),
         reference_month: "2026-10".to_string(),
-        amount: 8750.0,
+        amount: dec!(8750.0),
         due_date: "2026-11-10".to_string(),
         settled_date: Some("2026-10-28".to_string()),
         payment_method: "Pix Dinâmico / Protocolo D1".to_string(),
@@ -95,21 +96,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 id: "ITM-01".to_string(),
                 description: "Cota de Participação e Governança DAO".to_string(),
                 service: Some("Governança Associativa".to_string()),
-                quantity: 1.0,
-                price: 5000.0,
-                total: 5000.0,
+                quantity: dec!(1.0),
+                price: dec!(5000.0),
+                total: dec!(5000.0),
             },
             InvoiceReportItem {
                 id: "ITM-02".to_string(),
                 description: "Taxa de Custódia e Monitoramento Vault DePIN".to_string(),
                 service: Some("Segurança Criptográfica Enclave".to_string()),
-                quantity: 1.0,
-                price: 3750.0,
-                total: 3750.0,
+                quantity: dec!(1.0),
+                price: dec!(3750.0),
+                total: dec!(3750.0),
             },
         ],
-        taxes: Some(0.0),
-        discount: Some(0.0),
+        taxes: Some(dec!(0.0)),
+        discount: Some(dec!(0.0)),
         d1_protocol: Some(
             "0x89abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567::FAT-2026-ASP-0042"
                 .to_string(),
@@ -136,7 +137,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "imovelQuadra": "B"
         }),
     };
-    let service = app_lib::modules::documents::default_documents_service();
+    let service = app_lib::modules::documents::documents_service_for_edition(
+        app_lib::modules::documents::ApplicationEdition::Cockpit,
+    );
     let res = service.generate_document(app_lib::modules::documents::DocumentRequest::CessaoPosse(
         cessao_payload,
     ));
