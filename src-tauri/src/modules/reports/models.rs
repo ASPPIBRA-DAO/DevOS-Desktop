@@ -12,6 +12,7 @@ pub use crate::modules::documents::models::{
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rust_decimal_macros::dec;
     use serde_json::{json, Value};
 
     fn sample_invoice_payload_json() -> Value {
@@ -85,8 +86,8 @@ mod tests {
 
         assert_eq!(payload.id, "INV-2023-001");
         assert_eq!(payload.items.len(), 1);
-        assert_eq!(payload.items[0].total, 5000.0);
-        assert_eq!(payload.amount, 5000.0);
+        assert_eq!(payload.items[0].total, dec!(5000.0));
+        assert_eq!(payload.amount, dec!(5000.0));
 
         assert_eq!(
             payload.member_email.as_deref(),

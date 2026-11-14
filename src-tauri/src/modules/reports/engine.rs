@@ -10,8 +10,16 @@ use crate::modules::documents::{
 /// Mantém a interface legada e delega a geração ao DocumentsService.
 /// Não realiza operações explícitas de escrita em disco.
 pub fn compile_citizen_ledger_pdf(payload: &CitizenLedgerPayload) -> Result<Vec<u8>, String> {
+    compile_citizen_ledger_pdf_with_scope(payload, active_document_scope())
+}
+
+/// Compila o PDF do Livro-Razão do Cidadão com escopo explícito.
+pub fn compile_citizen_ledger_pdf_with_scope(
+    payload: &CitizenLedgerPayload,
+    scope: DocumentScope,
+) -> Result<Vec<u8>, String> {
     let request = DocumentRequest::CitizenLedger(payload.clone());
-    compile_document_pdf(request)
+    compile_document_pdf_with_scope(request, scope)
 }
 
 /// Compila o PDF da Fatura / Recibo Associativo em memória.
@@ -19,8 +27,16 @@ pub fn compile_citizen_ledger_pdf(payload: &CitizenLedgerPayload) -> Result<Vec<
 /// Mantém a interface legada e delega a geração ao DocumentsService.
 /// Não realiza operações explícitas de escrita em disco.
 pub fn compile_invoice_pdf(payload: &InvoiceReportPayload) -> Result<Vec<u8>, String> {
+    compile_invoice_pdf_with_scope(payload, active_document_scope())
+}
+
+/// Compila o PDF da Fatura / Recibo Associativo com escopo explícito.
+pub fn compile_invoice_pdf_with_scope(
+    payload: &InvoiceReportPayload,
+    scope: DocumentScope,
+) -> Result<Vec<u8>, String> {
     let request = DocumentRequest::InvoiceBill(payload.clone());
-    compile_document_pdf(request)
+    compile_document_pdf_with_scope(request, scope)
 }
 
 /// Compila o PDF do Contrato de Cessão de Posse em memória,
@@ -53,7 +69,7 @@ pub fn compile_document_pdf_with_scope(
 ) -> Result<Vec<u8>, String> {
     documents_service_with_scope(scope)
         .generate_document(request)
-        .map(|output| output.pdf_bytes)
+        .map(|output| output.pdf_bytes.to_vec())
         .map_err(|error| error.to_string())
 }
 
@@ -61,6 +77,7 @@ pub fn compile_document_pdf_with_scope(
 mod tests {
     use super::*;
     use crate::modules::reports::models::InvoiceReportItem;
+    use rust_decimal_macros::dec;
     use serde_json::json;
 
     fn assert_valid_pdf(bytes: &[u8], document_name: &str) {
@@ -113,9 +130,10 @@ mod tests {
             }),
         };
 
-        let bytes = compile_citizen_ledger_pdf(&payload).unwrap_or_else(|error| {
-            panic!("Falha ao compilar o PDF do Livro-Razão do Cidadão: {error}")
-        });
+        let bytes = compile_citizen_ledger_pdf_with_scope(&payload, DocumentScope::NodeOnly)
+            .unwrap_or_else(|error| {
+                panic!("Falha ao compilar o PDF do Livro-Razão do Cidadão: {error}")
+            });
 
         assert_valid_pdf(&bytes, "Livro-Razão do Cidadão");
     }
@@ -130,7 +148,7 @@ mod tests {
             member_address: Some("Endereço de Teste, Município de Teste - UF".to_string()),
             description: "Mensalidade Associativa de Teste".to_string(),
             reference_month: "2023-08".to_string(),
-            amount: 5000.0,
+            amount: dec!(5000.0),
             due_date: "2023-08-08".to_string(),
             settled_date: Some("2023-08-08".to_string()),
             payment_method: "Pix Dinâmico / D1".to_string(),
@@ -139,18 +157,19 @@ mod tests {
                 id: "item-test-1".to_string(),
                 description: "Mensalidade Associativa de Teste".to_string(),
                 service: Some("Contribuição Regular de Teste".to_string()),
-                quantity: 1.0,
-                price: 5000.0,
-                total: 5000.0,
+                quantity: dec!(1.0),
+                price: dec!(5000.0),
+                total: dec!(5000.0),
             }],
-            taxes: Some(0.0),
-            discount: Some(0.0),
+            taxes: Some(dec!(0.0)),
+            discount: Some(dec!(0.0)),
             d1_protocol: Some("TEST-PROTOCOL-INV-TEST-001".to_string()),
         };
 
-        let bytes = compile_invoice_pdf(&payload).unwrap_or_else(|error| {
-            panic!("Falha ao compilar o PDF da fatura associativa: {error}")
-        });
+        let bytes = compile_invoice_pdf_with_scope(&payload, DocumentScope::NodeOnly)
+            .unwrap_or_else(|error| {
+                panic!("Falha ao compilar o PDF da fatura associativa: {error}")
+            });
 
         assert_valid_pdf(&bytes, "Fatura Associativa");
     }
@@ -166,7 +185,7 @@ mod tests {
             member_address: None,
             description: "Fatura Inválida".to_string(),
             reference_month: "2026-10".to_string(),
-            amount: 100.0,
+            amount: dec!(100.0),
             due_date: "2026-10-31".to_string(),
             settled_date: None,
             payment_method: "Pix".to_string(),

@@ -115,7 +115,7 @@ pub(crate) fn preview_document_with_store_and_scope(
         preview_id: stored.preview_id,
         pdf_base64,
         page_count,
-        pages: stored.pages,
+        pages: stored.pages.to_vec(),
         created_at_utc: stored.created_at_utc,
         expires_at_utc: stored.expires_at_utc,
         message: "Visualização do PDF gerada em memória com sucesso.".to_string(),
@@ -136,33 +136,57 @@ pub(crate) fn export_previewed_document_in_directory_with_store_and_scope(
         target_file_name,
     } = payload;
 
-    let stored = store
-        .verify_and_get_for_export(&preview_id, &expected_sha256, active_scope)
+    let reservation = store
+        .begin_export(&preview_id, &expected_sha256, active_scope)
         .map_err(|err| err.public_message())?;
 
-    let kind = stored.metadata.document_kind;
+    let kind = reservation.metadata.document_kind;
     let file_name = match target_file_name {
-        Some(name) => normalize_pdf_file_name(&name)?,
+        Some(name) => match normalize_pdf_file_name(&name) {
+            Ok(valid) => valid,
+            Err(err) => {
+                store.abort_export(&reservation);
+                return Err(err);
+            }
+        },
         None => default_file_name(kind),
     };
 
-    fs::create_dir_all(download_dir)
-        .map_err(|_| "Não foi possível preparar o diretório de destino do PDF.".to_string())?;
+    if fs::create_dir_all(download_dir).is_err() {
+        store.abort_export(&reservation);
+        return Err("Não foi possível preparar o diretório de destino do PDF.".to_string());
+    }
 
     let target_path = download_dir.join(&file_name);
 
-    write_pdf_without_overwrite(&target_path, &stored.pdf_bytes)?;
+    if let Err(err) = write_pdf_without_overwrite(&target_path, &reservation.pdf_bytes) {
+        store.abort_export(&reservation);
+        return Err(err);
+    }
 
     // Confirmação criptográfica pós-gravação: o arquivo gravado possui exatamente o mesmo SHA-256 do preview
-    let disk_bytes = fs::read(&target_path)
-        .map_err(|_| "Não foi possível verificar a integridade do PDF exportado.".to_string())?;
+    let disk_bytes = match fs::read(&target_path) {
+        Ok(bytes) => bytes,
+        Err(_) => {
+            let _ = fs::remove_file(&target_path);
+            store.abort_export(&reservation);
+            return Err("Não foi possível verificar a integridade do PDF exportado.".to_string());
+        }
+    };
+
     let disk_sha256 = hex::encode(Sha256::digest(&disk_bytes));
-    if disk_sha256 != stored.sha256_checksum {
+    if disk_sha256 != reservation.metadata.sha256_checksum {
         let _ = fs::remove_file(&target_path);
+        store.abort_export(&reservation);
         return Err(
             "Falha de integridade pós-gravação: o hash SHA-256 do arquivo divergiu do preview."
                 .to_string(),
         );
+    }
+
+    // Concretização transacional do ciclo de exportação
+    if let Err(err) = store.confirm_export_success(&reservation) {
+        return Err(err.public_message());
     }
 
     let message = if open_after_export.unwrap_or(false) {
@@ -180,7 +204,7 @@ pub(crate) fn export_previewed_document_in_directory_with_store_and_scope(
         file_path: target_path.to_string_lossy().into_owned(),
         file_name,
         message,
-        metadata: stored.metadata,
+        metadata: reservation.metadata,
     })
 }
 
@@ -350,6 +374,7 @@ fn write_pdf_without_overwrite(target_path: &Path, pdf_bytes: &[u8]) -> Result<(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rust_decimal_macros::dec;
 
     use crate::modules::reports::models::{
         CitizenLedgerPayload, InvoiceReportItem, InvoiceReportPayload,
@@ -519,8 +544,12 @@ mod tests {
             target_file_name: Some(unique_name.clone()),
         };
 
-        let result = generate_document_in_directory(payload, directory.path())
-            .expect("Falha ao gerar o extrato");
+        let result = generate_document_in_directory_with_scope(
+            payload,
+            directory.path(),
+            DocumentScope::NodeOnly,
+        )
+        .expect("Falha ao gerar o extrato");
 
         assert_eq!(result.file_name, unique_name);
         assert_valid_result(&result, DocumentKind::CitizenLedger, directory.path());
@@ -540,7 +569,7 @@ mod tests {
                 member_address: None,
                 description: "Fatura de Teste IPC".to_string(),
                 reference_month: "2026-10".to_string(),
-                amount: 100.0,
+                amount: dec!(100.0),
                 due_date: "2026-10-31".to_string(),
                 settled_date: None,
                 payment_method: "Pix".to_string(),
@@ -549,9 +578,9 @@ mod tests {
                     id: "it-1".to_string(),
                     description: "Item 1".to_string(),
                     service: None,
-                    quantity: 1.0,
-                    price: 100.0,
-                    total: 100.0,
+                    quantity: dec!(1.0),
+                    price: dec!(100.0),
+                    total: dec!(100.0),
                 }],
                 taxes: None,
                 discount: None,
@@ -561,8 +590,12 @@ mod tests {
             target_file_name: Some(unique_name.clone()),
         };
 
-        let result = generate_document_in_directory(payload, directory.path())
-            .expect("Falha ao gerar a fatura");
+        let result = generate_document_in_directory_with_scope(
+            payload,
+            directory.path(),
+            DocumentScope::NodeOnly,
+        )
+        .expect("Falha ao gerar a fatura");
 
         assert_eq!(result.file_name, unique_name);
         assert_valid_result(&result, DocumentKind::InvoiceBill, directory.path());
@@ -578,14 +611,18 @@ mod tests {
                 crate::modules::documents::models::CessaoPossePayload {
                     document_number: "".to_string(),
                     auth_code: "2026-X7Y9".to_string(),
-                    data: serde_json::json!({}),
+                    data: serde_json::json!({"cedente": "Nome"}),
                 },
             ),
             open_after_export: Some(false),
             target_file_name: None,
         };
 
-        let result = generate_document_in_directory(payload_empty, directory.path());
+        let result = generate_document_in_directory_with_scope(
+            payload_empty,
+            directory.path(),
+            DocumentScope::CockpitOnly,
+        );
         assert!(result.is_err());
         let err_msg = result.unwrap_err();
         assert!(err_msg.contains("Os dados fornecidos para o documento são inválidos"));
@@ -597,14 +634,18 @@ mod tests {
                 crate::modules::documents::models::CessaoPossePayload {
                     document_number: "   \t\n".to_string(),
                     auth_code: "2026-X7Y9".to_string(),
-                    data: serde_json::json!({}),
+                    data: serde_json::json!({"cedente": "Nome"}),
                 },
             ),
             open_after_export: Some(false),
             target_file_name: None,
         };
 
-        let res_ws = generate_document_in_directory(payload_whitespace, directory.path());
+        let res_ws = generate_document_in_directory_with_scope(
+            payload_whitespace,
+            directory.path(),
+            DocumentScope::CockpitOnly,
+        );
         assert!(res_ws.is_err());
         assert!(res_ws.unwrap_err().contains("document_number"));
     }
@@ -619,14 +660,18 @@ mod tests {
                 crate::modules::documents::models::CessaoPossePayload {
                     document_number: "2026-0001/CP".to_string(),
                     auth_code: "   ".to_string(),
-                    data: serde_json::json!({}),
+                    data: serde_json::json!({"cedente": "Nome"}),
                 },
             ),
             open_after_export: Some(false),
             target_file_name: None,
         };
 
-        let result = generate_document_in_directory(payload_ws, directory.path());
+        let result = generate_document_in_directory_with_scope(
+            payload_ws,
+            directory.path(),
+            DocumentScope::CockpitOnly,
+        );
         assert!(result.is_err());
         let err_msg = result.unwrap_err();
         assert!(err_msg.contains("Os dados fornecidos para o documento são inválidos"));
@@ -638,14 +683,18 @@ mod tests {
                 crate::modules::documents::models::CessaoPossePayload {
                     document_number: "2026-0001/CP".to_string(),
                     auth_code: "".to_string(),
-                    data: serde_json::json!({}),
+                    data: serde_json::json!({"cedente": "Nome"}),
                 },
             ),
             open_after_export: Some(false),
             target_file_name: None,
         };
 
-        let res_empty = generate_document_in_directory(payload_empty, directory.path());
+        let res_empty = generate_document_in_directory_with_scope(
+            payload_empty,
+            directory.path(),
+            DocumentScope::CockpitOnly,
+        );
         assert!(res_empty.is_err());
         assert!(res_empty.unwrap_err().contains("auth_code"));
     }

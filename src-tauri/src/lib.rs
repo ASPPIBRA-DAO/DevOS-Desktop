@@ -112,10 +112,16 @@ pub fn run() {
 
     let context = tauri::generate_context!();
     let is_cockpit = context.config().identifier == COCKPIT_IDENTIFIER;
-    let active_scope = modules::documents::DocumentScope::from_app_identifier(
+    let edition = match modules::documents::ApplicationEdition::try_from_bundle_identifier(
         &context.config().identifier,
-    );
-    modules::documents::configure_active_document_scope(active_scope);
+    ) {
+        Ok(ed) => ed,
+        Err(err) => {
+            log::error!("[Startup] Falha crítica de segurança: {err}");
+            panic!("[Startup] Falha crítica de segurança: {err}");
+        }
+    };
+    let _ = modules::documents::initialize_application_edition(edition);
 
     let builder = tauri::Builder::default()
         .setup(move |app| {
