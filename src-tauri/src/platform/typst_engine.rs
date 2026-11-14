@@ -9,6 +9,7 @@ use typst::visualize::{CurveItem, FillRule, Geometry, ImageKind, LineCap, LineJo
 use typst_as_lib::TypstEngine;
 
 const PDF_HEADER: &[u8] = b"%PDF-";
+const PDF_TRAILER: &[u8] = b"%%EOF";
 const BASE64_ALPHABET: &[u8; 64] =
     b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
@@ -20,6 +21,8 @@ pub enum TypstEngineError {
     PdfRenderingFailed(String),
     #[error("Saída inválida do compilador: o buffer não contém cabeçalho canônico %PDF-")]
     InvalidPdfOutput,
+    #[error("Falha na validação estrutural do documento PDF: {0}")]
+    StructuralValidationError(String),
 }
 
 /// Representação vetorial individual de uma página compilada do PDF para visualização interna.
@@ -137,14 +140,82 @@ pub fn decode_base64(encoded: &str) -> Result<Vec<u8>, String> {
     Ok(out)
 }
 
+/// Valida as invariantes estruturais básicas de um buffer binário de documento PDF.
+///
+/// Verifica tamanho mínimo, cabeçalho canônico `%PDF-` e a presença do marcador
+/// de encerramento estrutural `%%EOF` na janela final do arquivo (conforme ISO 32000-1 §7.5.5).
+pub fn validate_pdf_structure(pdf_bytes: &[u8]) -> Result<(), TypstEngineError> {
+    if pdf_bytes.len() < 12 {
+        return Err(TypstEngineError::StructuralValidationError(
+            "O buffer do documento possui tamanho insuficiente para um arquivo PDF.".to_string(),
+        ));
+    }
+    if !pdf_bytes.starts_with(PDF_HEADER) {
+        return Err(TypstEngineError::InvalidPdfOutput);
+    }
+
+    let search_window_start = pdf_bytes.len().saturating_sub(1024);
+    let search_slice = &pdf_bytes[search_window_start..];
+    if !search_slice
+        .windows(PDF_TRAILER.len())
+        .any(|window| window == PDF_TRAILER)
+    {
+        return Err(TypstEngineError::StructuralValidationError(
+            "Marcador de final de arquivo %%EOF não encontrado no encerramento do buffer PDF."
+                .to_string(),
+        ));
+    }
+
+    Ok(())
+}
+
+/// Compila um documento Typst diretamente em PDF canônico sem alocar memória
+/// nem executar renderização vetorial SVG das páginas.
+pub fn compile_typst_document_to_pdf(
+    options: TypstCompileOptions<'_>,
+) -> Result<Vec<u8>, TypstEngineError> {
+    let mut inputs = Dict::new();
+    for (key, value) in options.string_inputs {
+        inputs.insert(key.into(), Value::Str(value.into()));
+    }
+
+    let mut builder = TypstEngine::builder()
+        .main_file(("main.typ", options.template_source))
+        .fonts(options.fonts.iter().copied());
+
+    if !options.static_sources.is_empty() {
+        builder = builder.with_static_source_file_resolver(options.static_sources.iter().copied());
+    }
+
+    let engine = builder.build();
+
+    let document = engine
+        .compile_with_input(inputs)
+        .output
+        .map_err(|err| TypstEngineError::CompilationFailed(err.to_string()))?;
+
+    let pdf_bytes = typst_pdf::pdf(&document, &Default::default())
+        .map_err(|err| TypstEngineError::PdfRenderingFailed(format!("{err:?}")))?;
+
+    validate_pdf_structure(&pdf_bytes)?;
+
+    let expected_pages = document.pages().len();
+    if expected_pages == 0 {
+        return Err(TypstEngineError::PdfRenderingFailed(
+            "O documento compilado não contém páginas.".to_string(),
+        ));
+    }
+
+    Ok(pdf_bytes)
+}
+
 /// Compila um documento Typst em memória e retorna os bytes do PDF.
 ///
-/// A função não realiza operações explícitas de escrita em disco e não
-/// depende de janela, IPC ou serviços específicos da aplicação.
+/// Utiliza a compilação direta sem alocação ou conversão de páginas SVG.
 pub fn compile_typst_document(
     options: TypstCompileOptions<'_>,
 ) -> Result<Vec<u8>, TypstEngineError> {
-    compile_typst_document_with_preview(options).map(|compiled| compiled.pdf_bytes)
+    compile_typst_document_to_pdf(options)
 }
 
 /// Compila um documento Typst em memória e retorna tanto os bytes canônicos do PDF
@@ -175,9 +246,7 @@ pub fn compile_typst_document_with_preview(
     let pdf_bytes = typst_pdf::pdf(&document, &Default::default())
         .map_err(|err| TypstEngineError::PdfRenderingFailed(format!("{err:?}")))?;
 
-    if !pdf_bytes.starts_with(PDF_HEADER) {
-        return Err(TypstEngineError::InvalidPdfOutput);
-    }
+    validate_pdf_structure(&pdf_bytes)?;
 
     let doc_pages = document.pages();
     let expected_pages = doc_pages.len();
