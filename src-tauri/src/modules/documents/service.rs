@@ -50,6 +50,22 @@ impl DocumentsService {
         }
     }
 
+    /// Inicializa o serviço com um renderizador e uma edição explícita da aplicação (`ApplicationEdition`).
+    pub fn with_edition(
+        renderer: Arc<dyn DocumentRenderer>,
+        edition: crate::modules::documents::models::ApplicationEdition,
+    ) -> Self {
+        let system_scope = match edition {
+            crate::modules::documents::models::ApplicationEdition::Cockpit => {
+                crate::modules::documents::models::DocumentVisibility::CockpitOnly
+            }
+            crate::modules::documents::models::ApplicationEdition::Node => {
+                crate::modules::documents::models::DocumentVisibility::NodeOnly
+            }
+        };
+        Self::with_scope(renderer, system_scope)
+    }
+
     /// Retorna o escopo de sistema atualmente configurado no serviço.
     pub fn system_scope(&self) -> DocumentScope {
         self.system_scope
@@ -57,6 +73,13 @@ impl DocumentsService {
 
     /// Valida se o escopo exigido é autorizado pelo contexto do sistema.
     pub fn validate_scope_for(&self, required: DocumentScope) -> Result<(), DocumentError> {
+        if self.system_scope == DocumentScope::Uninitialized {
+            return Err(DocumentError::UnauthorizedScope(
+                "Operações documentais bloqueadas: a edição da aplicação não foi inicializada."
+                    .to_string(),
+            ));
+        }
+
         match (required, self.system_scope) {
             (DocumentScope::Universal, _) => Ok(()),
             (DocumentScope::CockpitOnly, DocumentScope::CockpitOnly) => Ok(()),
@@ -73,43 +96,30 @@ impl DocumentsService {
         self.validate_scope_for(kind.required_scope())
     }
 
-    /// Ponto de entrada padrão para geração, autorização, validação e integridade documental.
-    pub fn generate_document(
-        &self,
-        request: DocumentRequest,
-    ) -> Result<DocumentOutput, DocumentError> {
-        self.generate_document_with_pages(request)
-            .map(|(output, _)| output)
-    }
-
-    /// Gera o documento canônico com validação, autorização de escopo e cálculo de SHA-256,
-    /// retornando tanto o `DocumentOutput` quanto as páginas vetoriais para visualização interna.
-    pub fn generate_document_with_pages(
-        &self,
-        request: DocumentRequest,
-    ) -> Result<(DocumentOutput, Vec<RenderedPagePreview>), DocumentError> {
-        // 1. Validação estrita das regras de domínio e integridade do payload
+    /// Valida o pipeline comum (autorização de escopo, regras de payload e suporte do renderizador).
+    fn validate_pipeline(&self, request: &DocumentRequest) -> Result<(), DocumentError> {
+        self.validate_scope(request.kind())?;
         request.validate()?;
-
-        let kind = request.kind();
-
-        // 2. Validação obrigatória de autorização de escopo
-        self.validate_scope(kind)?;
-
-        // 3. Verificação se o motor injetado suporta o tipo requisitado
-        if !self.renderer.supports(kind) {
+        if !self.renderer.supports(request.kind()) {
             return Err(DocumentError::UnsupportedDocumentType(format!(
-                "O renderizador documental configurado não oferece suporte ao tipo {kind:?}"
+                "O renderizador documental configurado não oferece suporte ao tipo {:?}",
+                request.kind()
             )));
         }
+        Ok(())
+    }
 
-        // 4. Delegação da renderização física ao motor especializado
-        let rendered = self.renderer.render(request)?;
+    /// Valida a integridade do PDF gerado e constrói o `DocumentOutput` canônico com metadados e SHA-256.
+    fn build_document_output(
+        kind: DocumentKind,
+        pdf_bytes: Arc<[u8]>,
+    ) -> Result<DocumentOutput, DocumentError> {
+        crate::platform::typst_engine::validate_pdf_structure(&pdf_bytes)
+            .map_err(|e| DocumentError::CompilationError(e.to_string()))?;
 
-        // 5. Centralização da integridade documental e montagem canônica dos metadados
-        let checksum = Sha256::digest(&rendered.pdf_bytes);
+        let checksum = Sha256::digest(&pdf_bytes);
         let sha256_checksum = hex::encode(checksum);
-        let byte_size = rendered.pdf_bytes.len();
+        let byte_size = pdf_bytes.len();
         let generated_at_utc = Utc::now().to_rfc3339();
 
         let metadata = DocumentMetadata {
@@ -120,19 +130,41 @@ impl DocumentsService {
             template_id: kind.template_id().to_string(),
         };
 
-        Ok((
-            DocumentOutput {
-                pdf_bytes: rendered.pdf_bytes,
-                metadata,
-            },
-            rendered.pages,
-        ))
+        Ok(DocumentOutput {
+            pdf_bytes,
+            metadata,
+        })
+    }
+
+    /// Ponto de entrada padrão para geração, autorização, validação e integridade documental.
+    pub fn generate_document(
+        &self,
+        request: DocumentRequest,
+    ) -> Result<DocumentOutput, DocumentError> {
+        let kind = request.kind();
+        self.validate_pipeline(&request)?;
+        let rendered = self.renderer.render_pdf_only(request)?;
+        Self::build_document_output(kind, rendered.pdf_bytes)
+    }
+
+    /// Gera o documento canônico com validação, autorização de escopo e cálculo de SHA-256,
+    /// retornando tanto o `DocumentOutput` quanto as páginas vetoriais para visualização interna.
+    pub fn generate_document_with_pages(
+        &self,
+        request: DocumentRequest,
+    ) -> Result<(DocumentOutput, Vec<RenderedPagePreview>), DocumentError> {
+        let kind = request.kind();
+        self.validate_pipeline(&request)?;
+        let rendered = self.renderer.render(request)?;
+        let output = Self::build_document_output(kind, rendered.pdf_bytes)?;
+        Ok((output, rendered.pages))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rust_decimal_macros::dec;
     use sha2::{Digest, Sha256};
 
     use crate::modules::documents::ports::RenderedDocument;
@@ -248,7 +280,7 @@ mod tests {
             member_address: Some("Rio de Janeiro, RJ".to_string()),
             description: "Mensalidade Associativa".to_string(),
             reference_month: "2026-10".to_string(),
-            amount: 1500.0,
+            amount: dec!(1500.0),
             due_date: "2026-10-30".to_string(),
             settled_date: Some("2026-10-23".to_string()),
             payment_method: "Pix / D1".to_string(),
@@ -257,12 +289,12 @@ mod tests {
                 id: "item-1".to_string(),
                 description: "Taxa de Manutenção".to_string(),
                 service: Some("Operação DevOS".to_string()),
-                quantity: 1.0,
-                price: 1500.0,
-                total: 1500.0,
+                quantity: dec!(1.0),
+                price: dec!(1500.0),
+                total: dec!(1500.0),
             }],
-            taxes: Some(0.0),
-            discount: Some(0.0),
+            taxes: Some(dec!(0.0)),
+            discount: Some(dec!(0.0)),
             d1_protocol: Some("d1_protocol_sample_hash".to_string()),
         };
 
@@ -383,7 +415,7 @@ mod tests {
             member_address: None,
             description: "Desc".to_string(),
             reference_month: "2026-10".to_string(),
-            amount: 100.0,
+            amount: dec!(100.0),
             due_date: "2026-10-31".to_string(),
             settled_date: None,
             payment_method: "Pix".to_string(),
@@ -426,7 +458,9 @@ mod tests {
         fn render(&self, _request: DocumentRequest) -> Result<RenderedDocument, DocumentError> {
             self.render_invocations
                 .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-            Ok(RenderedDocument::new(b"%PDF-1.7 mock output".to_vec()))
+            Ok(RenderedDocument::new(
+                b"%PDF-1.7 mock output payload buffer\n%%EOF".to_vec(),
+            ))
         }
     }
 
@@ -443,7 +477,7 @@ mod tests {
             member_address: None,
             description: "Mock Description".to_string(),
             reference_month: "2026-10".to_string(),
-            amount: 100.0,
+            amount: dec!(100.0),
             due_date: "2026-10-31".to_string(),
             settled_date: None,
             payment_method: "Pix".to_string(),
@@ -452,9 +486,9 @@ mod tests {
                 id: "item-1".to_string(),
                 description: "Item 1".to_string(),
                 service: None,
-                quantity: 1.0,
-                price: 100.0,
-                total: 100.0,
+                quantity: dec!(1.0),
+                price: dec!(100.0),
+                total: dec!(100.0),
             }],
             taxes: None,
             discount: None,
@@ -466,10 +500,11 @@ mod tests {
             .expect("Mock deve renderizar com sucesso");
 
         assert_eq!(mock.invocations(), 1);
-        assert_eq!(output.pdf_bytes, b"%PDF-1.7 mock output");
+        let expected_bytes = b"%PDF-1.7 mock output payload buffer\n%%EOF";
+        assert_eq!(&*output.pdf_bytes, expected_bytes);
         assert_eq!(output.metadata.document_kind, DocumentKind::InvoiceBill);
-        assert_eq!(output.metadata.byte_size, 20);
-        let expected_sha = hex::encode(Sha256::digest(b"%PDF-1.7 mock output"));
+        assert_eq!(output.metadata.byte_size, expected_bytes.len());
+        let expected_sha = hex::encode(Sha256::digest(expected_bytes));
         assert_eq!(output.metadata.sha256_checksum, expected_sha);
     }
 
@@ -486,7 +521,7 @@ mod tests {
             member_address: None,
             description: "Mock Description".to_string(),
             reference_month: "2026-10".to_string(),
-            amount: 100.0,
+            amount: dec!(100.0),
             due_date: "2026-10-31".to_string(),
             settled_date: None,
             payment_method: "Pix".to_string(),
@@ -495,9 +530,9 @@ mod tests {
                 id: "item-1".to_string(),
                 description: "Item 1".to_string(),
                 service: None,
-                quantity: 1.0,
-                price: 100.0,
-                total: 100.0,
+                quantity: dec!(1.0),
+                price: dec!(100.0),
+                total: dec!(100.0),
             }],
             taxes: None,
             discount: None,
@@ -525,7 +560,7 @@ mod tests {
             member_address: None,
             description: "Mock Description".to_string(),
             reference_month: "2026-10".to_string(),
-            amount: 100.0,
+            amount: dec!(100.0),
             due_date: "2026-10-31".to_string(),
             settled_date: None,
             payment_method: "Pix".to_string(),
@@ -555,7 +590,7 @@ mod tests {
             member_address: None,
             description: "Mock Description".to_string(),
             reference_month: "2026-10".to_string(),
-            amount: 100.0,
+            amount: dec!(100.0),
             due_date: "2026-10-31".to_string(),
             settled_date: None,
             payment_method: "Pix".to_string(),
@@ -564,9 +599,9 @@ mod tests {
                 id: "item-1".to_string(),
                 description: "Item 1".to_string(),
                 service: None,
-                quantity: 1.0,
-                price: 100.0,
-                total: 100.0,
+                quantity: dec!(1.0),
+                price: dec!(100.0),
+                total: dec!(100.0),
             }],
             taxes: None,
             discount: None,
@@ -626,7 +661,7 @@ mod tests {
             member_address: None,
             description: "Fatura Escopo".to_string(),
             reference_month: "2026-10".to_string(),
-            amount: 100.0,
+            amount: dec!(100.0),
             due_date: "2026-10-31".to_string(),
             settled_date: None,
             payment_method: "Pix".to_string(),
@@ -635,9 +670,9 @@ mod tests {
                 id: "it-1".to_string(),
                 description: "Item".to_string(),
                 service: None,
-                quantity: 1.0,
-                price: 100.0,
-                total: 100.0,
+                quantity: dec!(1.0),
+                price: dec!(100.0),
+                total: dec!(100.0),
             }],
             taxes: None,
             discount: None,

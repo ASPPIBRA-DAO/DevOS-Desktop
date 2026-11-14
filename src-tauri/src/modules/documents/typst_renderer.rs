@@ -3,8 +3,10 @@ use std::collections::HashMap;
 use crate::modules::documents::models::{DocumentError, DocumentKind, DocumentRequest};
 use crate::modules::documents::ports::{DocumentRenderer, RenderedDocument};
 use crate::platform::typst_engine::{
-    compile_typst_document, compile_typst_document_with_preview, TypstCompileOptions,
+    compile_typst_document_to_pdf, compile_typst_document_with_preview, TypstCompileOptions,
 };
+#[cfg(test)]
+use crate::platform::typst_engine::compile_typst_document;
 
 static CITIZEN_TEMPLATE: &str = include_str!("../../../templates/extrato_citizen_ledger.typ");
 
@@ -58,6 +60,46 @@ impl TypstDocumentRenderer {
     }
 }
 
+impl TypstDocumentRenderer {
+    fn resolve_template_and_payload(
+        request: &DocumentRequest,
+    ) -> Result<(&'static str, String), DocumentError> {
+        match request {
+            DocumentRequest::CitizenLedger(payload) => {
+                let json_str = serde_json::to_string(&payload.data)
+                    .map_err(|error| DocumentError::SerializationError(error.to_string()))?;
+
+                Ok((CITIZEN_TEMPLATE, json_str))
+            }
+
+            DocumentRequest::InvoiceBill(payload) => {
+                let json_value = serde_json::json!({
+                    "invoice": payload
+                });
+
+                let json_str = serde_json::to_string(&json_value)
+                    .map_err(|error| DocumentError::SerializationError(error.to_string()))?;
+
+                Ok((INVOICE_TEMPLATE, json_str))
+            }
+
+            DocumentRequest::CessaoPosse(payload) => {
+                let json_str = serde_json::to_string(&payload)
+                    .map_err(|error| DocumentError::SerializationError(error.to_string()))?;
+
+                Ok((CONTRATO_CESSAO_TEMPLATE, json_str))
+            }
+
+            DocumentRequest::RealEstateReconciliation(payload) => {
+                let json_str = serde_json::to_string(&payload.data)
+                    .map_err(|error| DocumentError::SerializationError(error.to_string()))?;
+
+                Ok((RECONCILIATION_TEMPLATE, json_str))
+            }
+        }
+    }
+}
+
 impl DocumentRenderer for TypstDocumentRenderer {
     fn supports(&self, kind: DocumentKind) -> bool {
         matches!(
@@ -70,39 +112,7 @@ impl DocumentRenderer for TypstDocumentRenderer {
     }
 
     fn render(&self, request: DocumentRequest) -> Result<RenderedDocument, DocumentError> {
-        let (template_source, json_payload) = match request {
-            DocumentRequest::CitizenLedger(payload) => {
-                let json_str = serde_json::to_string(&payload.data)
-                    .map_err(|error| DocumentError::SerializationError(error.to_string()))?;
-
-                (CITIZEN_TEMPLATE, json_str)
-            }
-
-            DocumentRequest::InvoiceBill(payload) => {
-                let json_value = serde_json::json!({
-                    "invoice": payload
-                });
-
-                let json_str = serde_json::to_string(&json_value)
-                    .map_err(|error| DocumentError::SerializationError(error.to_string()))?;
-
-                (INVOICE_TEMPLATE, json_str)
-            }
-
-            DocumentRequest::CessaoPosse(payload) => {
-                let json_str = serde_json::to_string(&payload)
-                    .map_err(|error| DocumentError::SerializationError(error.to_string()))?;
-
-                (CONTRATO_CESSAO_TEMPLATE, json_str)
-            }
-
-            DocumentRequest::RealEstateReconciliation(payload) => {
-                let json_str = serde_json::to_string(&payload.data)
-                    .map_err(|error| DocumentError::SerializationError(error.to_string()))?;
-
-                (RECONCILIATION_TEMPLATE, json_str)
-            }
-        };
+        let (template_source, json_payload) = Self::resolve_template_and_payload(&request)?;
 
         let mut string_inputs = HashMap::new();
         string_inputs.insert("data", json_payload);
@@ -122,6 +132,25 @@ impl DocumentRenderer for TypstDocumentRenderer {
             compiled.pages,
         ))
     }
+
+    fn render_pdf_only(&self, request: DocumentRequest) -> Result<RenderedDocument, DocumentError> {
+        let (template_source, json_payload) = Self::resolve_template_and_payload(&request)?;
+
+        let mut string_inputs = HashMap::new();
+        string_inputs.insert("data", json_payload);
+
+        let options = TypstCompileOptions {
+            template_source,
+            fonts: &[ROBOTO_REGULAR, ROBOTO_BOLD],
+            string_inputs,
+            static_sources: CANONICAL_TYPST_STATIC_SOURCES,
+        };
+
+        let pdf_bytes = compile_typst_document_to_pdf(options)
+            .map_err(|error| DocumentError::CompilationError(error.to_string()))?;
+
+        Ok(RenderedDocument::with_pages(pdf_bytes, Vec::new()))
+    }
 }
 
 #[cfg(test)]
@@ -131,6 +160,7 @@ mod tests {
         CessaoPossePayload, CitizenLedgerPayload, InvoiceReportItem, InvoiceReportPayload,
         RealEstateReconciliationPayload,
     };
+    use rust_decimal_macros::dec;
     use serde_json::json;
 
     fn assert_valid_rendered(rendered: &RenderedDocument) {
@@ -168,7 +198,7 @@ mod tests {
             member_address: None,
             description: "Taxa Associativa".to_string(),
             reference_month: "2026-10".to_string(),
-            amount: 150.0,
+            amount: dec!(150.0),
             due_date: "2026-10-31".to_string(),
             settled_date: None,
             payment_method: "Pix".to_string(),
@@ -177,9 +207,9 @@ mod tests {
                 id: "item-1".to_string(),
                 description: "Taxa de Manutenção".to_string(),
                 service: None,
-                quantity: 1.0,
-                price: 150.0,
-                total: 150.0,
+                quantity: dec!(1.0),
+                price: dec!(150.0),
+                total: dec!(150.0),
             }],
             taxes: None,
             discount: None,
@@ -1021,10 +1051,10 @@ mod tests {
 
         let scenarios = [
             // (amount, taxes, discount, expected_total_str)
-            (150.0, None, None, "Total: R$ 150"),
-            (150.0, Some(15.5), None, "Total: R$ 165.5"),
-            (150.0, None, Some(20.0), "Total: R$ 130"),
-            (150.0, Some(15.5), Some(20.0), "Total: R$ 145.5"),
+            (dec!(150.0), None, None, "Total: R$ 150"),
+            (dec!(150.0), Some(dec!(15.5)), None, "Total: R$ 165.5"),
+            (dec!(150.0), None, Some(dec!(20.0)), "Total: R$ 130"),
+            (dec!(150.0), Some(dec!(15.5)), Some(dec!(20.0)), "Total: R$ 145.5"),
         ];
 
         for (amount, taxes, discount, expected_total_marker) in scenarios {
@@ -1045,7 +1075,7 @@ mod tests {
                     id: "item-1".to_string(),
                     description: "Serviço Associativo".to_string(),
                     service: None,
-                    quantity: 1.0,
+                    quantity: dec!(1.0),
                     price: amount,
                     total: amount,
                 }],

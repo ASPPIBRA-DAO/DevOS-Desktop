@@ -33,38 +33,66 @@ pub use service::*;
 // Mantém o renderizador Typst disponível na raiz do módulo.
 pub use typst_renderer::*;
 
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::OnceLock;
 
-const SCOPE_COCKPIT_ONLY: u8 = 0;
-const SCOPE_NODE_ONLY: u8 = 1;
-const SCOPE_UNIVERSAL: u8 = 2;
+static ACTIVE_APPLICATION_EDITION: OnceLock<ApplicationEdition> = OnceLock::new();
 
-static ACTIVE_DOCUMENT_SCOPE: AtomicU8 = AtomicU8::new(SCOPE_COCKPIT_ONLY);
-
-fn encode_scope(scope: DocumentScope) -> u8 {
-    match scope {
-        DocumentScope::CockpitOnly => SCOPE_COCKPIT_ONLY,
-        DocumentScope::NodeOnly => SCOPE_NODE_ONLY,
-        DocumentScope::Universal => SCOPE_UNIVERSAL,
-    }
+/// Inicializa imutavelmente a edição do DevOS na subida do executável.
+///
+/// Aplica o princípio do fail-closed: a edição só pode ser configurada uma única vez no boot.
+pub fn initialize_application_edition(edition: ApplicationEdition) -> Result<(), &'static str> {
+    ACTIVE_APPLICATION_EDITION
+        .set(edition)
+        .map_err(|_| "A edição da aplicação já foi previamente configurada e é imutável.")
 }
 
-fn decode_scope(code: u8) -> DocumentScope {
-    match code {
-        SCOPE_COCKPIT_ONLY => DocumentScope::CockpitOnly,
-        SCOPE_NODE_ONLY => DocumentScope::NodeOnly,
-        _ => DocumentScope::Universal,
-    }
+/// Retorna a edição ativa da aplicação, ou erro se o sistema ainda não foi inicializado.
+pub fn get_active_application_edition() -> Result<ApplicationEdition, DocumentError> {
+    ACTIVE_APPLICATION_EDITION
+        .get()
+        .copied()
+        .ok_or_else(|| {
+            DocumentError::UnauthorizedScope(
+                "Operações documentais bloqueadas: a edição da aplicação não foi inicializada."
+                    .to_string(),
+            )
+        })
 }
 
-/// Configura o escopo documental correspondente à edição ativa da aplicação.
-pub fn configure_active_document_scope(scope: DocumentScope) {
-    ACTIVE_DOCUMENT_SCOPE.store(encode_scope(scope), Ordering::SeqCst);
+/// Retorna a edição ativa da aplicação.
+/// Em caso de chamada antes da inicialização, opera em fail-closed retornando Node (compatibilidade retroativa).
+pub fn active_application_edition() -> ApplicationEdition {
+    ACTIVE_APPLICATION_EDITION
+        .get()
+        .copied()
+        .unwrap_or(ApplicationEdition::Node)
+}
+
+/// Configura o escopo documental correspondente à edição ativa da aplicação (compatibilidade).
+pub fn configure_active_document_scope(scope: DocumentScope) -> Result<(), &'static str> {
+    let edition = match scope {
+        DocumentVisibility::CockpitOnly => ApplicationEdition::Cockpit,
+        _ => ApplicationEdition::Node,
+    };
+    initialize_application_edition(edition)
 }
 
 /// Retorna o escopo documental configurado para a edição ativa da aplicação.
+///
+/// FAIL-CLOSED ESTRITO: Se a aplicação não tiver sido inicializada oficialmente via `initialize_application_edition`,
+/// retorna `DocumentVisibility::Uninitialized`, bloqueando todas as operações documentais.
 pub fn active_document_scope() -> DocumentScope {
-    decode_scope(ACTIVE_DOCUMENT_SCOPE.load(Ordering::SeqCst))
+    match ACTIVE_APPLICATION_EDITION.get() {
+        Some(ApplicationEdition::Cockpit) => DocumentVisibility::CockpitOnly,
+        Some(ApplicationEdition::Node) => DocumentVisibility::NodeOnly,
+        None => DocumentVisibility::Uninitialized,
+    }
+}
+
+/// Cria uma instância do `DocumentsService` configurada para uma edição explícita.
+/// Útil para testes automatizados isolados de cada edição sem depender de estado global.
+pub fn documents_service_for_edition(edition: ApplicationEdition) -> DocumentsService {
+    DocumentsService::with_edition(std::sync::Arc::new(TypstDocumentRenderer::new()), edition)
 }
 
 /// Cria uma instância do `DocumentsService` configurada com o renderizador institucional Typst
@@ -78,6 +106,10 @@ pub fn documents_service_with_scope(scope: DocumentScope) -> DocumentsService {
 ///
 /// Atua como ponto canônico de composição (Composition Root) para consumidores que
 /// requerem a pilha documental padrão da aplicação.
-pub fn default_documents_service() -> DocumentsService {
-    documents_service_with_scope(active_document_scope())
+///
+/// Aplica fail-closed estrito: falha com `DocumentError::UnauthorizedScope` caso a aplicação
+/// não tenha sido inicializada oficialmente no boot.
+pub fn default_documents_service() -> Result<DocumentsService, DocumentError> {
+    let edition = get_active_application_edition()?;
+    Ok(documents_service_for_edition(edition))
 }
