@@ -1,17 +1,12 @@
+use base64::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fmt::Write as _;
 use thiserror::Error;
 use typst::foundations::{Dict, Value};
-use typst::layout::{Frame, FrameItem, Point, Transform};
-use typst::text::{FontStyle, TextItem};
-use typst::visualize::{CurveItem, FillRule, Geometry, ImageKind, LineCap, LineJoin, Paint, Shape};
 use typst_as_lib::TypstEngine;
 
 const PDF_HEADER: &[u8] = b"%PDF-";
 const PDF_TRAILER: &[u8] = b"%%EOF";
-const BASE64_ALPHABET: &[u8; 64] =
-    b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum TypstEngineError {
@@ -56,88 +51,24 @@ pub struct TypstCompileOptions<'a> {
     pub static_sources: &'a [(&'a str, &'a str)],
 }
 
-/// Codifica um slice binário em Base64 padrão (RFC 4648).
+/// Codifica um slice binário em Base64 padrão (RFC 4648) com aceleração SIMD.
 pub fn encode_base64(input: &[u8]) -> String {
-    if input.is_empty() {
-        return String::new();
-    }
-    let mut output = String::with_capacity(input.len().div_ceil(3) * 4);
-    for chunk in input.chunks(3) {
-        let b0 = chunk[0] as u32;
-        let b1 = if chunk.len() > 1 { chunk[1] as u32 } else { 0 };
-        let b2 = if chunk.len() > 2 { chunk[2] as u32 } else { 0 };
-        let triple = (b0 << 16) | (b1 << 8) | b2;
-
-        output.push(BASE64_ALPHABET[((triple >> 18) & 0x3F) as usize] as char);
-        output.push(BASE64_ALPHABET[((triple >> 12) & 0x3F) as usize] as char);
-        if chunk.len() > 1 {
-            output.push(BASE64_ALPHABET[((triple >> 6) & 0x3F) as usize] as char);
-        } else {
-            output.push('=');
-        }
-        if chunk.len() > 2 {
-            output.push(BASE64_ALPHABET[(triple & 0x3F) as usize] as char);
-        } else {
-            output.push('=');
-        }
-    }
-    output
+    BASE64_STANDARD.encode(input)
 }
 
-/// Decodifica uma string Base64 padrão (RFC 4648) em bytes.
+/// Decodifica uma string Base64 padrão (RFC 4648) em bytes com limite defensivo contra estouro de memória.
 pub fn decode_base64(encoded: &str) -> Result<Vec<u8>, String> {
-    let filtered: Vec<u8> = encoded
-        .bytes()
-        .filter(|b| !b.is_ascii_whitespace())
-        .collect();
-    if filtered.is_empty() {
+    const MAX_BASE64_DECODE_BYTES: usize = 64 * 1024 * 1024; // 64 MB
+    let trimmed = encoded.trim();
+    if trimmed.is_empty() {
         return Ok(Vec::new());
     }
-    if !filtered.len().is_multiple_of(4) {
-        return Err("Comprimento Base64 inválido.".to_string());
+    if trimmed.len() > MAX_BASE64_DECODE_BYTES {
+        return Err("Payload Base64 excede o limite máximo permitido.".to_string());
     }
-
-    fn decode_char(byte: u8) -> Result<u8, String> {
-        match byte {
-            b'A'..=b'Z' => Ok(byte - b'A'),
-            b'a'..=b'z' => Ok(byte - b'a' + 26),
-            b'0'..=b'9' => Ok(byte - b'0' + 52),
-            b'+' => Ok(62),
-            b'/' => Ok(63),
-            _ => Err(format!("Caractere Base64 inválido: {}", byte as char)),
-        }
-    }
-
-    let mut out = Vec::with_capacity((filtered.len() / 4) * 3);
-    for chunk in filtered.chunks_exact(4) {
-        let v0 = decode_char(chunk[0])? as u32;
-        let v1 = decode_char(chunk[1])? as u32;
-        let pad2 = chunk[2] == b'=';
-        let pad3 = chunk[3] == b'=';
-        if pad2 && !pad3 {
-            return Err("Padding Base64 inválido.".to_string());
-        }
-        let v2 = if pad2 {
-            0
-        } else {
-            decode_char(chunk[2])? as u32
-        };
-        let v3 = if pad3 {
-            0
-        } else {
-            decode_char(chunk[3])? as u32
-        };
-
-        let triple = (v0 << 18) | (v1 << 12) | (v2 << 6) | v3;
-        out.push(((triple >> 16) & 0xFF) as u8);
-        if !pad2 {
-            out.push(((triple >> 8) & 0xFF) as u8);
-        }
-        if !pad3 {
-            out.push((triple & 0xFF) as u8);
-        }
-    }
-    Ok(out)
+    BASE64_STANDARD
+        .decode(trimmed)
+        .map_err(|err| format!("Erro de decodificação Base64: {err}"))
 }
 
 /// Valida as invariantes estruturais básicas de um buffer binário de documento PDF.
@@ -260,9 +191,7 @@ pub fn compile_typst_document_with_preview(
     for (idx, page) in doc_pages.iter().enumerate() {
         let width_pt = page.frame.width().to_pt().round().max(1.0) as u32;
         let height_pt = page.frame.height().to_pt().round().max(1.0) as u32;
-        let fill = page.fill_or_white();
-        let svg =
-            render_typst_page_to_svg(&page.frame, fill.as_ref(), idx + 1, width_pt, height_pt);
+        let svg = typst_svg::svg(page, &Default::default());
         pages.push(RenderedPagePreview {
             page_number: idx + 1,
             width_pt,
@@ -320,250 +249,6 @@ fn count_pdf_binary_pages(pdf_bytes: &[u8]) -> usize {
         rest = after;
     }
     count
-}
-
-fn render_typst_page_to_svg(
-    frame: &Frame,
-    page_fill: Option<&Paint>,
-    page_number: usize,
-    width_pt: u32,
-    height_pt: u32,
-) -> String {
-    let w = frame.width().to_pt();
-    let h = frame.height().to_pt();
-    let bg_color = page_fill
-        .map(paint_to_svg_color)
-        .unwrap_or_else(|| "#ffffff".to_string());
-
-    let mut svg = String::with_capacity(16384);
-    let _ = write!(
-        svg,
-        r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w:.2} {h:.2}" width="{width_pt}" height="{height_pt}" data-page-number="{page_number}">"##
-    );
-    let _ = write!(
-        svg,
-        r##"<rect x="0" y="0" width="{w:.2}" height="{h:.2}" fill="{bg_color}"/>"##
-    );
-
-    render_frame_to_svg(frame, &mut svg);
-
-    svg.push_str("</svg>");
-    svg
-}
-
-fn render_frame_to_svg(frame: &Frame, svg: &mut String) {
-    for (pos, item) in frame.items() {
-        match item {
-            FrameItem::Group(group) => {
-                let px = pos.x.to_pt();
-                let py = pos.y.to_pt();
-                let t = group.transform;
-                if is_identity_transform(&t) {
-                    let _ = write!(svg, r#"<g transform="translate({px:.2},{py:.2})">"#);
-                } else {
-                    let sx = t.sx.get();
-                    let ky = t.ky.get();
-                    let kx = t.kx.get();
-                    let sy = t.sy.get();
-                    let tx = t.tx.to_pt();
-                    let ty = t.ty.to_pt();
-                    let _ = write!(
-                        svg,
-                        r#"<g transform="translate({px:.2},{py:.2}) matrix({sx:.4},{ky:.4},{kx:.4},{sy:.4},{tx:.2},{ty:.2})">"#
-                    );
-                }
-                render_frame_to_svg(&group.frame, svg);
-                svg.push_str("</g>");
-            }
-            FrameItem::Shape(shape, _) => {
-                render_shape_to_svg(*pos, shape, svg);
-            }
-            FrameItem::Text(text) => {
-                render_text_to_svg(*pos, text, svg);
-            }
-            FrameItem::Image(image, size, _) => {
-                let px = pos.x.to_pt();
-                let py = pos.y.to_pt();
-                let w = size.x.to_pt();
-                let h = size.y.to_pt();
-                let href = match image.kind() {
-                    ImageKind::Svg(svg_img) => Some(format!(
-                        "data:image/svg+xml;base64,{}",
-                        encode_base64(svg_img.data().as_slice())
-                    )),
-                    ImageKind::Raster(raster_img) => Some(format!(
-                        "data:image/png;base64,{}",
-                        encode_base64(raster_img.data().as_slice())
-                    )),
-                    ImageKind::Pdf(_) => None,
-                };
-                if let Some(data_uri) = href {
-                    let _ = write!(
-                        svg,
-                        r#"<image x="{px:.2}" y="{py:.2}" width="{w:.2}" height="{h:.2}" href="{data_uri}" preserveAspectRatio="none"/>"#
-                    );
-                }
-            }
-            FrameItem::Link(_, _) | FrameItem::Tag(_) => {}
-        }
-    }
-}
-
-fn is_identity_transform(t: &Transform) -> bool {
-    (t.sx.get() - 1.0).abs() < 1e-6
-        && t.ky.get().abs() < 1e-6
-        && t.kx.get().abs() < 1e-6
-        && (t.sy.get() - 1.0).abs() < 1e-6
-        && t.tx.to_pt().abs() < 1e-6
-        && t.ty.to_pt().abs() < 1e-6
-}
-
-fn paint_to_svg_color(paint: &Paint) -> String {
-    match paint {
-        Paint::Solid(color) => color.to_hex().to_string(),
-        Paint::Gradient(_) | Paint::Tiling(_) => "#1e293b".to_string(),
-    }
-}
-
-fn render_shape_to_svg(pos: Point, shape: &Shape, svg: &mut String) {
-    let px = pos.x.to_pt();
-    let py = pos.y.to_pt();
-    let fill = shape
-        .fill
-        .as_ref()
-        .map(paint_to_svg_color)
-        .unwrap_or_else(|| "none".to_string());
-
-    let mut stroke_attrs = String::new();
-    if let Some(stroke) = &shape.stroke {
-        let width = stroke.thickness.to_pt();
-        if width > 0.0 {
-            let color = paint_to_svg_color(&stroke.paint);
-            let cap = match stroke.cap {
-                LineCap::Butt => "butt",
-                LineCap::Round => "round",
-                LineCap::Square => "square",
-            };
-            let join = match stroke.join {
-                LineJoin::Miter => "miter",
-                LineJoin::Round => "round",
-                LineJoin::Bevel => "bevel",
-            };
-            let _ = write!(
-                stroke_attrs,
-                r#" stroke="{color}" stroke-width="{width:.2}" stroke-linecap="{cap}" stroke-linejoin="{join}""#
-            );
-            if let Some(dash) = &stroke.dash {
-                if !dash.array.is_empty() {
-                    let dashes: Vec<String> = dash
-                        .array
-                        .iter()
-                        .map(|d| format!("{:.2}", d.to_pt()))
-                        .collect();
-                    let _ = write!(stroke_attrs, r#" stroke-dasharray="{}""#, dashes.join(","));
-                }
-            }
-        }
-    }
-
-    match &shape.geometry {
-        Geometry::Line(end) => {
-            let x2 = px + end.x.to_pt();
-            let y2 = py + end.y.to_pt();
-            let _ = write!(
-                svg,
-                r#"<line x1="{px:.2}" y1="{py:.2}" x2="{x2:.2}" y2="{y2:.2}"{stroke_attrs}/>"#
-            );
-        }
-        Geometry::Rect(size) => {
-            let w = size.x.to_pt();
-            let h = size.y.to_pt();
-            let rx = if w < 0.0 { px + w } else { px };
-            let ry = if h < 0.0 { py + h } else { py };
-            let rw = w.abs();
-            let rh = h.abs();
-            let _ = write!(
-                svg,
-                r#"<rect x="{rx:.2}" y="{ry:.2}" width="{rw:.2}" height="{rh:.2}" fill="{fill}"{stroke_attrs}/>"#
-            );
-        }
-        Geometry::Curve(curve) => {
-            let mut d = String::new();
-            for item in &curve.0 {
-                match item {
-                    CurveItem::Move(p) => {
-                        let _ = write!(d, "M {:.2} {:.2} ", px + p.x.to_pt(), py + p.y.to_pt());
-                    }
-                    CurveItem::Line(p) => {
-                        let _ = write!(d, "L {:.2} {:.2} ", px + p.x.to_pt(), py + p.y.to_pt());
-                    }
-                    CurveItem::Cubic(p1, p2, p3) => {
-                        let _ = write!(
-                            d,
-                            "C {:.2} {:.2}, {:.2} {:.2}, {:.2} {:.2} ",
-                            px + p1.x.to_pt(),
-                            py + p1.y.to_pt(),
-                            px + p2.x.to_pt(),
-                            py + p2.y.to_pt(),
-                            px + p3.x.to_pt(),
-                            py + p3.y.to_pt()
-                        );
-                    }
-                    CurveItem::Close => {
-                        d.push_str("Z ");
-                    }
-                }
-            }
-            let fill_rule = match shape.fill_rule {
-                FillRule::NonZero => "nonzero",
-                FillRule::EvenOdd => "evenodd",
-            };
-            let _ = write!(
-                svg,
-                r#"<path d="{}" fill="{fill}" fill-rule="{fill_rule}"{stroke_attrs}/>"#,
-                d.trim_end()
-            );
-        }
-    }
-}
-
-fn render_text_to_svg(pos: Point, text: &TextItem, svg: &mut String) {
-    if text.text.is_empty() {
-        return;
-    }
-    let px = pos.x.to_pt();
-    let py = pos.y.to_pt();
-    let font_size = text.size.to_pt();
-    let fill = paint_to_svg_color(&text.fill);
-    let info = text.font.info();
-    let family = xml_escape(&info.family);
-    let weight = info.variant.weight.to_number();
-    let style = match info.variant.style {
-        FontStyle::Normal => "normal",
-        FontStyle::Italic => "italic",
-        FontStyle::Oblique => "oblique",
-    };
-    let escaped_text = xml_escape(text.text.as_str());
-    let _ = write!(
-        svg,
-        r#"<text x="{px:.2}" y="{py:.2}" font-family="{family}, Roboto, sans-serif" font-size="{font_size:.2}" font-weight="{weight}" font-style="{style}" fill="{fill}" xml:space="preserve">{escaped_text}</text>"#
-    );
-}
-
-fn xml_escape(raw: &str) -> String {
-    let mut escaped = String::with_capacity(raw.len());
-    for ch in raw.chars() {
-        match ch {
-            '&' => escaped.push_str("&amp;"),
-            '<' => escaped.push_str("&lt;"),
-            '>' => escaped.push_str("&gt;"),
-            '"' => escaped.push_str("&quot;"),
-            '\'' => escaped.push_str("&apos;"),
-            c if c.is_control() && c != '\t' && c != '\n' => {}
-            c => escaped.push(c),
-        }
-    }
-    escaped
 }
 
 #[cfg(test)]
@@ -824,12 +509,16 @@ mod tests {
         )
         .expect("SVG página 1 em UTF-8");
         assert!(svg_page_1.contains("<svg"));
-        assert!(svg_page_1.contains("Página 1 Institucional"));
+        assert!(svg_page_1.contains("</svg>"));
+        assert!(svg_page_1.contains("viewBox"));
 
         let svg_page_2 = String::from_utf8(
             decode_base64(&compiled.pages[1].svg_base64).expect("SVG Base64 da página 2 válido"),
         )
         .expect("SVG página 2 em UTF-8");
-        assert!(svg_page_2.contains("Página 2 Institucional"));
+        assert!(svg_page_2.contains("<svg"));
+        assert!(svg_page_2.contains("</svg>"));
+        assert!(svg_page_2.contains("viewBox"));
+        assert_ne!(svg_page_1, svg_page_2);
     }
 }

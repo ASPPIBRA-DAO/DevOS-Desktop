@@ -117,6 +117,7 @@ version = "1.0.0"
 dependencies = [
  "aes-gcm",
  "argon2",
+ "base64 0.22.1",
  "bip32",
  "bip39",
  "calamine",
@@ -144,6 +145,7 @@ dependencies = [
  "typst",
  "typst-as-lib",
  "typst-pdf",
+ "typst-svg",
  "uuid",
  "zeroize",
 ]

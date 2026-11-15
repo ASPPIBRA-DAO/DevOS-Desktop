@@ -3,7 +3,7 @@ name = "app"
 version = "1.0.0"
 description = "ASPPIBRA DevOS Desktop — Native Core com Cofre Criptográfico e Infraestrutura DePIN"
 edition = "2024"
-rust-version = "1.90"
+rust-version = "1.92"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -18,7 +18,7 @@ tauri-build = { version = "2.7.1", features = [] }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive", "rc"] }
 log = "0.4"
-tauri = { version = "2.12.1", features = ["devtools"] }
+tauri = { version = "2.12.1", features = [] }
 tauri-plugin-log = "2"
 bip39 = { version = "2.1", features = ["rand"] }
 bip32 = { version = "0.5", features = ["secp256k1"] }
@@ -27,6 +27,7 @@ aes-gcm = "0.10"
 argon2 = "0.5"
 rand = "0.8"
 hex = "0.4"
+base64 = "0.22"
 zeroize = { version = "1.8", features = ["derive"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "multipart", "stream"] }
 chrono = { version = "0.4", features = ["serde"] }
@@ -41,6 +42,7 @@ uuid = { version = "1", features = ["v4"] }
 typst = "0.15"
 typst-as-lib = "0.17"
 typst-pdf = "0.15"
+typst-svg = "0.15"
 dirs = "6"
 open = "5"
 rust_decimal = { version = "1.36", features = ["serde-with-float", "serde-with-str"] }
