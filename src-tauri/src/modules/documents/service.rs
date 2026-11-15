@@ -3,97 +3,74 @@ use sha2::{Digest, Sha256};
 use std::sync::Arc;
 
 use crate::modules::documents::models::{
-    DocumentError, DocumentKind, DocumentMetadata, DocumentOutput, DocumentRequest, DocumentScope,
+    ApplicationEdition, DocumentError, DocumentKind, DocumentMetadata, DocumentOutput,
+    DocumentRequest, DocumentScope, DocumentVisibility,
 };
 use crate::modules::documents::ports::DocumentRenderer;
+use crate::modules::documents::preview_store::{DocumentPreviewStore, StoredDocumentPreview};
 use crate::platform::typst_engine::RenderedPagePreview;
 
 /// Serviço orquestrador para geração, autorização, validação e integridade de documentos canônicos.
 ///
 /// Atua como camada de coordenação e domínio:
-/// 1. Valida o payload de entrada contra regras estruturais e de integridade (`request.validate()`).
-/// 2. Valida a autorização de escopo contra o contexto confiável do backend (`self.validate_scope()`).
+/// 1. Valida a autorização de escopo contra a edição confiável do sistema (`self.validate_scope()`).
+/// 2. Valida o payload de entrada contra regras estruturais e de integridade (`request.validate()`).
 /// 3. Verifica se o renderizador injetado suporta o tipo documental solicitado (`self.renderer.supports()`).
-/// 4. Delega a compilação física ao adaptador de renderização (`self.renderer.render()`).
+/// 4. Delega a compilação física ao adaptador de renderização (`self.renderer.render()` ou `render_pdf_only()`).
 /// 5. Garante a integridade documental calculando o hash SHA-256 canônico,
 ///    o tamanho em bytes, o carimbo de data/hora UTC e os metadados de emissão.
 #[derive(Clone)]
 pub struct DocumentsService {
     renderer: Arc<dyn DocumentRenderer>,
-    system_scope: DocumentScope,
+    edition: ApplicationEdition,
 }
 
 impl DocumentsService {
-    /// Inicializa o serviço com um renderizador injetado via `Arc` no escopo padrão Universal.
-    pub fn new(renderer: Arc<dyn DocumentRenderer>) -> Self {
-        Self {
-            renderer,
-            system_scope: DocumentScope::Universal,
-        }
-    }
-
-    /// Alias semântico para inicialização com renderizador injetado via `Arc`.
-    pub fn with_renderer(renderer: Arc<dyn DocumentRenderer>) -> Self {
-        Self::new(renderer)
-    }
-
-    /// Inicializa o serviço com qualquer implementação concreta de `DocumentRenderer`.
-    pub fn new_with_renderer<R: DocumentRenderer + 'static>(renderer: R) -> Self {
-        Self::new(Arc::new(renderer))
-    }
-
-    /// Inicializa o serviço com um renderizador e um escopo de sistema autorizado específico.
-    pub fn with_scope(renderer: Arc<dyn DocumentRenderer>, system_scope: DocumentScope) -> Self {
-        Self {
-            renderer,
-            system_scope,
-        }
-    }
-
     /// Inicializa o serviço com um renderizador e uma edição explícita da aplicação (`ApplicationEdition`).
-    pub fn with_edition(
-        renderer: Arc<dyn DocumentRenderer>,
-        edition: crate::modules::documents::models::ApplicationEdition,
-    ) -> Self {
-        let system_scope = match edition {
-            crate::modules::documents::models::ApplicationEdition::Cockpit => {
-                crate::modules::documents::models::DocumentVisibility::CockpitOnly
-            }
-            crate::modules::documents::models::ApplicationEdition::Node => {
-                crate::modules::documents::models::DocumentVisibility::NodeOnly
-            }
-        };
-        Self::with_scope(renderer, system_scope)
+    pub fn with_edition(renderer: Arc<dyn DocumentRenderer>, edition: ApplicationEdition) -> Self {
+        Self { renderer, edition }
     }
 
+    // TODO(dívida): remover junto com documents_service_with_scope
+    /// Inicializa o serviço validando se o escopo de sistema corresponde a uma edição autorizada.
+    ///
+    /// Rejeita `Universal` e `Uninitialized`, pois não representam perfis de execução reais.
+    pub fn with_scope(
+        renderer: Arc<dyn DocumentRenderer>,
+        system_scope: DocumentScope,
+    ) -> Result<Self, DocumentError> {
+        let edition = ApplicationEdition::try_from_scope(system_scope)?;
+        Ok(Self::with_edition(renderer, edition))
+    }
+
+    /// Retorna a edição da aplicação configurada no serviço.
+    pub fn edition(&self) -> ApplicationEdition {
+        self.edition
+    }
+
+    // TODO(dívida): remover após migrar document_commands.rs e reports/engine.rs
     /// Retorna o escopo de sistema atualmente configurado no serviço.
     pub fn system_scope(&self) -> DocumentScope {
-        self.system_scope
+        let visibility: DocumentVisibility = self.edition.as_visibility();
+        visibility
     }
 
-    /// Valida se o escopo exigido é autorizado pelo contexto do sistema.
+    // TODO(dívida): remover após migrar document_commands.rs e reports/engine.rs
+    /// Valida se o escopo exigido é autorizado pelo contexto do sistema delegando à fonte canônica da verdade.
     pub fn validate_scope_for(&self, required: DocumentScope) -> Result<(), DocumentError> {
-        if self.system_scope == DocumentScope::Uninitialized {
-            return Err(DocumentError::UnauthorizedScope(
-                "Operações documentais bloqueadas: a edição da aplicação não foi inicializada."
-                    .to_string(),
-            ));
-        }
-
-        match (required, self.system_scope) {
-            (DocumentScope::Universal, _) => Ok(()),
-            (DocumentScope::CockpitOnly, DocumentScope::CockpitOnly) => Ok(()),
-            (DocumentScope::NodeOnly, DocumentScope::NodeOnly) => Ok(()),
-            _ => Err(DocumentError::UnauthorizedScope(format!(
-                "Emissão não autorizada: o escopo exigido {required:?} é incompatível com o contexto ativo {:?}",
-                self.system_scope
-            ))),
+        if required.is_allowed_for(self.edition) {
+            Ok(())
+        } else {
+            Err(DocumentError::UnauthorizedScope(format!(
+                "Emissão não autorizada: o escopo exigido {required:?} é incompatível com a edição ativa {:?}.",
+                self.edition
+            )))
         }
     }
 
     /// Verifica se o escopo exigido pelo tipo documental é autorizado pelo contexto do sistema.
     fn validate_scope(&self, kind: DocumentKind) -> Result<(), DocumentError> {
-        self.validate_scope_for(kind.required_scope())
+        self.validate_scope_for(kind.required_visibility())
     }
 
     /// Valida o pipeline comum (autorização de escopo, regras de payload e suporte do renderizador).
@@ -158,6 +135,20 @@ impl DocumentsService {
         let rendered = self.renderer.render(request)?;
         let output = Self::build_document_output(kind, rendered.pdf_bytes)?;
         Ok((output, rendered.pages))
+    }
+
+    /// Gera o documento com suas páginas vetoriais e o armazena no store em memória utilizando
+    /// o escopo confiável do próprio serviço, garantindo que o chamador não possa forjar o escopo.
+    pub fn generate_preview(
+        &self,
+        request: DocumentRequest,
+        store: &DocumentPreviewStore,
+    ) -> Result<StoredDocumentPreview, DocumentError> {
+        let (output, pages) = self.generate_document_with_pages(request)?;
+        let stored = store
+            .store_preview(output, pages, self.edition.as_visibility())
+            .map_err(DocumentError::from)?;
+        Ok(stored)
     }
 }
 

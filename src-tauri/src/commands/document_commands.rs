@@ -97,15 +97,11 @@ pub(crate) fn preview_document_with_store_and_scope(
     store: &DocumentPreviewStore,
     active_scope: DocumentScope,
 ) -> Result<DocumentPreviewResult, String> {
-    let service = documents_service_with_scope(active_scope);
+    let service = documents_service_with_scope(active_scope).map_err(public_document_error)?;
 
-    let (output, pages) = service
-        .generate_document_with_pages(payload.request)
+    let stored = service
+        .generate_preview(payload.request, store)
         .map_err(public_document_error)?;
-
-    let stored = store
-        .store_preview(output, pages, active_scope)
-        .map_err(|err| err.public_message())?;
 
     let page_count = stored.pages.len();
     let pdf_base64 = encode_base64(&stored.pdf_bytes);
@@ -140,12 +136,12 @@ pub(crate) fn export_previewed_document_in_directory_with_store_and_scope(
         .begin_export(&preview_id, &expected_sha256, active_scope)
         .map_err(|err| err.public_message())?;
 
-    let kind = reservation.metadata.document_kind;
+    let kind = reservation.metadata().document_kind;
     let file_name = match target_file_name {
         Some(name) => match normalize_pdf_file_name(&name) {
             Ok(valid) => valid,
             Err(err) => {
-                store.abort_export(&reservation);
+                reservation.abort();
                 return Err(err);
             }
         },
@@ -153,14 +149,14 @@ pub(crate) fn export_previewed_document_in_directory_with_store_and_scope(
     };
 
     if fs::create_dir_all(download_dir).is_err() {
-        store.abort_export(&reservation);
+        reservation.abort();
         return Err("Não foi possível preparar o diretório de destino do PDF.".to_string());
     }
 
     let target_path = download_dir.join(&file_name);
 
-    if let Err(err) = write_pdf_without_overwrite(&target_path, &reservation.pdf_bytes) {
-        store.abort_export(&reservation);
+    if let Err(err) = write_pdf_without_overwrite(&target_path, reservation.pdf_bytes()) {
+        reservation.abort();
         return Err(err);
     }
 
@@ -169,23 +165,25 @@ pub(crate) fn export_previewed_document_in_directory_with_store_and_scope(
         Ok(bytes) => bytes,
         Err(_) => {
             let _ = fs::remove_file(&target_path);
-            store.abort_export(&reservation);
+            reservation.abort();
             return Err("Não foi possível verificar a integridade do PDF exportado.".to_string());
         }
     };
 
     let disk_sha256 = hex::encode(Sha256::digest(&disk_bytes));
-    if disk_sha256 != reservation.metadata.sha256_checksum {
+    if disk_sha256 != reservation.metadata().sha256_checksum {
         let _ = fs::remove_file(&target_path);
-        store.abort_export(&reservation);
+        reservation.abort();
         return Err(
             "Falha de integridade pós-gravação: o hash SHA-256 do arquivo divergiu do preview."
                 .to_string(),
         );
     }
 
+    let metadata = reservation.metadata().clone();
+
     // Concretização transacional do ciclo de exportação
-    if let Err(err) = store.confirm_export_success(&reservation) {
+    if let Err(err) = reservation.confirm() {
         return Err(err.public_message());
     }
 
@@ -204,7 +202,7 @@ pub(crate) fn export_previewed_document_in_directory_with_store_and_scope(
         file_path: target_path.to_string_lossy().into_owned(),
         file_name,
         message,
-        metadata: reservation.metadata,
+        metadata,
     })
 }
 
@@ -247,7 +245,7 @@ pub(crate) fn generate_document_in_directory_with_scope(
         None => default_file_name(kind),
     };
 
-    let service = documents_service_with_scope(active_scope);
+    let service = documents_service_with_scope(active_scope).map_err(public_document_error)?;
 
     let output = service
         .generate_document(request)

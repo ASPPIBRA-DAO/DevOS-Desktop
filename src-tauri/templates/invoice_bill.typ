@@ -31,23 +31,17 @@
   message: "invoice_bill.typ: 'invoice.id' é obrigatório e não pode ser vazio.",
 )
 
-#let subtotal_amount = calc.round(data.invoice.amount, digits: 2)
-#let taxes_amount = if "taxes" in data.invoice and data.invoice.taxes != none {
-  calc.round(data.invoice.taxes, digits: 2)
-} else {
-  0.0
-}
-#let discount_amount = if "discount" in data.invoice and data.invoice.discount != none {
-  calc.round(data.invoice.discount, digits: 2)
-} else {
-  0.0
-}
-#let final_total = calc.round(subtotal_amount + taxes_amount - discount_amount, digits: 2)
+#let subtotal_fmt = if "subtotal_fmt" in data.invoice { str(data.invoice.subtotal_fmt) } else if "amount_fmt" in data.invoice { str(data.invoice.amount_fmt) } else { "0,00" }
+#let taxes_fmt = if "taxes_fmt" in data.invoice and data.invoice.taxes_fmt != none { str(data.invoice.taxes_fmt) } else { "0,00" }
+#let discount_fmt = if "discount_fmt" in data.invoice and data.invoice.discount_fmt != none { str(data.invoice.discount_fmt) } else { "0,00" }
+#let final_total_fmt = if "final_total_fmt" in data.invoice { str(data.invoice.final_total_fmt) } else { "0,00" }
+#let has_taxes = taxes_fmt != "0,00" and taxes_fmt != "0.00" and taxes_fmt != "0"
+#let has_discount = discount_fmt != "0,00" and discount_fmt != "0.00" and discount_fmt != "0"
 
 #set document(
   title: "Fatura_" + invoice_id,
   author: asppibra_sigla,
-  description: "Subtotal: R$ " + str(subtotal_amount) + " | Tributos: R$ " + str(taxes_amount) + " | Desconto: R$ " + str(discount_amount) + " | Total: R$ " + str(final_total),
+  description: "Subtotal: R$ " + subtotal_fmt + " | Tributos: R$ " + taxes_fmt + " | Desconto: R$ " + discount_fmt + " | Total: R$ " + final_total_fmt,
 )
 
 #set page(
@@ -207,9 +201,9 @@
           #text(size: font_size_caption, fill: color_muted_text)[#item.service]
         ]
       ],
-      text(size: font_size_subtitle, fill: color_primary_text)[#item.quantity],
-      text(size: font_size_subtitle, fill: color_primary_text)[R\$ #calc.round(item.price, digits: 2)],
-      text(size: 8pt, weight: "bold", fill: color_primary)[R\$ #calc.round(item.total, digits: 2)],
+      text(size: font_size_subtitle, fill: color_primary_text)[#if "quantity_fmt" in item { item.quantity_fmt } else { "1" }],
+      text(size: font_size_subtitle, fill: color_primary_text)[R\$ #if "price_fmt" in item { item.price_fmt } else { "0,00" }],
+      text(size: 8pt, weight: "bold", fill: color_primary)[R\$ #if "total_fmt" in item { item.total_fmt } else { "0,00" }],
     )
   }
 )
@@ -231,25 +225,25 @@
         row-gutter: 5pt,
         align: (left + horizon, right + horizon),
         text(size: font_size_subtitle, fill: color_secondary_text)[Subtotal:],
-        text(size: 8pt, weight: "bold", fill: color_primary_text)[R\$ #subtotal_amount],
+        text(size: 8pt, weight: "bold", fill: color_primary_text)[R\$ #subtotal_fmt],
 
-        ..(if taxes_amount > 0 {
+        ..(if has_taxes {
           (
             text(size: font_size_subtitle, fill: color_secondary_text)[Tributos / Taxas:],
-            text(size: 8pt, fill: color_primary_text)[R\$ #taxes_amount],
+            text(size: 8pt, fill: color_primary_text)[R\$ #taxes_fmt],
           )
         } else { () }),
-        ..(if discount_amount > 0 {
+        ..(if has_discount {
           (
             text(size: font_size_subtitle, fill: color_secondary_text)[Desconto:],
-            text(size: 8pt, fill: color_status_paid)[- R\$ #discount_amount],
+            text(size: 8pt, fill: color_status_paid)[- R\$ #discount_fmt],
           )
         } else { () }),
 
         grid.hline(stroke: 1pt + color_gold),
         text(size: font_size_section, weight: "bold", fill: color_primary)[VALOR TOTAL:],
         text(size: font_size_heading, weight: "bold", fill: if data.invoice.status == "paid" { color_status_paid } else { color_primary })[
-          R\$ #final_total
+          R\$ #final_total_fmt
         ],
       )
     ]

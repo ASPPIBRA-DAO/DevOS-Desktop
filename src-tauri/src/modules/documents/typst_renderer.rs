@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use rust_decimal::{Decimal, RoundingStrategy};
+
 use crate::modules::documents::models::{DocumentError, DocumentKind, DocumentRequest};
 use crate::modules::documents::ports::{DocumentRenderer, RenderedDocument};
 use crate::platform::typst_engine::{
@@ -44,6 +46,8 @@ static ROBOTO_REGULAR: &[u8] = include_bytes!("../../../assets/fonts/Roboto-Regu
 
 static ROBOTO_BOLD: &[u8] = include_bytes!("../../../assets/fonts/Roboto-Bold.ttf");
 
+static CANONICAL_FONTS: &[&[u8]] = &[ROBOTO_REGULAR, ROBOTO_BOLD];
+
 /// Adaptador de renderização documental baseado no compilador nativo Typst.
 ///
 /// Encapsula o carregamento dos templates `.typ`, fontes institucionais,
@@ -60,6 +64,61 @@ impl TypstDocumentRenderer {
     }
 }
 
+/// Formata um valor `Decimal` no padrão monetário brasileiro (ex.: 1234.56 -> "1.234,56", 10.0 -> "10,00").
+pub fn format_decimal_br(val: Decimal) -> String {
+    let rounded = val.round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero);
+    let is_negative = rounded.is_sign_negative() && !rounded.is_zero();
+    let abs_val = rounded.abs();
+    let s = format!("{:.2}", abs_val);
+    let parts: Vec<&str> = s.split('.').collect();
+    let int_part = parts[0];
+    let frac_part = if parts.len() > 1 { parts[1] } else { "00" };
+
+    let int_bytes = int_part.as_bytes();
+    let len = int_bytes.len();
+    let mut formatted_int = String::with_capacity(len + (len / 3));
+
+    for (idx, &byte) in int_bytes.iter().enumerate() {
+        if idx > 0 && (len - idx).is_multiple_of(3) {
+            formatted_int.push('.');
+        }
+        formatted_int.push(byte as char);
+    }
+
+    let sign = if is_negative { "-" } else { "" };
+    format!("{sign}{formatted_int},{frac_part}")
+}
+
+/// Formata uma quantidade `Decimal` no padrão numérico brasileiro (até 4 casas decimais, sem zeros à direita supérfluos e sem ",00" em inteiros).
+pub(crate) fn format_quantity_br(q: Decimal) -> String {
+    let normalized = q
+        .round_dp_with_strategy(4, RoundingStrategy::MidpointAwayFromZero)
+        .normalize();
+    let is_negative = normalized.is_sign_negative() && !normalized.is_zero();
+    let abs_val = normalized.abs();
+    let s = abs_val.to_string();
+    let parts: Vec<&str> = s.split('.').collect();
+    let int_part = parts[0];
+
+    let int_bytes = int_part.as_bytes();
+    let len = int_bytes.len();
+    let mut formatted_int = String::with_capacity(len + (len / 3));
+
+    for (idx, &byte) in int_bytes.iter().enumerate() {
+        if idx > 0 && (len - idx).is_multiple_of(3) {
+            formatted_int.push('.');
+        }
+        formatted_int.push(byte as char);
+    }
+
+    let sign = if is_negative { "-" } else { "" };
+    if parts.len() > 1 && !parts[1].is_empty() {
+        format!("{sign}{formatted_int},{}", parts[1])
+    } else {
+        format!("{sign}{formatted_int}")
+    }
+}
+
 impl TypstDocumentRenderer {
     fn resolve_template_and_payload(
         request: &DocumentRequest,
@@ -73,8 +132,89 @@ impl TypstDocumentRenderer {
             }
 
             DocumentRequest::InvoiceBill(payload) => {
+                let final_total = payload.final_total()?;
+                let mut invoice_json = serde_json::to_value(payload)
+                    .map_err(|error| DocumentError::SerializationError(error.to_string()))?;
+
+                if let serde_json::Value::Object(ref mut map) = invoice_json {
+                    // Remove identificadores legados que não fazem parte do contrato visual do Typst
+                    map.remove("d1_protocol");
+
+                    let amount_fmt = format_decimal_br(payload.amount);
+                    let taxes_fmt = format_decimal_br(payload.taxes.unwrap_or(Decimal::ZERO));
+                    let discount_fmt = format_decimal_br(payload.discount.unwrap_or(Decimal::ZERO));
+                    let final_total_fmt = format_decimal_br(final_total);
+
+                    map.insert(
+                        "amount_fmt".to_string(),
+                        serde_json::Value::String(amount_fmt.clone()),
+                    );
+                    map.insert(
+                        "subtotal_fmt".to_string(),
+                        serde_json::Value::String(amount_fmt),
+                    );
+                    map.insert(
+                        "taxes_fmt".to_string(),
+                        serde_json::Value::String(taxes_fmt),
+                    );
+                    map.insert(
+                        "discount_fmt".to_string(),
+                        serde_json::Value::String(discount_fmt),
+                    );
+                    map.insert(
+                        "final_total_fmt".to_string(),
+                        serde_json::Value::String(final_total_fmt),
+                    );
+
+                    let formatted_items: Vec<serde_json::Value> = payload
+                        .items
+                        .iter()
+                        .map(|item| {
+                            let mut item_map = serde_json::Map::new();
+                            item_map.insert("id".to_string(), serde_json::Value::String(item.id.clone()));
+                            item_map.insert(
+                                "description".to_string(),
+                                serde_json::Value::String(item.description.clone()),
+                            );
+                            if let Some(ref service) = item.service {
+                                item_map.insert(
+                                    "service".to_string(),
+                                    serde_json::Value::String(service.clone()),
+                                );
+                            }
+                            item_map.insert(
+                                "quantity".to_string(),
+                                serde_json::Value::String(item.quantity.to_string()),
+                            );
+                            item_map.insert(
+                                "price".to_string(),
+                                serde_json::Value::String(item.price.to_string()),
+                            );
+                            item_map.insert(
+                                "total".to_string(),
+                                serde_json::Value::String(item.total.to_string()),
+                            );
+                            item_map.insert(
+                                "quantity_fmt".to_string(),
+                                serde_json::Value::String(format_quantity_br(item.quantity)),
+                            );
+                            item_map.insert(
+                                "price_fmt".to_string(),
+                                serde_json::Value::String(format_decimal_br(item.price)),
+                            );
+                            item_map.insert(
+                                "total_fmt".to_string(),
+                                serde_json::Value::String(format_decimal_br(item.total)),
+                            );
+                            serde_json::Value::Object(item_map)
+                        })
+                        .collect();
+
+                    map.insert("items".to_string(), serde_json::Value::Array(formatted_items));
+                }
+
                 let json_value = serde_json::json!({
-                    "invoice": payload
+                    "invoice": invoice_json
                 });
 
                 let json_str = serde_json::to_string(&json_value)
@@ -98,6 +238,23 @@ impl TypstDocumentRenderer {
             }
         }
     }
+
+    /// Constrói de forma centralizada e sem duplicação as opções de compilação Typst.
+    fn build_options(
+        request: &DocumentRequest,
+    ) -> Result<TypstCompileOptions<'static>, DocumentError> {
+        let (template_source, json_payload) = Self::resolve_template_and_payload(request)?;
+
+        let mut string_inputs = HashMap::new();
+        string_inputs.insert("data", json_payload);
+
+        Ok(TypstCompileOptions {
+            template_source,
+            fonts: CANONICAL_FONTS,
+            string_inputs,
+            static_sources: CANONICAL_TYPST_STATIC_SOURCES,
+        })
+    }
 }
 
 impl DocumentRenderer for TypstDocumentRenderer {
@@ -112,17 +269,7 @@ impl DocumentRenderer for TypstDocumentRenderer {
     }
 
     fn render(&self, request: DocumentRequest) -> Result<RenderedDocument, DocumentError> {
-        let (template_source, json_payload) = Self::resolve_template_and_payload(&request)?;
-
-        let mut string_inputs = HashMap::new();
-        string_inputs.insert("data", json_payload);
-
-        let options = TypstCompileOptions {
-            template_source,
-            fonts: &[ROBOTO_REGULAR, ROBOTO_BOLD],
-            string_inputs,
-            static_sources: CANONICAL_TYPST_STATIC_SOURCES,
-        };
+        let options = Self::build_options(&request)?;
 
         let compiled = compile_typst_document_with_preview(options)
             .map_err(|error| DocumentError::CompilationError(error.to_string()))?;
@@ -134,17 +281,7 @@ impl DocumentRenderer for TypstDocumentRenderer {
     }
 
     fn render_pdf_only(&self, request: DocumentRequest) -> Result<RenderedDocument, DocumentError> {
-        let (template_source, json_payload) = Self::resolve_template_and_payload(&request)?;
-
-        let mut string_inputs = HashMap::new();
-        string_inputs.insert("data", json_payload);
-
-        let options = TypstCompileOptions {
-            template_source,
-            fonts: &[ROBOTO_REGULAR, ROBOTO_BOLD],
-            string_inputs,
-            static_sources: CANONICAL_TYPST_STATIC_SOURCES,
-        };
+        let options = Self::build_options(&request)?;
 
         let pdf_bytes = compile_typst_document_to_pdf(options)
             .map_err(|error| DocumentError::CompilationError(error.to_string()))?;

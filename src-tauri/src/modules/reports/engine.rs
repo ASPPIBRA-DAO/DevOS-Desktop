@@ -68,6 +68,7 @@ pub fn compile_document_pdf_with_scope(
     scope: DocumentScope,
 ) -> Result<Vec<u8>, String> {
     documents_service_with_scope(scope)
+        .map_err(|e| e.to_string())?
         .generate_document(request)
         .map(|output| output.pdf_bytes.to_vec())
         .map_err(|error| error.to_string())

@@ -121,7 +121,6 @@ pub fn run() {
             panic!("[Startup] Falha crítica de segurança: {err}");
         }
     };
-    let _ = modules::documents::initialize_application_edition(edition);
 
     let builder = tauri::Builder::default()
         .setup(move |app| {
@@ -133,6 +132,18 @@ pub fn run() {
                         .build(),
                 )?;
             }
+
+            // 0. Inicializar imutavelmente a edição do módulo de documentos no boot
+            modules::documents::initialize_application_edition(edition).map_err(|error| {
+                log::error!(
+                    "[Startup] Falha crítica ao inicializar a edição de documentos da aplicação: {}",
+                    error
+                );
+                startup_error(
+                    "Falha crítica ao inicializar a edição de documentos da aplicação",
+                    error,
+                )
+            })?;
 
             // 1. Resolver diretórios de dados nativos
             let app_handle = app.handle();

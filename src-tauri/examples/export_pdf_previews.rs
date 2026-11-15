@@ -1,3 +1,4 @@
+use app_lib::modules::documents::models::InvoiceStatus;
 use app_lib::modules::reports::engine::{compile_citizen_ledger_pdf, compile_invoice_pdf};
 use app_lib::modules::reports::models::{
     CitizenLedgerPayload, InvoiceReportItem, InvoiceReportPayload,
@@ -7,12 +8,15 @@ use serde_json::json;
 use std::fs;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let _ = app_lib::modules::documents::initialize_application_edition(
+        app_lib::modules::documents::ApplicationEdition::Cockpit,
+    );
     let output_dir = std::env::temp_dir().join("pdf_previews");
     fs::create_dir_all(&output_dir)?;
 
     // 1. Compilar Extrato do Cidadão (Citizen Ledger)
     let citizen_payload = CitizenLedgerPayload {
-        associate_id: Some("ASSOC-2026-7788".to_string()),
+        associate_id: Some("1042".to_string()),
         data: json!({
             "meta": {
                 "generated_at": "29/10/2026 14:00 UTC",
@@ -90,7 +94,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         due_date: "2026-11-10".to_string(),
         settled_date: Some("2026-10-28".to_string()),
         payment_method: "Pix Dinâmico / Protocolo D1".to_string(),
-        status: "paid".to_string(),
+        status: InvoiceStatus::Paid,
         items: vec![
             InvoiceReportItem {
                 id: "ITM-01".to_string(),
