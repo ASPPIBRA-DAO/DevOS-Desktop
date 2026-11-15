@@ -57,6 +57,18 @@ export const BLANK_SHEETS_REGISTRY: BlankSheetItem[] = [
         document_number: 'ABNT-NBR-14724/FOLHA-BASE',
         auth_code: '2026-ABNT-CANONICAL',
         data: {
+          cedenteNome: 'ASSOCIAÇÃO DOS PROPRIETÁRIOS E POSSEIROS DE IMÓVEIS NO BRASIL',
+          cedenteCpf: '55.666.777/0001-88',
+          cedenteNacionalidade: 'Brasileira',
+          cedenteEstadoCivil: 'Pessoa Jurídica de Direito Privado',
+          cedenteEndereco: 'Avenida Central, 450, Centro, Maricá/RJ',
+          cessionarioNome: 'ADMINISTRADOR DE SISTEMAS DEVOS COCKPIT',
+          cessionarioCpf: '000.000.000-00',
+          cessionarioNacionalidade: 'Brasileiro',
+          cessionarioEstadoCivil: 'Entidade Autônoma Descentralizada',
+          cessionarioEndereco: 'Rede Local P2P',
+          numeroLote: '01',
+          quadraLote: 'A',
           is_blank_sheet: true,
           sheet_title: 'FOLHA A4 ABNT INSTITUCIONAL (CANÔNICA)',
           contract_title: 'FOLHA A4 ABNT INSTITUCIONAL (CANÔNICA)',
@@ -113,7 +125,7 @@ export const BLANK_SHEETS_REGISTRY: BlankSheetItem[] = [
     sampleRequest: {
       kind: 'citizen_ledger',
       payload: {
-        associate_id: 'FOLHA-GRID-ANALYTICS-A4',
+        associate_id: 'GRID-HIGH-DENSITY',
         data: {
           meta: {
             generated_at: '11/11/2026',
@@ -177,6 +189,7 @@ export const BLANK_SHEETS_REGISTRY: BlankSheetItem[] = [
       kind: 'real_estate_reconciliation',
       payload: {
         data: {
+          generatedAt: '11/11/2026',
           batch_id: 'CERT-PAISAGEM-2026',
           generated_at: '11/11/2026',
           metrics: {
@@ -239,6 +252,8 @@ export const DOCUMENT_TEMPLATES_REGISTRY: DocumentTemplateItem[] = [
           cessionarioRg: '98.765.432-1 DETRAN/RJ',
           cessionarioCpf: '555.666.777-88',
           cessionarioEndereco: 'Avenida Central, 450, Centro, Maricá/RJ',
+          numeroLote: '42',
+          quadraLote: '12',
           imovelDenominacao: 'Sítio Recanto das Águas • Lote 42',
           imovelLocalizacao: 'Distrito de Inoã, Município de Maricá/RJ',
           imovelAreaTotal: '15.000,00 m²',
@@ -266,7 +281,7 @@ export const DOCUMENT_TEMPLATES_REGISTRY: DocumentTemplateItem[] = [
     sampleRequest: {
       kind: 'citizen_ledger',
       payload: {
-        associate_id: 'ASSOC-MODELO-01',
+        associate_id: 'ASSOC-042',
         data: {
           meta: {
             generated_at: '11/11/2026',
@@ -384,6 +399,7 @@ export const DOCUMENT_TEMPLATES_REGISTRY: DocumentTemplateItem[] = [
       kind: 'real_estate_reconciliation',
       payload: {
         data: {
+          generatedAt: '11/11/2026 às 10:00:00 UTC',
           header: {
             title: 'RELATÓRIO OFICIAL DE RECONCILIAÇÃO TERRITORIAL',
             subtitle: 'Prefeitura Municipal de Maricá & ASPPIBRA • Base Cadastral Mapa5',

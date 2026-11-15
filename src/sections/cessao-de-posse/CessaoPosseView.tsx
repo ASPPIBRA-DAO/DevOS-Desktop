@@ -119,6 +119,18 @@ export function CessaoPosseView() {
     asppibraAgencia: '0001',
     asppibraConta: '6193441-3',
     asppibraChavePix: '26.325.396/0001-30',
+    cedenteNome: 'CARLOS EDUARDO SILVA (CEDENTE MODELO)',
+    cedenteCpf: '111.222.333-44',
+    cedenteNacionalidade: 'Brasileiro',
+    cedenteEstadoCivil: 'Casado',
+    cedenteEndereco: 'Estrada Velha de Maricá, Km 12, Maricá/RJ',
+    cessionarioNome: 'MARIA APARECIDA SANTOS (CESSIONÁRIA MODELO)',
+    cessionarioCpf: '555.666.777-88',
+    cessionarioNacionalidade: 'Brasileira',
+    cessionarioEstadoCivil: 'Solteira',
+    cessionarioEndereco: 'Avenida Central, 450, Centro, Maricá/RJ',
+    numeroLote: '42',
+    quadraLote: '12',
   };
 
   const handleExportNativePdf = async () => {
