@@ -61,7 +61,7 @@ pub struct GenerateDocumentResult {
 pub fn generate_document(
     payload: GenerateDocumentPayload,
 ) -> Result<GenerateDocumentResult, String> {
-    let download_dir = resolve_download_dir();
+    let download_dir = resolve_download_dir()?;
 
     generate_document_in_directory(payload, &download_dir)
 }
@@ -82,7 +82,7 @@ pub fn preview_document(payload: PreviewDocumentPayload) -> Result<DocumentPrevi
 pub fn export_previewed_document(
     payload: ExportPreviewPayload,
 ) -> Result<GenerateDocumentResult, String> {
-    let download_dir = resolve_download_dir();
+    let download_dir = resolve_download_dir()?;
 
     export_previewed_document_in_directory_with_store_and_scope(
         payload,
@@ -161,8 +161,9 @@ pub(crate) fn export_previewed_document_in_directory_with_store_and_scope(
     }
 
     // Confirmação criptográfica pós-gravação: o arquivo gravado possui exatamente o mesmo SHA-256 do preview
-    let disk_bytes = match fs::read(&target_path) {
-        Ok(bytes) => bytes,
+    // Utiliza streaming em blocos (64 KB) para não duplicar o arquivo em memória
+    let disk_sha256 = match compute_file_sha256(&target_path) {
+        Ok(hash) => hash,
         Err(_) => {
             let _ = fs::remove_file(&target_path);
             reservation.abort();
@@ -170,7 +171,6 @@ pub(crate) fn export_previewed_document_in_directory_with_store_and_scope(
         }
     };
 
-    let disk_sha256 = hex::encode(Sha256::digest(&disk_bytes));
     if disk_sha256 != reservation.metadata().sha256_checksum {
         let _ = fs::remove_file(&target_path);
         reservation.abort();
@@ -182,8 +182,9 @@ pub(crate) fn export_previewed_document_in_directory_with_store_and_scope(
 
     let metadata = reservation.metadata().clone();
 
-    // Concretização transacional do ciclo de exportação
+    // Concretização transacional do ciclo de exportação: se falhar, limpa o arquivo do disco
     if let Err(err) = reservation.confirm() {
+        let _ = fs::remove_file(&target_path);
         return Err(err.public_message());
     }
 
@@ -206,11 +207,32 @@ pub(crate) fn export_previewed_document_in_directory_with_store_and_scope(
     })
 }
 
-/// Resolve o diretório padrão, preservando a ordem de preferência existente.
-fn resolve_download_dir() -> PathBuf {
+/// Resolve o diretório padrão de download do usuário. Retorna erro explícito caso não encontre
+/// um diretório persistente adequado, impedindo o salvamento silencioso na pasta temporária.
+fn resolve_download_dir() -> Result<PathBuf, String> {
     dirs::download_dir()
         .or_else(|| dirs::home_dir().map(|home| home.join("Downloads")))
-        .unwrap_or_else(std::env::temp_dir)
+        .ok_or_else(|| {
+            "Não foi possível localizar o diretório de Downloads do usuário no sistema operacional."
+                .to_string()
+        })
+}
+
+/// Calcula o hash SHA-256 de um arquivo em disco via streaming em blocos (64 KB),
+/// evitando duplicar a alocação de memória para documentos de grande porte.
+fn compute_file_sha256(path: &Path) -> Result<String, std::io::Error> {
+    use std::io::Read;
+    let mut file = fs::File::open(path)?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0u8; 65536];
+    loop {
+        let bytes_read = file.read(&mut buffer)?;
+        if bytes_read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..bytes_read]);
+    }
+    Ok(hex::encode(hasher.finalize()))
 }
 
 /// Gera e exporta o documento para o diretório especificado usando o escopo ativo da aplicação.
@@ -289,38 +311,45 @@ fn public_document_error(error: DocumentError) -> String {
     }
 }
 
-/// Produz um nome padrão com precisão de microssegundos para reduzir colisões.
+/// Produz um nome padrão com precisão de microssegundos e entropia para garantir zero colisão.
 fn default_file_name(kind: DocumentKind) -> String {
     let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S_%f");
+    let entropy = &uuid::Uuid::new_v4().simple().to_string()[..6];
 
     match kind {
         DocumentKind::CitizenLedger => {
-            format!("extrato_citizen_ledger_{timestamp}.pdf")
+            format!("extrato_citizen_ledger_{timestamp}_{entropy}.pdf")
         }
         DocumentKind::InvoiceBill => {
-            format!("fatura_associativa_{timestamp}.pdf")
+            format!("fatura_associativa_{timestamp}_{entropy}.pdf")
         }
         DocumentKind::CessaoPosse => {
-            format!("contrato_cessao_posse_{timestamp}.pdf")
+            format!("contrato_cessao_posse_{timestamp}_{entropy}.pdf")
         }
         DocumentKind::RealEstateReconciliation => {
-            format!("reconciliacao_imobiliaria_{timestamp}.pdf")
+            format!("reconciliacao_imobiliaria_{timestamp}_{entropy}.pdf")
         }
     }
 }
 
 /// Valida e normaliza o nome de arquivo recebido pelo IPC.
 ///
-/// Não permite caminhos, separadores ou extensões diferentes de PDF.
+/// Não permite caminhos, separadores, caracteres inválidos em sistemas Windows/Unix,
+/// nomes de dispositivos reservados nem extensões diferentes de PDF.
 /// Quando a extensão estiver ausente, acrescenta `.pdf`.
 fn normalize_pdf_file_name(file_name: &str) -> Result<String, String> {
     if file_name.is_empty()
+        || file_name.len() > 255
         || file_name.trim() != file_name
         || file_name == "."
         || file_name == ".."
-        || file_name
-            .chars()
-            .any(|character| character.is_control() || matches!(character, '/' | '\\' | ':'))
+        || file_name.chars().any(|character| {
+            character.is_control()
+                || matches!(
+                    character,
+                    '/' | '\\' | ':' | '<' | '>' | '"' | '|' | '?' | '*'
+                )
+        })
     {
         return Err(
             "O nome do arquivo é inválido. Informe apenas um nome de arquivo PDF.".to_string(),
@@ -335,21 +364,77 @@ fn normalize_pdf_file_name(file_name: &str) -> Result<String, String> {
         return Err("O nome do arquivo deve ser um único componente, sem diretórios.".to_string());
     }
 
-    match path.extension().and_then(|extension| extension.to_str()) {
-        Some(extension) if extension.eq_ignore_ascii_case("pdf") => Ok(file_name.to_string()),
-        Some(_) => Err("A extensão do arquivo deve ser .pdf.".to_string()),
-        None => Ok(format!("{file_name}.pdf")),
+    let (stem, final_name) = match path.extension().and_then(|extension| extension.to_str()) {
+        Some(extension) if extension.eq_ignore_ascii_case("pdf") => {
+            let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+            (stem, file_name.to_string())
+        }
+        Some(_) => return Err("A extensão do arquivo deve ser .pdf.".to_string()),
+        None => {
+            let full = format!("{file_name}.pdf");
+            if full.len() > 255 {
+                return Err("O nome do arquivo excede o limite máximo permitido.".to_string());
+            }
+            (file_name, full)
+        }
+    };
+
+    if stem.is_empty() || stem.ends_with('.') || stem.ends_with(' ') {
+        return Err("O nome do arquivo não pode terminar com ponto ou espaço.".to_string());
     }
+
+    let stem_upper = stem.to_ascii_uppercase();
+    let is_reserved_windows = matches!(
+        stem_upper.as_str(),
+        "CON"
+            | "PRN"
+            | "AUX"
+            | "NUL"
+            | "COM1"
+            | "COM2"
+            | "COM3"
+            | "COM4"
+            | "COM5"
+            | "COM6"
+            | "COM7"
+            | "COM8"
+            | "COM9"
+            | "LPT1"
+            | "LPT2"
+            | "LPT3"
+            | "LPT4"
+            | "LPT5"
+            | "LPT6"
+            | "LPT7"
+            | "LPT8"
+            | "LPT9"
+    );
+
+    if is_reserved_windows {
+        return Err(
+            "O nome informado é uma palavra reservada do sistema operacional.".to_string(),
+        );
+    }
+
+    Ok(final_name)
 }
 
 /// Cria um PDF sem sobrescrever um arquivo ou link simbólico preexistente.
 ///
+/// Define permissões restritas (0600 em Unix) e executa `flush` síncrono.
 /// Se a escrita falhar, tenta remover o arquivo parcial criado por esta
 /// operação, sem expor o caminho do sistema de arquivos pela fronteira IPC.
 fn write_pdf_without_overwrite(target_path: &Path, pdf_bytes: &[u8]) -> Result<(), String> {
-    let mut file = OpenOptions::new()
-        .write(true)
-        .create_new(true)
+    let mut options = OpenOptions::new();
+    options.write(true).create_new(true);
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+
+    let mut file = options
         .open(target_path)
         .map_err(|error| {
             if error.kind() == std::io::ErrorKind::AlreadyExists {
@@ -359,7 +444,7 @@ fn write_pdf_without_overwrite(target_path: &Path, pdf_bytes: &[u8]) -> Result<(
             }
         })?;
 
-    if file.write_all(pdf_bytes).is_err() {
+    if file.write_all(pdf_bytes).and_then(|_| file.flush()).is_err() {
         drop(file);
         let _ = fs::remove_file(target_path);
 
@@ -453,6 +538,12 @@ mod tests {
             bytes.len(),
             "O tamanho registrado deve corresponder aos bytes do PDF"
         );
+
+        let calculated_hash = hex::encode(Sha256::digest(&bytes));
+        assert_eq!(
+            result.metadata.sha256_checksum, calculated_hash,
+            "O hash SHA-256 gravado no disco deve ser exatamente igual ao registrado no metadata"
+        );
     }
 
     #[test]
@@ -489,6 +580,37 @@ mod tests {
         );
 
         assert!(normalize_pdf_file_name("relatorio.txt").is_err());
+    }
+
+    #[test]
+    fn test_normalize_pdf_file_name_rejects_windows_invalid_and_reserved_names() {
+        let invalid_names = [
+            "relatorio<1>.pdf",
+            "relatorio>1.pdf",
+            "relatorio\"1.pdf",
+            "relatorio|1.pdf",
+            "relatorio?1.pdf",
+            "relatorio*1.pdf",
+            "meu_relatorio.",
+            "meu_relatorio ",
+            "meu_relatorio. .pdf",
+            "CON.pdf",
+            "con",
+            "PRN.pdf",
+            "aux",
+            "NUL.pdf",
+            "COM1.pdf",
+            "com9",
+            "LPT1.pdf",
+            "lpt5",
+        ];
+
+        for name in invalid_names {
+            assert!(
+                normalize_pdf_file_name(name).is_err(),
+                "O nome inválido ou reservado deveria ter sido rejeitado: {name:?}"
+            );
+        }
     }
 
     #[test]
@@ -921,7 +1043,14 @@ mod tests {
     #[test]
     fn test_preview_and_export_enforce_scope_hash_and_expiration_guards() {
         let directory = TestDirectory::new();
-        let store = DocumentPreviewStore::new();
+        let start_time = std::time::Instant::now();
+        let clock = std::sync::Arc::new(crate::modules::documents::MockMonotonicClock::new(start_time));
+        let store = DocumentPreviewStore::with_clock_and_limits(
+            clock.clone(),
+            std::time::Duration::from_secs(10),
+            10,
+            10 * 1024 * 1024,
+        );
 
         // 1. NodeOnly não pode gerar preview de CessaoPosse (CockpitOnly)
         let forbidden_preview = preview_document_with_store_and_scope(
@@ -1007,5 +1136,46 @@ mod tests {
         );
         assert!(unknown_id_res.is_err());
         assert!(unknown_id_res.unwrap_err().contains("não foi encontrado"));
+
+        // 5. Rejeita exportação de preview expirado após transcurso do TTL
+        clock.advance(std::time::Duration::from_secs(15));
+        let expired_res = export_previewed_document_in_directory_with_store_and_scope(
+            ExportPreviewPayload {
+                preview_id: preview.preview_id.clone(),
+                expected_sha256: preview.metadata.sha256_checksum.clone(),
+                open_after_export: Some(false),
+                target_file_name: Some("nao_deve_gravar_expirado.pdf".to_string()),
+            },
+            directory.path(),
+            &store,
+            DocumentScope::CockpitOnly,
+        );
+        assert!(expired_res.is_err());
+        assert!(expired_res.unwrap_err().contains("expirou"));
+        assert!(!directory.path().join("nao_deve_gravar_expirado.pdf").exists());
+    }
+
+    #[test]
+    fn test_compute_file_sha256_matches_digest() {
+        let directory = TestDirectory::new();
+        let target = directory.path().join("hash_test.bin");
+        let test_data = b"dados de teste para validacao de streaming SHA-256";
+        fs::write(&target, test_data).expect("gravar arquivo de teste");
+
+        let streaming_hash = compute_file_sha256(&target).expect("computar hash via streaming");
+        let direct_hash = hex::encode(Sha256::digest(test_data));
+        assert_eq!(streaming_hash, direct_hash);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_write_pdf_without_overwrite_unix_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+        let directory = TestDirectory::new();
+        let target = directory.path().join("perm_test.pdf");
+        write_pdf_without_overwrite(&target, b"%PDF-1.7\ntest").expect("gravar com sucesso");
+
+        let permissions = fs::metadata(&target).unwrap().permissions();
+        assert_eq!(permissions.mode() & 0o777, 0o600, "Permissões devem ser 0600 (rw-------)");
     }
 }
