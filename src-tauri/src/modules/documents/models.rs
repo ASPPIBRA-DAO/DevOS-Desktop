@@ -1023,10 +1023,21 @@ impl CessaoPossePayload {
                 "O número do documento (document_number) não pode ser vazio.".to_string(),
             ));
         }
+        if self.document_number.chars().count() > 64 {
+            return Err(DocumentError::ValidationError(
+                "O número do documento (document_number) excede o limite de 64 caracteres."
+                    .to_string(),
+            ));
+        }
 
         if self.auth_code.trim().is_empty() {
             return Err(DocumentError::ValidationError(
                 "O código de autenticação (auth_code) não pode ser vazio.".to_string(),
+            ));
+        }
+        if self.auth_code.chars().count() > 64 {
+            return Err(DocumentError::ValidationError(
+                "O código de autenticação (auth_code) excede o limite de 64 caracteres.".to_string(),
             ));
         }
 
@@ -1038,7 +1049,8 @@ impl CessaoPossePayload {
                 for &req_key in CESSAO_REQUIRED_KEYS {
                     match map.get(req_key) {
                         Some(serde_json::Value::String(s)) if !s.trim().is_empty() => {}
-                        Some(serde_json::Value::Number(_)) => {}
+                        Some(serde_json::Value::Number(_))
+                            if req_key == "numeroLote" || req_key == "quadraLote" => {}
                         _ => {
                             missing_keys.push(req_key);
                         }
@@ -1219,19 +1231,19 @@ mod tests {
     }
 
     #[test]
-    fn application_edition_from_bundle_identifier_principle_of_least_privilege() {
+    fn application_edition_try_from_bundle_identifier_fail_closed() {
         assert_eq!(
-            ApplicationEdition::from_bundle_identifier("br.aspp.devos.cockpit"),
+            ApplicationEdition::try_from_bundle_identifier("br.aspp.devos.cockpit").unwrap(),
             ApplicationEdition::Cockpit
         );
         assert_eq!(
-            ApplicationEdition::from_bundle_identifier("br.aspp.devos.node"),
+            ApplicationEdition::try_from_bundle_identifier("br.aspp.devos.node").unwrap(),
             ApplicationEdition::Node
         );
-        assert_eq!(
-            ApplicationEdition::from_bundle_identifier("qualquer.outro.id"),
-            ApplicationEdition::Node
-        );
+        assert!(matches!(
+            ApplicationEdition::try_from_bundle_identifier("qualquer.outro.id"),
+            Err(DocumentError::UnauthorizedScope(_))
+        ));
     }
 
     #[test]
@@ -1344,7 +1356,20 @@ mod tests {
         let valid_json = json!({
             "document_number": "2026-0001/CP",
             "auth_code": "2026-X7Y9",
-            "data": { "chave": "valor" }
+            "data": {
+                "cedenteNome": "João Silva",
+                "cedenteCpf": "111.222.333-44",
+                "cedenteNacionalidade": "Brasileiro",
+                "cedenteEstadoCivil": "Casado",
+                "cedenteEndereco": "Rua das Flores, 100",
+                "cessionarioNome": "Maria Santos",
+                "cessionarioCpf": "555.666.777-88",
+                "cessionarioNacionalidade": "Brasileira",
+                "cessionarioEstadoCivil": "Solteira",
+                "cessionarioEndereco": "Avenida Central, 200",
+                "numeroLote": "12",
+                "quadraLote": "34"
+            }
         });
         let valid_payload = serde_json::from_value::<CessaoPossePayload>(valid_json).unwrap();
         assert!(valid_payload.validate().is_ok());
@@ -1395,7 +1420,7 @@ mod tests {
             due_date: "2026-10-31".to_string(),
             settled_date: None,
             payment_method: "Pix".to_string(),
-            status: "paid".to_string(),
+            status: InvoiceStatus::Pending,
             items: vec![InvoiceReportItem {
                 id: "it-1".to_string(),
                 description: "Item 1".to_string(),
@@ -1576,7 +1601,7 @@ mod tests {
             due_date: "2026-10-31".to_string(),
             settled_date: None,
             payment_method: "Pix".to_string(),
-            status: "pending".to_string(),
+            status: InvoiceStatus::Pending,
             items: vec![
                 InvoiceReportItem {
                     id: "it-1".to_string(),
@@ -1602,26 +1627,26 @@ mod tests {
 
         // 1. Sem tributos e sem desconto
         assert!(base_invoice.validate().is_ok());
-        assert_eq!(base_invoice.final_total(), dec!(100.00));
+        assert_eq!(base_invoice.final_total().unwrap(), dec!(100.00));
 
         // 2. Com tributos
         let mut with_taxes = base_invoice.clone();
         with_taxes.taxes = Some(dec!(15.50));
         assert!(with_taxes.validate().is_ok());
-        assert_eq!(with_taxes.final_total(), dec!(115.50));
+        assert_eq!(with_taxes.final_total().unwrap(), dec!(115.50));
 
         // 3. Com desconto
         let mut with_discount = base_invoice.clone();
         with_discount.discount = Some(dec!(20.00));
         assert!(with_discount.validate().is_ok());
-        assert_eq!(with_discount.final_total(), dec!(80.00));
+        assert_eq!(with_discount.final_total().unwrap(), dec!(80.00));
 
         // 4. Com tributos e desconto
         let mut with_taxes_and_discount = base_invoice.clone();
         with_taxes_and_discount.taxes = Some(dec!(15.50));
         with_taxes_and_discount.discount = Some(dec!(20.00));
         assert!(with_taxes_and_discount.validate().is_ok());
-        assert_eq!(with_taxes_and_discount.final_total(), dec!(95.50));
+        assert_eq!(with_taxes_and_discount.final_total().unwrap(), dec!(95.50));
 
         // 5. Desconto excessivo (> amount + taxes) -> ValidationError
         let mut excessive_discount = base_invoice.clone();
@@ -1653,7 +1678,7 @@ mod tests {
             due_date: "2026-10-31".to_string(),
             settled_date: None,
             payment_method: "Pix".to_string(),
-            status: "pending".to_string(),
+            status: InvoiceStatus::Pending,
             items: vec![
                 InvoiceReportItem {
                     id: "it-1".to_string(),
@@ -1677,14 +1702,17 @@ mod tests {
             d1_protocol: None,
         };
         assert!(exact_decimal_invoice.validate().is_ok());
-        assert_eq!(exact_decimal_invoice.final_total(), dec!(0.30));
+        assert_eq!(exact_decimal_invoice.final_total().unwrap(), dec!(0.30));
     }
 
     #[test]
     fn test_ledger_and_reconciliation_validation() {
         let valid_ledger = DocumentRequest::CitizenLedger(CitizenLedgerPayload {
             associate_id: Some("ASSOC-01".to_string()),
-            data: json!({ "meta": {} }),
+            data: json!({
+                "associate": { "id": "ASSOC-01" },
+                "meta": { "reference_period": "2026-10" }
+            }),
         });
         assert!(valid_ledger.validate().is_ok());
 
@@ -1699,7 +1727,10 @@ mod tests {
 
         let valid_reconciliation =
             DocumentRequest::RealEstateReconciliation(RealEstateReconciliationPayload {
-                data: json!({ "lots": [] }),
+                data: json!({
+                    "generatedAt": "2026-11-15T12:00:00Z",
+                    "lots": []
+                }),
             });
         assert!(valid_reconciliation.validate().is_ok());
 
@@ -1723,6 +1754,7 @@ mod tests {
             "reference_month": "2026-10",
             "amount": 2500, // número inteiro enviado pelo TypeScript
             "due_date": "2026-10-31",
+            "settled_date": "2026-10-28",
             "payment_method": "Pix",
             "status": "paid",
             "items": [
@@ -1759,7 +1791,7 @@ mod tests {
             due_date: "2026-10-31".to_string(),
             settled_date: None,
             payment_method: "Pix".to_string(),
-            status: "pending".to_string(),
+            status: InvoiceStatus::Pending,
             items: vec![
                 InvoiceReportItem {
                     id: "item-rep".to_string(),

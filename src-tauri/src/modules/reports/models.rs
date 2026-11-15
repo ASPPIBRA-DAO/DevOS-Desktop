@@ -146,7 +146,7 @@ mod tests {
             serde_json::to_value(&payload).expect("InvoiceReportPayload deve ser serializável");
 
         assert_eq!(serialized["id"], "INV-2023-001");
-        assert_eq!(serialized["amount"], 5000.0);
+        assert_eq!(serialized["amount"], "5000");
         assert_eq!(serialized["status"], "paid");
 
         assert!(

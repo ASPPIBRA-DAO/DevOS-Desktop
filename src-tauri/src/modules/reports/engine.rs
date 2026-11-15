@@ -77,6 +77,7 @@ pub fn compile_document_pdf_with_scope(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::modules::documents::models::InvoiceStatus;
     use crate::modules::reports::models::InvoiceReportItem;
     use rust_decimal_macros::dec;
     use serde_json::json;
@@ -103,7 +104,7 @@ mod tests {
                     "audit_hash": "test-audit-sha256-hash"
                 },
                 "associate": {
-                    "id": "TEST-10",
+                    "id": "TEST001",
                     "name": "Pessoa Associada de Teste",
                     "cpf": "000.000.000-00",
                     "email": "associado@example.invalid",
@@ -153,7 +154,7 @@ mod tests {
             due_date: "2023-08-08".to_string(),
             settled_date: Some("2023-08-08".to_string()),
             payment_method: "Pix Dinâmico / D1".to_string(),
-            status: "paid".to_string(),
+            status: InvoiceStatus::Paid,
             items: vec![InvoiceReportItem {
                 id: "item-test-1".to_string(),
                 description: "Mensalidade Associativa de Teste".to_string(),
@@ -190,7 +191,7 @@ mod tests {
             due_date: "2026-10-31".to_string(),
             settled_date: None,
             payment_method: "Pix".to_string(),
-            status: "pending".to_string(),
+            status: InvoiceStatus::Pending,
             items: vec![],
             taxes: None,
             discount: None,
@@ -217,7 +218,20 @@ mod tests {
         let valid_cessao = CessaoPossePayload {
             document_number: "2026-0001/CP".to_string(),
             auth_code: "2026-X7Y9".to_string(),
-            data: json!({"cedenteNome": "JOÃO SILVA", "cessionarioNome": "MARIA SOUZA"}),
+            data: json!({
+                "cedenteNome": "JOÃO SILVA",
+                "cedenteCpf": "111.111.111-11",
+                "cedenteNacionalidade": "Brasileiro",
+                "cedenteEstadoCivil": "Casado",
+                "cedenteEndereco": "Rua A, 123",
+                "cessionarioNome": "MARIA SOUZA",
+                "cessionarioCpf": "222.222.222-22",
+                "cessionarioNacionalidade": "Brasileira",
+                "cessionarioEstadoCivil": "Solteira",
+                "cessionarioEndereco": "Rua B, 456",
+                "numeroLote": "10",
+                "quadraLote": "A"
+            }),
         };
         assert!(
             compile_document_pdf_with_scope(

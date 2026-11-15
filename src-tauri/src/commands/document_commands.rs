@@ -377,6 +377,7 @@ mod tests {
     use crate::modules::reports::models::{
         CitizenLedgerPayload, InvoiceReportItem, InvoiceReportPayload,
     };
+    use crate::modules::documents::models::InvoiceStatus;
 
     use serde_json::json;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -522,7 +523,7 @@ mod tests {
                         "audit_hash": "test"
                     },
                     "associate": {
-                        "id": "1",
+                        "id": "CMD_TEST_01",
                         "name": "Teste Comand",
                         "cpf": "000",
                         "email": "a@b.c",
@@ -571,7 +572,7 @@ mod tests {
                 due_date: "2026-10-31".to_string(),
                 settled_date: None,
                 payment_method: "Pix".to_string(),
-                status: "pending".to_string(),
+                status: InvoiceStatus::Pending,
                 items: vec![InvoiceReportItem {
                     id: "it-1".to_string(),
                     description: "Item 1".to_string(),
@@ -741,7 +742,20 @@ mod tests {
                 crate::modules::documents::models::CessaoPossePayload {
                     document_number: "2026-0001/CP".to_string(),
                     auth_code: "2026-X7Y9".to_string(),
-                    data: json!({"cedenteNome": "JOÃO SILVA", "cessionarioNome": "MARIA SOUZA"}),
+                    data: json!({
+                        "cedenteNome": "JOÃO SILVA",
+                        "cedenteCpf": "111.111.111-11",
+                        "cedenteNacionalidade": "Brasileiro",
+                        "cedenteEstadoCivil": "Casado",
+                        "cedenteEndereco": "Rua A, 123",
+                        "cessionarioNome": "MARIA SOUZA",
+                        "cessionarioCpf": "222.222.222-22",
+                        "cessionarioNacionalidade": "Brasileira",
+                        "cessionarioEstadoCivil": "Solteira",
+                        "cessionarioEndereco": "Rua B, 456",
+                        "numeroLote": "10",
+                        "quadraLote": "A"
+                    }),
                 },
             ),
             open_after_export: Some(false),
@@ -830,9 +844,17 @@ mod tests {
                     auth_code: "2026-X7Y9".to_string(),
                     data: json!({
                         "cedenteNome": "CARLOS EDUARDO TESTE",
+                        "cedenteCpf": "111.111.111-11",
+                        "cedenteNacionalidade": "Brasileiro",
+                        "cedenteEstadoCivil": "Casado",
+                        "cedenteEndereco": "Rua A, 123",
                         "cessionarioNome": "ANA PAULA TESTE",
-                        "imovelLote": "15",
-                        "imovelQuadra": "D"
+                        "cessionarioCpf": "222.222.222-22",
+                        "cessionarioNacionalidade": "Brasileira",
+                        "cessionarioEstadoCivil": "Solteira",
+                        "cessionarioEndereco": "Rua B, 456",
+                        "numeroLote": "15",
+                        "quadraLote": "D"
                     }),
                 },
             ),
@@ -933,7 +955,7 @@ mod tests {
                             "audit_hash": "hash-1"
                         },
                         "associate": {
-                            "id": "1",
+                            "id": "ASSOC-PREVIEW-01",
                             "name": "Associado Preview",
                             "cpf": "000.111.222-33",
                             "email": "preview@asppibra.org",

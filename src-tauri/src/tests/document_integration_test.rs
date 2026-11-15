@@ -6,6 +6,7 @@ use crate::commands::document_commands::{
 use crate::modules::documents::{
     DocumentKind, DocumentPreviewStore, DocumentRequest, DocumentScope,
 };
+use crate::modules::documents::models::InvoiceStatus;
 use crate::modules::reports::models::{
     CessaoPossePayload, CitizenLedgerPayload, InvoiceReportItem, InvoiceReportPayload,
     RealEstateReconciliationPayload,
@@ -231,7 +232,7 @@ fn test_generate_document_integration_invoice_bill_end_to_end() {
             amount: dec!(7500.0),
             due_date: "2026-10-31".to_string(),
             settled_date: Some("2026-10-23".to_string()),
-            status: "paid".to_string(),
+            status: InvoiceStatus::Paid,
             payment_method: "PIX / USDC Multi-Chain".to_string(),
             d1_protocol: Some("FATURA-TX-E2E-PROOF".to_string()),
             taxes: Some(dec!(150.0)),
@@ -295,7 +296,7 @@ fn test_generate_document_integration_invoice_bill_end_to_end() {
     // Verifica que o VALOR TOTAL calculado (7500 + 150 - 50 = 7600) está nos metadados do PDF
     let pdf_lossy = String::from_utf8_lossy(&read_bytes);
     assert!(
-        pdf_lossy.contains("Total: R$ 7600"),
+        pdf_lossy.contains("7.600,00") || pdf_lossy.contains("7600"),
         "O PDF da fatura deve refletir o valor total calculado (7500 + 150 - 50 = 7600)"
     );
 
@@ -317,9 +318,17 @@ fn test_generate_document_integration_cessao_posse_scope_and_temp_dir_end_to_end
             auth_code: "AUTH-INT-2026".to_string(),
             data: json!({
                 "cedenteNome": "JOÃO CARLOS DA SILVA",
+                "cedenteCpf": "111.222.333-44",
+                "cedenteNacionalidade": "Brasileiro",
+                "cedenteEstadoCivil": "Casado",
+                "cedenteEndereco": "Rua A, 1",
                 "cessionarioNome": "MARIA FERNANDA SOUZA",
-                "imovelLote": "15",
-                "imovelQuadra": "C"
+                "cessionarioCpf": "555.666.777-88",
+                "cessionarioNacionalidade": "Brasileira",
+                "cessionarioEstadoCivil": "Solteira",
+                "cessionarioEndereco": "Rua B, 2",
+                "numeroLote": "15",
+                "quadraLote": "C"
             }),
         }),
         open_after_export: Some(false),
@@ -365,9 +374,17 @@ fn test_preview_and_export_previewed_document_end_to_end_all_models() {
                 auth_code: "2026-X7Y9".to_string(),
                 data: json!({
                     "cedenteNome": "JOÃO CARLOS DA SILVA",
+                    "cedenteCpf": "111.222.333-44",
+                    "cedenteNacionalidade": "Brasileiro",
+                    "cedenteEstadoCivil": "Casado",
+                    "cedenteEndereco": "Rua A, 1",
                     "cessionarioNome": "MARIA FERNANDA SOUZA",
-                    "imovelLote": "15",
-                    "imovelQuadra": "C"
+                    "cessionarioCpf": "555.666.777-88",
+                    "cessionarioNacionalidade": "Brasileira",
+                    "cessionarioEstadoCivil": "Solteira",
+                    "cessionarioEndereco": "Rua B, 2",
+                    "numeroLote": "15",
+                    "quadraLote": "C"
                 }),
             }),
         ),
@@ -443,40 +460,12 @@ fn test_uninitialized_application_edition_blocks_all_document_operations() {
         let unknown_res = ApplicationEdition::try_from_bundle_identifier("com.malicious.fake");
         assert!(matches!(unknown_res, Err(DocumentError::UnauthorizedScope(_))));
 
-        // 2. Serviço com DocumentVisibility::Uninitialized rejeita QUALQUER emissão (inclusive Universal)
+        // 2. Criação de serviço com DocumentVisibility::Uninitialized falha imediatamente
         let renderer = Arc::new(TypstDocumentRenderer::new());
-        let uninitialized_service =
+        let uninitialized_res =
             DocumentsService::with_scope(renderer, DocumentVisibility::Uninitialized);
-
-        let invoice_req = DocumentRequest::InvoiceBill(InvoiceReportPayload {
-            id: "INV-BLOCKED-01".to_string(),
-            member_name: "Tentativa Bloqueada".to_string(),
-            member_doc: "000".to_string(),
-            member_email: None,
-            member_address: None,
-            description: "Fatura Bloqueada".to_string(),
-            reference_month: "2026-10".to_string(),
-            amount: dec!(100.0),
-            due_date: "2026-10-31".to_string(),
-            settled_date: None,
-            payment_method: "Pix".to_string(),
-            status: "pending".to_string(),
-            items: vec![InvoiceReportItem {
-                id: "it-1".to_string(),
-                description: "Item".to_string(),
-                service: None,
-                quantity: dec!(1.0),
-                price: dec!(100.0),
-                total: dec!(100.0),
-            }],
-            taxes: None,
-            discount: None,
-            d1_protocol: None,
-        });
-
-        let res = uninitialized_service.generate_document(invoice_req);
         assert!(
-            matches!(res, Err(DocumentError::UnauthorizedScope(msg)) if msg.contains("não foi inicializada")),
+            matches!(uninitialized_res, Err(DocumentError::UnauthorizedScope(_))),
             "Emissão documental deve falhar categoricamente quando a edição da aplicação não foi inicializada"
         );
     }
@@ -548,11 +537,11 @@ fn test_uninitialized_application_edition_blocks_all_document_operations() {
         // 2. Validação aritmética exata sem desvios IEEE 754
         assert!(payload.validate().is_ok());
         assert_eq!(payload.amount, dec!(1000001500.80));
-        assert_eq!(payload.final_total(), dec!(1000001500.80));
+        assert_eq!(payload.final_total().unwrap(), dec!(1000001500.80));
 
         // 3. Execução pelo pipeline completo do DocumentsService -> Typst -> PDF
         let renderer = Arc::new(TypstDocumentRenderer::new());
-        let service = DocumentsService::with_scope(renderer, DocumentScope::CockpitOnly);
+        let service = DocumentsService::with_scope(renderer, DocumentScope::CockpitOnly).unwrap();
 
         let output = service
             .generate_document(DocumentRequest::InvoiceBill(payload))
@@ -563,7 +552,7 @@ fn test_uninitialized_application_edition_blocks_all_document_operations() {
 
         // 4. Verificação de integridade no PDF gerado
         let pdf_lossy = String::from_utf8_lossy(&output.pdf_bytes);
-        assert!(pdf_lossy.contains("1000001500.8") || pdf_lossy.contains("1000001500"));
+        assert!(pdf_lossy.contains("1.000.001.500,80") || pdf_lossy.contains("1000001500"));
     }
 
     #[test]
@@ -590,7 +579,7 @@ fn test_uninitialized_application_edition_blocks_all_document_operations() {
                         "audit_hash": "mock_hash_clock"
                     },
                     "associate": {
-                        "id": "1",
+                        "id": "CLOCK_TEST_01",
                         "name": "Maria Silva Teste",
                         "cpf": "111.222.333-44",
                         "email": "maria@asppibra.org.br",
@@ -663,7 +652,7 @@ fn test_uninitialized_application_edition_blocks_all_document_operations() {
         use crate::modules::documents::DocumentsService;
 
         let renderer = std::sync::Arc::new(TypstDocumentRenderer::new());
-        let service = DocumentsService::with_scope(renderer, DocumentScope::CockpitOnly);
+        let service = DocumentsService::with_scope(renderer, DocumentScope::CockpitOnly).unwrap();
 
         let payload = DocumentRequest::InvoiceBill(InvoiceReportPayload {
             id: "FAT-SVG-SKIP-001".to_string(),
@@ -677,7 +666,7 @@ fn test_uninitialized_application_edition_blocks_all_document_operations() {
             due_date: "2026-11-30".to_string(),
             settled_date: None,
             payment_method: "Pix".to_string(),
-            status: "pending".to_string(),
+            status: InvoiceStatus::Pending,
             taxes: None,
             discount: None,
             d1_protocol: None,

@@ -7,9 +7,9 @@ Todos os arquivos estão 100% completos, sem omissões, comentários removidos o
 
 - [`mod.rs`](#file-mod-rs) (120 linhas)
 - [`ports.rs`](#file-ports-rs) (87 linhas)
-- [`models.rs`](#file-models-rs) (1807 linhas)
-- [`preview_store.rs`](#file-preview_store-rs) (1114 linhas)
-- [`service.rs`](#file-service-rs) (718 linhas)
+- [`models.rs`](#file-models-rs) (1839 linhas)
+- [`preview_store.rs`](#file-preview_store-rs) (1109 linhas)
+- [`service.rs`](#file-service-rs) (748 linhas)
 - [`typst_renderer.rs`](#file-typst_renderer-rs) (1237 linhas)
 
 ---
@@ -241,7 +241,7 @@ pub trait DocumentRenderer: Send + Sync {
 
 <a id="file-models-rs"></a>
 ## File: `models.rs`
-Caminho: `src/modules/documents/models.rs` (1807 linhas)
+Caminho: `src/modules/documents/models.rs` (1839 linhas)
 
 ```rust
 use chrono::NaiveDate;
@@ -1269,10 +1269,21 @@ impl CessaoPossePayload {
                 "O número do documento (document_number) não pode ser vazio.".to_string(),
             ));
         }
+        if self.document_number.chars().count() > 64 {
+            return Err(DocumentError::ValidationError(
+                "O número do documento (document_number) excede o limite de 64 caracteres."
+                    .to_string(),
+            ));
+        }
 
         if self.auth_code.trim().is_empty() {
             return Err(DocumentError::ValidationError(
                 "O código de autenticação (auth_code) não pode ser vazio.".to_string(),
+            ));
+        }
+        if self.auth_code.chars().count() > 64 {
+            return Err(DocumentError::ValidationError(
+                "O código de autenticação (auth_code) excede o limite de 64 caracteres.".to_string(),
             ));
         }
 
@@ -1284,7 +1295,8 @@ impl CessaoPossePayload {
                 for &req_key in CESSAO_REQUIRED_KEYS {
                     match map.get(req_key) {
                         Some(serde_json::Value::String(s)) if !s.trim().is_empty() => {}
-                        Some(serde_json::Value::Number(_)) => {}
+                        Some(serde_json::Value::Number(_))
+                            if req_key == "numeroLote" || req_key == "quadraLote" => {}
                         _ => {
                             missing_keys.push(req_key);
                         }
@@ -1465,19 +1477,19 @@ mod tests {
     }
 
     #[test]
-    fn application_edition_from_bundle_identifier_principle_of_least_privilege() {
+    fn application_edition_try_from_bundle_identifier_fail_closed() {
         assert_eq!(
-            ApplicationEdition::from_bundle_identifier("br.aspp.devos.cockpit"),
+            ApplicationEdition::try_from_bundle_identifier("br.aspp.devos.cockpit").unwrap(),
             ApplicationEdition::Cockpit
         );
         assert_eq!(
-            ApplicationEdition::from_bundle_identifier("br.aspp.devos.node"),
+            ApplicationEdition::try_from_bundle_identifier("br.aspp.devos.node").unwrap(),
             ApplicationEdition::Node
         );
-        assert_eq!(
-            ApplicationEdition::from_bundle_identifier("qualquer.outro.id"),
-            ApplicationEdition::Node
-        );
+        assert!(matches!(
+            ApplicationEdition::try_from_bundle_identifier("qualquer.outro.id"),
+            Err(DocumentError::UnauthorizedScope(_))
+        ));
     }
 
     #[test]
@@ -1590,7 +1602,20 @@ mod tests {
         let valid_json = json!({
             "document_number": "2026-0001/CP",
             "auth_code": "2026-X7Y9",
-            "data": { "chave": "valor" }
+            "data": {
+                "cedenteNome": "João Silva",
+                "cedenteCpf": "111.222.333-44",
+                "cedenteNacionalidade": "Brasileiro",
+                "cedenteEstadoCivil": "Casado",
+                "cedenteEndereco": "Rua das Flores, 100",
+                "cessionarioNome": "Maria Santos",
+                "cessionarioCpf": "555.666.777-88",
+                "cessionarioNacionalidade": "Brasileira",
+                "cessionarioEstadoCivil": "Solteira",
+                "cessionarioEndereco": "Avenida Central, 200",
+                "numeroLote": "12",
+                "quadraLote": "34"
+            }
         });
         let valid_payload = serde_json::from_value::<CessaoPossePayload>(valid_json).unwrap();
         assert!(valid_payload.validate().is_ok());
@@ -1641,7 +1666,7 @@ mod tests {
             due_date: "2026-10-31".to_string(),
             settled_date: None,
             payment_method: "Pix".to_string(),
-            status: "paid".to_string(),
+            status: InvoiceStatus::Pending,
             items: vec![InvoiceReportItem {
                 id: "it-1".to_string(),
                 description: "Item 1".to_string(),
@@ -1822,7 +1847,7 @@ mod tests {
             due_date: "2026-10-31".to_string(),
             settled_date: None,
             payment_method: "Pix".to_string(),
-            status: "pending".to_string(),
+            status: InvoiceStatus::Pending,
             items: vec![
                 InvoiceReportItem {
                     id: "it-1".to_string(),
@@ -1848,26 +1873,26 @@ mod tests {
 
         // 1. Sem tributos e sem desconto
         assert!(base_invoice.validate().is_ok());
-        assert_eq!(base_invoice.final_total(), dec!(100.00));
+        assert_eq!(base_invoice.final_total().unwrap(), dec!(100.00));
 
         // 2. Com tributos
         let mut with_taxes = base_invoice.clone();
         with_taxes.taxes = Some(dec!(15.50));
         assert!(with_taxes.validate().is_ok());
-        assert_eq!(with_taxes.final_total(), dec!(115.50));
+        assert_eq!(with_taxes.final_total().unwrap(), dec!(115.50));
 
         // 3. Com desconto
         let mut with_discount = base_invoice.clone();
         with_discount.discount = Some(dec!(20.00));
         assert!(with_discount.validate().is_ok());
-        assert_eq!(with_discount.final_total(), dec!(80.00));
+        assert_eq!(with_discount.final_total().unwrap(), dec!(80.00));
 
         // 4. Com tributos e desconto
         let mut with_taxes_and_discount = base_invoice.clone();
         with_taxes_and_discount.taxes = Some(dec!(15.50));
         with_taxes_and_discount.discount = Some(dec!(20.00));
         assert!(with_taxes_and_discount.validate().is_ok());
-        assert_eq!(with_taxes_and_discount.final_total(), dec!(95.50));
+        assert_eq!(with_taxes_and_discount.final_total().unwrap(), dec!(95.50));
 
         // 5. Desconto excessivo (> amount + taxes) -> ValidationError
         let mut excessive_discount = base_invoice.clone();
@@ -1899,7 +1924,7 @@ mod tests {
             due_date: "2026-10-31".to_string(),
             settled_date: None,
             payment_method: "Pix".to_string(),
-            status: "pending".to_string(),
+            status: InvoiceStatus::Pending,
             items: vec![
                 InvoiceReportItem {
                     id: "it-1".to_string(),
@@ -1923,14 +1948,17 @@ mod tests {
             d1_protocol: None,
         };
         assert!(exact_decimal_invoice.validate().is_ok());
-        assert_eq!(exact_decimal_invoice.final_total(), dec!(0.30));
+        assert_eq!(exact_decimal_invoice.final_total().unwrap(), dec!(0.30));
     }
 
     #[test]
     fn test_ledger_and_reconciliation_validation() {
         let valid_ledger = DocumentRequest::CitizenLedger(CitizenLedgerPayload {
             associate_id: Some("ASSOC-01".to_string()),
-            data: json!({ "meta": {} }),
+            data: json!({
+                "associate": { "id": "ASSOC-01" },
+                "meta": { "reference_period": "2026-10" }
+            }),
         });
         assert!(valid_ledger.validate().is_ok());
 
@@ -1945,7 +1973,10 @@ mod tests {
 
         let valid_reconciliation =
             DocumentRequest::RealEstateReconciliation(RealEstateReconciliationPayload {
-                data: json!({ "lots": [] }),
+                data: json!({
+                    "generatedAt": "2026-11-15T12:00:00Z",
+                    "lots": []
+                }),
             });
         assert!(valid_reconciliation.validate().is_ok());
 
@@ -1969,6 +2000,7 @@ mod tests {
             "reference_month": "2026-10",
             "amount": 2500, // número inteiro enviado pelo TypeScript
             "due_date": "2026-10-31",
+            "settled_date": "2026-10-28",
             "payment_method": "Pix",
             "status": "paid",
             "items": [
@@ -2005,7 +2037,7 @@ mod tests {
             due_date: "2026-10-31".to_string(),
             settled_date: None,
             payment_method: "Pix".to_string(),
-            status: "pending".to_string(),
+            status: InvoiceStatus::Pending,
             items: vec![
                 InvoiceReportItem {
                     id: "item-rep".to_string(),
@@ -2057,7 +2089,7 @@ mod tests {
 
 <a id="file-preview_store-rs"></a>
 ## File: `preview_store.rs`
-Caminho: `src/modules/documents/preview_store.rs` (1114 linhas)
+Caminho: `src/modules/documents/preview_store.rs` (1109 linhas)
 
 ```rust
 use chrono::{Duration as ChronoDuration, Utc};
@@ -2997,26 +3029,20 @@ mod tests {
             .begin_export(&stored.preview_id, &sha, DocumentScope::NodeOnly)
             .expect("Deve iniciar reserva de exportação");
 
-        assert_eq!(reservation.preview_id, stored.preview_id);
-        assert_eq!(reservation.pdf_bytes, stored.pdf_bytes);
+        assert_eq!(reservation.preview_id(), stored.preview_id);
+        assert_eq!(reservation.pdf_bytes(), &stored.pdf_bytes);
 
         // 2. Abortar reserva e verificar contadores
-        store.abort_export(&reservation);
+        reservation.abort();
 
         // 3. Iniciar nova reserva e confirmar sucesso
         let new_reservation = store
             .begin_export(&stored.preview_id, &sha, DocumentScope::NodeOnly)
             .expect("Deve iniciar nova reserva");
 
-        store
-            .confirm_export_success(&new_reservation)
+        new_reservation
+            .confirm()
             .expect("Confirmação deve ter sucesso");
-
-        // Tentativa de reconfirmar o mesmo bilhete deve ser rejeitada
-        assert_eq!(
-            store.confirm_export_success(&new_reservation),
-            Err(PreviewStoreError::InvalidReservation)
-        );
     }
 
     #[test]
@@ -3049,7 +3075,7 @@ mod tests {
             .unwrap();
 
         // p1 ainda deve existir (pois estava protegido)
-        store.confirm_export_success(&res1).unwrap();
+        res1.confirm().unwrap();
         assert!(store
             .verify_and_get_for_export(&p1.preview_id, &sha1, DocumentScope::NodeOnly)
             .is_ok());
@@ -3107,26 +3133,27 @@ mod tests {
     }
 
     #[test]
-    fn test_preview_store_rejects_tampered_preview_id_in_reservation() {
+    fn test_preview_store_reservation_raii_aborts_on_drop() {
         let store = DocumentPreviewStore::new();
-        let output = sample_output(DocumentKind::InvoiceBill, "tamper-test");
+        let output = sample_output(DocumentKind::InvoiceBill, "raii-test");
         let sha = output.metadata.sha256_checksum.clone();
 
         let stored = store
             .store_preview(output, sample_pages(), DocumentScope::NodeOnly)
             .unwrap();
 
-        let mut reservation = store
+        {
+            let _res = store
+                .begin_export(&stored.preview_id, &sha, DocumentScope::NodeOnly)
+                .unwrap();
+            // Ao sair deste escopo sem chamar confirm(), o bilhete é descartado e abortado via RAII Drop
+        }
+
+        // Uma nova reserva deve ser iniciada e confirmada normalmente
+        let second_res = store
             .begin_export(&stored.preview_id, &sha, DocumentScope::NodeOnly)
             .unwrap();
-
-        // Adulterar maliciosamente o preview_id na reserva deve ser rejeitado
-        reservation.preview_id = "preview-id-adulterado".to_string();
-
-        assert_eq!(
-            store.confirm_export_success(&reservation),
-            Err(PreviewStoreError::InvalidReservation)
-        );
+        assert!(second_res.confirm().is_ok());
     }
 
     #[test]
@@ -3160,7 +3187,7 @@ mod tests {
         );
 
         // 4. Mas o documento NÃO pode ser destruído da memória enquanto a exportação anterior estiver ativa
-        assert!(store.confirm_export_success(&reservation).is_ok());
+        assert!(reservation.confirm().is_ok());
 
         // 5. Após a finalização da exportação ativa, o item agora pode ser expurgado
         assert_eq!(store.active_count(), 0);
@@ -3180,7 +3207,7 @@ mod tests {
 
 <a id="file-service-rs"></a>
 ## File: `service.rs`
-Caminho: `src/modules/documents/service.rs` (718 linhas)
+Caminho: `src/modules/documents/service.rs` (748 linhas)
 
 ```rust
 use chrono::Utc;
@@ -3214,6 +3241,11 @@ impl DocumentsService {
     /// Inicializa o serviço com um renderizador e uma edição explícita da aplicação (`ApplicationEdition`).
     pub fn with_edition(renderer: Arc<dyn DocumentRenderer>, edition: ApplicationEdition) -> Self {
         Self { renderer, edition }
+    }
+
+    #[cfg(test)]
+    pub fn with_renderer(renderer: Arc<dyn DocumentRenderer>) -> Self {
+        Self::with_edition(renderer, ApplicationEdition::Cockpit)
     }
 
     // TODO(dívida): remover junto com documents_service_with_scope
@@ -3345,6 +3377,7 @@ mod tests {
 
     use crate::modules::documents::ports::RenderedDocument;
     use crate::modules::documents::typst_renderer::TypstDocumentRenderer;
+    use crate::modules::documents::models::InvoiceStatus;
     use crate::modules::reports::models::{
         CitizenLedgerPayload, InvoiceReportItem, InvoiceReportPayload,
     };
@@ -3356,6 +3389,7 @@ mod tests {
             std::sync::Arc::new(TypstDocumentRenderer::new()),
             DocumentScope::CockpitOnly,
         )
+        .expect("Falha ao criar serviço de teste")
     }
 
     fn assert_valid_document_output(output: &DocumentOutput, expected_kind: DocumentKind) {
@@ -3410,7 +3444,7 @@ mod tests {
         let service = create_test_service();
 
         let payload = CitizenLedgerPayload {
-            associate_id: Some("MEMBER-123".to_string()),
+            associate_id: Some("123".to_string()),
             data: json!({
                 "meta": {
                     "generated_at": "23/10/2026",
@@ -3460,7 +3494,7 @@ mod tests {
             due_date: "2026-10-30".to_string(),
             settled_date: Some("2026-10-23".to_string()),
             payment_method: "Pix / D1".to_string(),
-            status: "paid".to_string(),
+            status: InvoiceStatus::Paid,
             items: vec![InvoiceReportItem {
                 id: "item-1".to_string(),
                 description: "Taxa de Manutenção".to_string(),
@@ -3492,9 +3526,17 @@ mod tests {
             auth_code: "2026-X7Y9".to_string(),
             data: serde_json::json!({
                 "cedenteNome": "JOÃO SILVA TESTE",
+                "cedenteCpf": "111.222.333-44",
+                "cedenteNacionalidade": "Brasileiro",
+                "cedenteEstadoCivil": "Casado",
+                "cedenteEndereco": "Rua A, 1",
                 "cessionarioNome": "MARIA SOUZA TESTE",
-                "imovelLote": "12",
-                "imovelQuadra": "B"
+                "cessionarioCpf": "555.666.777-88",
+                "cessionarioNacionalidade": "Brasileira",
+                "cessionarioEstadoCivil": "Solteira",
+                "cessionarioEndereco": "Rua B, 2",
+                "numeroLote": "12",
+                "quadraLote": "B"
             }),
         };
 
@@ -3593,9 +3635,9 @@ mod tests {
             reference_month: "2026-10".to_string(),
             amount: dec!(100.0),
             due_date: "2026-10-31".to_string(),
-            settled_date: None,
+            settled_date: Some("2026-10-25".to_string()),
             payment_method: "Pix".to_string(),
-            status: "paid".to_string(),
+            status: InvoiceStatus::Paid,
             items: vec![],
             taxes: None,
             discount: None,
@@ -3657,7 +3699,7 @@ mod tests {
             due_date: "2026-10-31".to_string(),
             settled_date: None,
             payment_method: "Pix".to_string(),
-            status: "pending".to_string(),
+            status: InvoiceStatus::Pending,
             items: vec![InvoiceReportItem {
                 id: "item-1".to_string(),
                 description: "Item 1".to_string(),
@@ -3701,7 +3743,7 @@ mod tests {
             due_date: "2026-10-31".to_string(),
             settled_date: None,
             payment_method: "Pix".to_string(),
-            status: "pending".to_string(),
+            status: InvoiceStatus::Pending,
             items: vec![InvoiceReportItem {
                 id: "item-1".to_string(),
                 description: "Item 1".to_string(),
@@ -3740,7 +3782,7 @@ mod tests {
             due_date: "2026-10-31".to_string(),
             settled_date: None,
             payment_method: "Pix".to_string(),
-            status: "pending".to_string(),
+            status: InvoiceStatus::Pending,
             items: vec![],
             taxes: None,
             discount: None,
@@ -3755,8 +3797,8 @@ mod tests {
     #[test]
     fn test_documents_service_authorizes_scope_matching() {
         let mock = std::sync::Arc::new(MockRenderer::new(vec![DocumentKind::InvoiceBill]));
-        // Serviço configurado com escopo universal explícito
-        let service = DocumentsService::with_scope(mock.clone(), DocumentScope::Universal);
+        // Serviço configurado com escopo CockpitOnly
+        let service = DocumentsService::with_scope(mock.clone(), DocumentScope::CockpitOnly).unwrap();
 
         let payload = InvoiceReportPayload {
             id: "FAT-SCOPE-001".to_string(),
@@ -3770,7 +3812,7 @@ mod tests {
             due_date: "2026-10-31".to_string(),
             settled_date: None,
             payment_method: "Pix".to_string(),
-            status: "pending".to_string(),
+            status: InvoiceStatus::Pending,
             items: vec![InvoiceReportItem {
                 id: "item-1".to_string(),
                 description: "Item 1".to_string(),
@@ -3793,21 +3835,16 @@ mod tests {
     fn test_documents_service_rejects_unauthorized_scope() {
         let mock = std::sync::Arc::new(MockRenderer::new(vec![DocumentKind::InvoiceBill]));
         // Serviço configurado com escopo restrito a NodeOnly
-        let node_service = DocumentsService::with_scope(mock.clone(), DocumentScope::NodeOnly);
+        let node_service = DocumentsService::with_scope(mock.clone(), DocumentScope::NodeOnly)
+            .expect("NodeOnly é um escopo válido");
 
         // Tentativa de emissão exigindo CockpitOnly é rejeitada com UnauthorizedScope
         let auth_res = node_service.validate_scope_for(DocumentScope::CockpitOnly);
         assert!(matches!(auth_res, Err(DocumentError::UnauthorizedScope(_))));
 
-        // Serviço Universal também rejeita escopos restritos a Cockpit ou Node
-        let universal_service =
-            DocumentsService::with_scope(mock.clone(), DocumentScope::Universal);
+        // Escopo Universal não é uma edição executável e é rejeitado na criação do serviço
         assert!(matches!(
-            universal_service.validate_scope_for(DocumentScope::CockpitOnly),
-            Err(DocumentError::UnauthorizedScope(_))
-        ));
-        assert!(matches!(
-            universal_service.validate_scope_for(DocumentScope::NodeOnly),
+            DocumentsService::with_scope(mock.clone(), DocumentScope::Universal),
             Err(DocumentError::UnauthorizedScope(_))
         ));
 
@@ -3827,7 +3864,10 @@ mod tests {
 
         let ledger_req = DocumentRequest::CitizenLedger(CitizenLedgerPayload {
             associate_id: Some("ASSOC-01".to_string()),
-            data: json!({"meta": {}}),
+            data: json!({
+                "associate": { "id": "ASSOC-01" },
+                "meta": { "reference_period": "2026-10" }
+            }),
         });
         let invoice_req = DocumentRequest::InvoiceBill(InvoiceReportPayload {
             id: "FAT-SCOPE-02".to_string(),
@@ -3841,7 +3881,7 @@ mod tests {
             due_date: "2026-10-31".to_string(),
             settled_date: None,
             payment_method: "Pix".to_string(),
-            status: "pending".to_string(),
+            status: InvoiceStatus::Pending,
             items: vec![InvoiceReportItem {
                 id: "it-1".to_string(),
                 description: "Item".to_string(),
@@ -3858,17 +3898,33 @@ mod tests {
             DocumentRequest::CessaoPosse(crate::modules::documents::models::CessaoPossePayload {
                 document_number: "2026-0001/CP".to_string(),
                 auth_code: "2026-X7Y9".to_string(),
-                data: json!({"cedenteNome": "Cedente"}),
+                data: json!({
+                    "cedenteNome": "Cedente Exemplo",
+                    "cedenteCpf": "111.222.333-44",
+                    "cedenteNacionalidade": "Brasileiro",
+                    "cedenteEstadoCivil": "Casado",
+                    "cedenteEndereco": "Rua A, 1",
+                    "cessionarioNome": "Cessionário Exemplo",
+                    "cessionarioCpf": "555.666.777-88",
+                    "cessionarioNacionalidade": "Brasileiro",
+                    "cessionarioEstadoCivil": "Solteiro",
+                    "cessionarioEndereco": "Rua B, 2",
+                    "numeroLote": "10",
+                    "quadraLote": "20"
+                }),
             });
         let reconciliation_req = DocumentRequest::RealEstateReconciliation(
             crate::modules::documents::models::RealEstateReconciliationPayload {
-                data: json!({"stats": {}}),
+                data: json!({
+                    "generatedAt": "2026-11-15T12:00:00Z",
+                    "stats": {}
+                }),
             },
         );
 
         // 1. Edição Cockpit (CockpitOnly): aceita Universal e CockpitOnly
         let cockpit_service =
-            DocumentsService::with_scope(mock.clone(), DocumentScope::CockpitOnly);
+            DocumentsService::with_scope(mock.clone(), DocumentScope::CockpitOnly).unwrap();
         assert!(cockpit_service
             .generate_document(ledger_req.clone())
             .is_ok());
@@ -3885,7 +3941,8 @@ mod tests {
 
         // 2. Edição Node (NodeOnly): aceita Universal (CitizenLedger, InvoiceBill),
         // mas rejeita documentos restritos ao Cockpit (CessaoPosse, RealEstateReconciliation)
-        let node_service = DocumentsService::with_scope(mock.clone(), DocumentScope::NodeOnly);
+        let node_service =
+            DocumentsService::with_scope(mock.clone(), DocumentScope::NodeOnly).unwrap();
         assert!(node_service.generate_document(ledger_req).is_ok());
         assert!(node_service.generate_document(invoice_req).is_ok());
         assert_eq!(mock.invocations(), 6);
@@ -4207,7 +4264,7 @@ mod tests {
     use super::*;
     use crate::modules::documents::models::{
         CessaoPossePayload, CitizenLedgerPayload, InvoiceReportItem, InvoiceReportPayload,
-        RealEstateReconciliationPayload,
+        InvoiceStatus, RealEstateReconciliationPayload,
     };
     use rust_decimal_macros::dec;
     use serde_json::json;
@@ -4251,7 +4308,7 @@ mod tests {
             due_date: "2026-10-31".to_string(),
             settled_date: None,
             payment_method: "Pix".to_string(),
-            status: "pending".to_string(),
+            status: InvoiceStatus::Pending,
             items: vec![InvoiceReportItem {
                 id: "item-1".to_string(),
                 description: "Taxa de Manutenção".to_string(),
@@ -5100,10 +5157,10 @@ mod tests {
 
         let scenarios = [
             // (amount, taxes, discount, expected_total_str)
-            (dec!(150.0), None, None, "Total: R$ 150"),
-            (dec!(150.0), Some(dec!(15.5)), None, "Total: R$ 165.5"),
-            (dec!(150.0), None, Some(dec!(20.0)), "Total: R$ 130"),
-            (dec!(150.0), Some(dec!(15.5)), Some(dec!(20.0)), "Total: R$ 145.5"),
+            (dec!(150.0), None, None, "150,00"),
+            (dec!(150.0), Some(dec!(15.5)), None, "165,50"),
+            (dec!(150.0), None, Some(dec!(20.0)), "130,00"),
+            (dec!(150.0), Some(dec!(15.5)), Some(dec!(20.0)), "145,50"),
         ];
 
         for (amount, taxes, discount, expected_total_marker) in scenarios {
@@ -5119,7 +5176,7 @@ mod tests {
                 due_date: "2026-10-31".to_string(),
                 settled_date: None,
                 payment_method: "Pix".to_string(),
-                status: "pending".to_string(),
+                status: InvoiceStatus::Pending,
                 items: vec![InvoiceReportItem {
                     id: "item-1".to_string(),
                     description: "Serviço Associativo".to_string(),

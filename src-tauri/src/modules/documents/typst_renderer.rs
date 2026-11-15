@@ -295,7 +295,7 @@ mod tests {
     use super::*;
     use crate::modules::documents::models::{
         CessaoPossePayload, CitizenLedgerPayload, InvoiceReportItem, InvoiceReportPayload,
-        RealEstateReconciliationPayload,
+        InvoiceStatus, RealEstateReconciliationPayload,
     };
     use rust_decimal_macros::dec;
     use serde_json::json;
@@ -339,7 +339,7 @@ mod tests {
             due_date: "2026-10-31".to_string(),
             settled_date: None,
             payment_method: "Pix".to_string(),
-            status: "pending".to_string(),
+            status: InvoiceStatus::Pending,
             items: vec![InvoiceReportItem {
                 id: "item-1".to_string(),
                 description: "Taxa de Manutenção".to_string(),
@@ -1188,10 +1188,10 @@ mod tests {
 
         let scenarios = [
             // (amount, taxes, discount, expected_total_str)
-            (dec!(150.0), None, None, "Total: R$ 150"),
-            (dec!(150.0), Some(dec!(15.5)), None, "Total: R$ 165.5"),
-            (dec!(150.0), None, Some(dec!(20.0)), "Total: R$ 130"),
-            (dec!(150.0), Some(dec!(15.5)), Some(dec!(20.0)), "Total: R$ 145.5"),
+            (dec!(150.0), None, None, "150,00"),
+            (dec!(150.0), Some(dec!(15.5)), None, "165,50"),
+            (dec!(150.0), None, Some(dec!(20.0)), "130,00"),
+            (dec!(150.0), Some(dec!(15.5)), Some(dec!(20.0)), "145,50"),
         ];
 
         for (amount, taxes, discount, expected_total_marker) in scenarios {
@@ -1207,7 +1207,7 @@ mod tests {
                 due_date: "2026-10-31".to_string(),
                 settled_date: None,
                 payment_method: "Pix".to_string(),
-                status: "pending".to_string(),
+                status: InvoiceStatus::Pending,
                 items: vec![InvoiceReportItem {
                     id: "item-1".to_string(),
                     description: "Serviço Associativo".to_string(),

@@ -31,6 +31,11 @@ impl DocumentsService {
         Self { renderer, edition }
     }
 
+    #[cfg(test)]
+    pub fn with_renderer(renderer: Arc<dyn DocumentRenderer>) -> Self {
+        Self::with_edition(renderer, ApplicationEdition::Cockpit)
+    }
+
     // TODO(dívida): remover junto com documents_service_with_scope
     /// Inicializa o serviço validando se o escopo de sistema corresponde a uma edição autorizada.
     ///
@@ -160,6 +165,7 @@ mod tests {
 
     use crate::modules::documents::ports::RenderedDocument;
     use crate::modules::documents::typst_renderer::TypstDocumentRenderer;
+    use crate::modules::documents::models::InvoiceStatus;
     use crate::modules::reports::models::{
         CitizenLedgerPayload, InvoiceReportItem, InvoiceReportPayload,
     };
@@ -171,6 +177,7 @@ mod tests {
             std::sync::Arc::new(TypstDocumentRenderer::new()),
             DocumentScope::CockpitOnly,
         )
+        .expect("Falha ao criar serviço de teste")
     }
 
     fn assert_valid_document_output(output: &DocumentOutput, expected_kind: DocumentKind) {
@@ -225,7 +232,7 @@ mod tests {
         let service = create_test_service();
 
         let payload = CitizenLedgerPayload {
-            associate_id: Some("MEMBER-123".to_string()),
+            associate_id: Some("123".to_string()),
             data: json!({
                 "meta": {
                     "generated_at": "23/10/2026",
@@ -275,7 +282,7 @@ mod tests {
             due_date: "2026-10-30".to_string(),
             settled_date: Some("2026-10-23".to_string()),
             payment_method: "Pix / D1".to_string(),
-            status: "paid".to_string(),
+            status: InvoiceStatus::Paid,
             items: vec![InvoiceReportItem {
                 id: "item-1".to_string(),
                 description: "Taxa de Manutenção".to_string(),
@@ -307,9 +314,17 @@ mod tests {
             auth_code: "2026-X7Y9".to_string(),
             data: serde_json::json!({
                 "cedenteNome": "JOÃO SILVA TESTE",
+                "cedenteCpf": "111.222.333-44",
+                "cedenteNacionalidade": "Brasileiro",
+                "cedenteEstadoCivil": "Casado",
+                "cedenteEndereco": "Rua A, 1",
                 "cessionarioNome": "MARIA SOUZA TESTE",
-                "imovelLote": "12",
-                "imovelQuadra": "B"
+                "cessionarioCpf": "555.666.777-88",
+                "cessionarioNacionalidade": "Brasileira",
+                "cessionarioEstadoCivil": "Solteira",
+                "cessionarioEndereco": "Rua B, 2",
+                "numeroLote": "12",
+                "quadraLote": "B"
             }),
         };
 
@@ -408,9 +423,9 @@ mod tests {
             reference_month: "2026-10".to_string(),
             amount: dec!(100.0),
             due_date: "2026-10-31".to_string(),
-            settled_date: None,
+            settled_date: Some("2026-10-25".to_string()),
             payment_method: "Pix".to_string(),
-            status: "paid".to_string(),
+            status: InvoiceStatus::Paid,
             items: vec![],
             taxes: None,
             discount: None,
@@ -472,7 +487,7 @@ mod tests {
             due_date: "2026-10-31".to_string(),
             settled_date: None,
             payment_method: "Pix".to_string(),
-            status: "pending".to_string(),
+            status: InvoiceStatus::Pending,
             items: vec![InvoiceReportItem {
                 id: "item-1".to_string(),
                 description: "Item 1".to_string(),
@@ -516,7 +531,7 @@ mod tests {
             due_date: "2026-10-31".to_string(),
             settled_date: None,
             payment_method: "Pix".to_string(),
-            status: "pending".to_string(),
+            status: InvoiceStatus::Pending,
             items: vec![InvoiceReportItem {
                 id: "item-1".to_string(),
                 description: "Item 1".to_string(),
@@ -555,7 +570,7 @@ mod tests {
             due_date: "2026-10-31".to_string(),
             settled_date: None,
             payment_method: "Pix".to_string(),
-            status: "pending".to_string(),
+            status: InvoiceStatus::Pending,
             items: vec![],
             taxes: None,
             discount: None,
@@ -570,8 +585,8 @@ mod tests {
     #[test]
     fn test_documents_service_authorizes_scope_matching() {
         let mock = std::sync::Arc::new(MockRenderer::new(vec![DocumentKind::InvoiceBill]));
-        // Serviço configurado com escopo universal explícito
-        let service = DocumentsService::with_scope(mock.clone(), DocumentScope::Universal);
+        // Serviço configurado com escopo CockpitOnly
+        let service = DocumentsService::with_scope(mock.clone(), DocumentScope::CockpitOnly).unwrap();
 
         let payload = InvoiceReportPayload {
             id: "FAT-SCOPE-001".to_string(),
@@ -585,7 +600,7 @@ mod tests {
             due_date: "2026-10-31".to_string(),
             settled_date: None,
             payment_method: "Pix".to_string(),
-            status: "pending".to_string(),
+            status: InvoiceStatus::Pending,
             items: vec![InvoiceReportItem {
                 id: "item-1".to_string(),
                 description: "Item 1".to_string(),
@@ -608,21 +623,16 @@ mod tests {
     fn test_documents_service_rejects_unauthorized_scope() {
         let mock = std::sync::Arc::new(MockRenderer::new(vec![DocumentKind::InvoiceBill]));
         // Serviço configurado com escopo restrito a NodeOnly
-        let node_service = DocumentsService::with_scope(mock.clone(), DocumentScope::NodeOnly);
+        let node_service = DocumentsService::with_scope(mock.clone(), DocumentScope::NodeOnly)
+            .expect("NodeOnly é um escopo válido");
 
         // Tentativa de emissão exigindo CockpitOnly é rejeitada com UnauthorizedScope
         let auth_res = node_service.validate_scope_for(DocumentScope::CockpitOnly);
         assert!(matches!(auth_res, Err(DocumentError::UnauthorizedScope(_))));
 
-        // Serviço Universal também rejeita escopos restritos a Cockpit ou Node
-        let universal_service =
-            DocumentsService::with_scope(mock.clone(), DocumentScope::Universal);
+        // Escopo Universal não é uma edição executável e é rejeitado na criação do serviço
         assert!(matches!(
-            universal_service.validate_scope_for(DocumentScope::CockpitOnly),
-            Err(DocumentError::UnauthorizedScope(_))
-        ));
-        assert!(matches!(
-            universal_service.validate_scope_for(DocumentScope::NodeOnly),
+            DocumentsService::with_scope(mock.clone(), DocumentScope::Universal),
             Err(DocumentError::UnauthorizedScope(_))
         ));
 
@@ -642,7 +652,10 @@ mod tests {
 
         let ledger_req = DocumentRequest::CitizenLedger(CitizenLedgerPayload {
             associate_id: Some("ASSOC-01".to_string()),
-            data: json!({"meta": {}}),
+            data: json!({
+                "associate": { "id": "ASSOC-01" },
+                "meta": { "reference_period": "2026-10" }
+            }),
         });
         let invoice_req = DocumentRequest::InvoiceBill(InvoiceReportPayload {
             id: "FAT-SCOPE-02".to_string(),
@@ -656,7 +669,7 @@ mod tests {
             due_date: "2026-10-31".to_string(),
             settled_date: None,
             payment_method: "Pix".to_string(),
-            status: "pending".to_string(),
+            status: InvoiceStatus::Pending,
             items: vec![InvoiceReportItem {
                 id: "it-1".to_string(),
                 description: "Item".to_string(),
@@ -673,17 +686,33 @@ mod tests {
             DocumentRequest::CessaoPosse(crate::modules::documents::models::CessaoPossePayload {
                 document_number: "2026-0001/CP".to_string(),
                 auth_code: "2026-X7Y9".to_string(),
-                data: json!({"cedenteNome": "Cedente"}),
+                data: json!({
+                    "cedenteNome": "Cedente Exemplo",
+                    "cedenteCpf": "111.222.333-44",
+                    "cedenteNacionalidade": "Brasileiro",
+                    "cedenteEstadoCivil": "Casado",
+                    "cedenteEndereco": "Rua A, 1",
+                    "cessionarioNome": "Cessionário Exemplo",
+                    "cessionarioCpf": "555.666.777-88",
+                    "cessionarioNacionalidade": "Brasileiro",
+                    "cessionarioEstadoCivil": "Solteiro",
+                    "cessionarioEndereco": "Rua B, 2",
+                    "numeroLote": "10",
+                    "quadraLote": "20"
+                }),
             });
         let reconciliation_req = DocumentRequest::RealEstateReconciliation(
             crate::modules::documents::models::RealEstateReconciliationPayload {
-                data: json!({"stats": {}}),
+                data: json!({
+                    "generatedAt": "2026-11-15T12:00:00Z",
+                    "stats": {}
+                }),
             },
         );
 
         // 1. Edição Cockpit (CockpitOnly): aceita Universal e CockpitOnly
         let cockpit_service =
-            DocumentsService::with_scope(mock.clone(), DocumentScope::CockpitOnly);
+            DocumentsService::with_scope(mock.clone(), DocumentScope::CockpitOnly).unwrap();
         assert!(cockpit_service
             .generate_document(ledger_req.clone())
             .is_ok());
@@ -700,7 +729,8 @@ mod tests {
 
         // 2. Edição Node (NodeOnly): aceita Universal (CitizenLedger, InvoiceBill),
         // mas rejeita documentos restritos ao Cockpit (CessaoPosse, RealEstateReconciliation)
-        let node_service = DocumentsService::with_scope(mock.clone(), DocumentScope::NodeOnly);
+        let node_service =
+            DocumentsService::with_scope(mock.clone(), DocumentScope::NodeOnly).unwrap();
         assert!(node_service.generate_document(ledger_req).is_ok());
         assert!(node_service.generate_document(invoice_req).is_ok());
         assert_eq!(mock.invocations(), 6);

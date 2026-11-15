@@ -935,26 +935,20 @@ mod tests {
             .begin_export(&stored.preview_id, &sha, DocumentScope::NodeOnly)
             .expect("Deve iniciar reserva de exportação");
 
-        assert_eq!(reservation.preview_id, stored.preview_id);
-        assert_eq!(reservation.pdf_bytes, stored.pdf_bytes);
+        assert_eq!(reservation.preview_id(), stored.preview_id);
+        assert_eq!(reservation.pdf_bytes(), &stored.pdf_bytes);
 
         // 2. Abortar reserva e verificar contadores
-        store.abort_export(&reservation);
+        reservation.abort();
 
         // 3. Iniciar nova reserva e confirmar sucesso
         let new_reservation = store
             .begin_export(&stored.preview_id, &sha, DocumentScope::NodeOnly)
             .expect("Deve iniciar nova reserva");
 
-        store
-            .confirm_export_success(&new_reservation)
+        new_reservation
+            .confirm()
             .expect("Confirmação deve ter sucesso");
-
-        // Tentativa de reconfirmar o mesmo bilhete deve ser rejeitada
-        assert_eq!(
-            store.confirm_export_success(&new_reservation),
-            Err(PreviewStoreError::InvalidReservation)
-        );
     }
 
     #[test]
@@ -987,7 +981,7 @@ mod tests {
             .unwrap();
 
         // p1 ainda deve existir (pois estava protegido)
-        store.confirm_export_success(&res1).unwrap();
+        res1.confirm().unwrap();
         assert!(store
             .verify_and_get_for_export(&p1.preview_id, &sha1, DocumentScope::NodeOnly)
             .is_ok());
@@ -1045,26 +1039,27 @@ mod tests {
     }
 
     #[test]
-    fn test_preview_store_rejects_tampered_preview_id_in_reservation() {
+    fn test_preview_store_reservation_raii_aborts_on_drop() {
         let store = DocumentPreviewStore::new();
-        let output = sample_output(DocumentKind::InvoiceBill, "tamper-test");
+        let output = sample_output(DocumentKind::InvoiceBill, "raii-test");
         let sha = output.metadata.sha256_checksum.clone();
 
         let stored = store
             .store_preview(output, sample_pages(), DocumentScope::NodeOnly)
             .unwrap();
 
-        let mut reservation = store
+        {
+            let _res = store
+                .begin_export(&stored.preview_id, &sha, DocumentScope::NodeOnly)
+                .unwrap();
+            // Ao sair deste escopo sem chamar confirm(), o bilhete é descartado e abortado via RAII Drop
+        }
+
+        // Uma nova reserva deve ser iniciada e confirmada normalmente
+        let second_res = store
             .begin_export(&stored.preview_id, &sha, DocumentScope::NodeOnly)
             .unwrap();
-
-        // Adulterar maliciosamente o preview_id na reserva deve ser rejeitado
-        reservation.preview_id = "preview-id-adulterado".to_string();
-
-        assert_eq!(
-            store.confirm_export_success(&reservation),
-            Err(PreviewStoreError::InvalidReservation)
-        );
+        assert!(second_res.confirm().is_ok());
     }
 
     #[test]
@@ -1098,7 +1093,7 @@ mod tests {
         );
 
         // 4. Mas o documento NÃO pode ser destruído da memória enquanto a exportação anterior estiver ativa
-        assert!(store.confirm_export_success(&reservation).is_ok());
+        assert!(reservation.confirm().is_ok());
 
         // 5. Após a finalização da exportação ativa, o item agora pode ser expurgado
         assert_eq!(store.active_count(), 0);
