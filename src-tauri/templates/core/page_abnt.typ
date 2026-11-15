@@ -20,3 +20,30 @@
 #let margins_institutional_territorial = (top: 2.0cm, bottom: 2.0cm, left: 1.5cm, right: 1.5cm)
 #let margins_territorial = margins_institutional_territorial
 #let margins_report = margins_institutional_territorial // Alias de compatibilidade retroativa
+
+// 4. Perfil Institucional Paisagem A4 (Certidões Territoriais e Quadros de Alta Densidade)
+#let margins_institutional_landscape = (top: 2.0cm, bottom: 2.0cm, left: 2.0cm, right: 2.0cm)
+#let margins_landscape = margins_institutional_landscape
+
+// Funções Canônicas de Configuração de Página (Helper Dictionaries para #set page(..))
+#let institutional_contract_page_setup(header: none, footer: none) = (
+  paper: standard_paper,
+  margin: margins_institutional_contract,
+  header: header,
+  footer: footer,
+)
+
+#let institutional_financial_page_setup(header: none, footer: none) = (
+  paper: standard_paper,
+  margin: margins_institutional_financial,
+  header: header,
+  footer: footer,
+)
+
+#let institutional_territorial_page_setup(header: none, footer: none, flipped: false) = (
+  paper: standard_paper,
+  margin: if flipped { margins_institutional_landscape } else { margins_institutional_territorial },
+  flipped: flipped,
+  header: header,
+  footer: footer,
+)

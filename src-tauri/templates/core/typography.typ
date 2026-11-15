@@ -3,9 +3,11 @@
 // Módulo: core/typography.typ
 // ====================================================================
 
+#import "branding.typ": color_primary, color_primary_text
+
 // Famílias Tipográficas Homologadas
 #let font_family_base = ("Roboto", "Liberation Sans", "Arial")
-#let font_family_mono = "monospace"
+#let font_family_mono = ("Roboto Mono", "Liberation Mono", "DejaVu Sans Mono", "monospace")
 
 // Escala Tipográfica Institucional
 #let font_size_title = 13.5pt
@@ -24,9 +26,14 @@
 #let leading_body = 0.6em
 #let first_line_indent_abnt = 1.25cm
 
+// Tokens de Espaçamento Semântico
+#let spacing_section_before = 8pt
+#let spacing_section_after = 3pt
+#let spacing_paragraph = 0.5em
+
 // Utilitário de Cabeçalho de Seção Padronizado
 #let section_heading(title) = {
-  v(8pt)
-  align(center)[#text(weight: "bold", size: font_size_section, fill: rgb("#111827"))[#title]]
-  v(3pt)
+  v(spacing_section_before)
+  align(center)[#text(weight: "bold", size: font_size_section, fill: color_primary)[#title]]
+  v(spacing_section_after)
 }

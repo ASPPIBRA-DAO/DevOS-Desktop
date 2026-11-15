@@ -126,6 +126,8 @@
 }
 
 // Rodapé Institucional com Identificação de Registro (quando aplicável)
+// Nota de governança: O campo `auth_code` representa o código de controle, autenticação
+// interna e rastreabilidade institucional emitido pelo DevOS (protocolo de auditoria).
 #let asppibra_footer(
   doc_number: none,
   auth_code: none,
