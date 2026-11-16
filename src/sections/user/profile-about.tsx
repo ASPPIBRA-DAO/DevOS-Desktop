@@ -1,3 +1,5 @@
+import type { UserProfileAbout } from './types';
+
 import React from 'react';
 
 import Card from '@mui/material/Card';
@@ -5,8 +7,6 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 
 import { Iconify } from 'src/shared/components/iconify';
-
-import type { UserProfileAbout } from './types';
 
 // ----------------------------------------------------------------------
 

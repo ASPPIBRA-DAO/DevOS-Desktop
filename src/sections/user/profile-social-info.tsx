@@ -1,3 +1,5 @@
+import type { UserProfileSocials } from './types';
+
 import React from 'react';
 
 import Link from '@mui/material/Link';
@@ -6,8 +8,6 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 
 import { Iconify } from 'src/shared/components/iconify';
-
-import type { UserProfileSocials } from './types';
 
 // ----------------------------------------------------------------------
 

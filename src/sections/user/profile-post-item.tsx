@@ -1,19 +1,17 @@
+import type { UserPostItem } from './types';
+
 import React, { useState } from 'react';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
 import Avatar from '@mui/material/Avatar';
-import Divider from '@mui/material/Divider';
 import InputBase from '@mui/material/InputBase';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
-import AvatarGroup from '@mui/material/AvatarGroup';
 
 import { Image } from 'src/shared/components/image';
 import { Iconify } from 'src/shared/components/iconify';
-
-import type { UserPostItem } from './types';
 
 // ----------------------------------------------------------------------
 
@@ -116,11 +114,11 @@ export function ProfilePostItem({ post }: Props) {
             {likes}
           </Typography>
 
-          <AvatarGroup max={4} sx={{ '& .MuiAvatar-root': { width: 22, height: 22, fontSize: '0.65rem' } }}>
-            <Avatar alt="User 1" src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" />
-            <Avatar alt="User 2" src="https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka" />
-            <Avatar alt="User 3" src="https://api.dicebear.com/7.x/avataaars/svg?seed=John" />
-          </AvatarGroup>
+          <Stack direction="row" spacing={-0.8} sx={{ alignItems: 'center' }}>
+            <Avatar alt="User 1" src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" sx={{ width: 22, height: 22, border: '2px solid #FFFFFF' }} />
+            <Avatar alt="User 2" src="https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka" sx={{ width: 22, height: 22, border: '2px solid #FFFFFF' }} />
+            <Avatar alt="User 3" src="https://api.dicebear.com/7.x/avataaars/svg?seed=John" sx={{ width: 22, height: 22, border: '2px solid #FFFFFF' }} />
+          </Stack>
         </Stack>
 
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>

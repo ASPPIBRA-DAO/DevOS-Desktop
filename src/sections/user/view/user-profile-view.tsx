@@ -5,11 +5,12 @@ import Card from '@mui/material/Card';
 import Typography from '@mui/material/Typography';
 
 import { paths } from 'src/app/router/paths';
+import { useUserProfile } from 'src/app/editions/node/hooks/use-user-profile';
+
 import { CustomBreadcrumbs } from 'src/shared/components/custom-breadcrumbs';
 
 import { ProfileHome } from '../profile-home';
 import { ProfileCover } from '../profile-cover';
-import { useUserProfile } from 'src/app/editions/node/hooks/use-user-profile';
 
 // ----------------------------------------------------------------------
 

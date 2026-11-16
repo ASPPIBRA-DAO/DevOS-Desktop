@@ -29,12 +29,15 @@ describe('DevOSLayout & Navigation Adapter', () => {
     it('deve converter corretamente grupos e itens preservando títulos, caminhos e subheaders', () => {
       const navData = toNavSectionData(nodeEdition.navigation);
 
-      expect(navData).toHaveLength(2);
+      expect(navData).toHaveLength(3);
       expect(navData[0].subheader).toBe('VISÃO GERAL');
       expect(navData[0].items[0].title).toBe('Painel do Nó');
       expect(navData[0].items[0].path).toBe('/');
-      expect(navData[1].subheader).toBe('INFRAESTRUTURA');
-      expect(navData[1].items).toHaveLength(2);
+      expect(navData[1].subheader).toBe('USUÁRIO');
+      expect(navData[1].items[0].title).toBe('Perfil');
+      expect(navData[1].items[0].path).toBe('/user/profile');
+      expect(navData[2].subheader).toBe('INFRAESTRUTURA');
+      expect(navData[2].items).toHaveLength(2);
     });
   });
 

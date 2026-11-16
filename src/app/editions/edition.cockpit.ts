@@ -29,6 +29,17 @@ export const currentEdition: EditionConfig = {
       ],
     },
     {
+      id: 'user',
+      subheader: 'USUÁRIO',
+      items: [
+        {
+          title: 'Perfil',
+          path: paths.dashboard.user.profile,
+          icon: 'solar:user-id-bold',
+        },
+      ],
+    },
+    {
       id: 'financial',
       subheader: 'FINANCEIRO',
       items: [
