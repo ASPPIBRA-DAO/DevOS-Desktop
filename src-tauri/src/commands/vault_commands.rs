@@ -4,9 +4,9 @@ use std::path::PathBuf;
 use tauri::State;
 use zeroize::{Zeroize, Zeroizing};
 
-use crate::storage::local_database::{LocalDatabase, StorageError};
 use crate::modules::vault::access_control::{VaultHeader, VaultSession, VaultStatus};
 use crate::modules::vault::encryption::VaultCrypto;
+use crate::storage::local_database::{LocalDatabase, StorageError};
 
 // ----------------------------------------------------------------------
 // Tratamento centralizado de erros
@@ -221,9 +221,7 @@ pub fn unlock_vault(
     if session.try_unlock(epoch_at_start) {
         Ok(true)
     } else {
-        Err(
-            "Operação de desbloqueio abortada: o cofre foi bloqueado concorrentemente.".to_string(),
-        )
+        Err("Operação de desbloqueio abortada: o cofre foi bloqueado concorrentemente.".to_string())
     }
 }
 
@@ -284,23 +282,28 @@ pub fn export_authorized_secret(
         })?
         .ok_or_else(|| "Registro criptográfico do cofre não encontrado.".to_string())?;
 
-    let decrypted_bytes = VaultCrypto::decrypt(&master_password, &secret.envelope).map_err(|_| {
-        "Falha ao decifrar o envelope do cofre. Dados corrompidos ou chave inválida.".to_string()
-    })?;
+    let decrypted_bytes =
+        VaultCrypto::decrypt(&master_password, &secret.envelope).map_err(|_| {
+            "Falha ao decifrar o envelope do cofre. Dados corrompidos ou chave inválida."
+                .to_string()
+        })?;
 
     let mut plaintext = match String::from_utf8(decrypted_bytes) {
         Ok(value) => value,
         Err(error) => {
             let mut invalid_bytes = error.into_bytes();
             invalid_bytes.zeroize();
-            return Err("O conteúdo decifrado não possui uma codificação UTF-8 válida.".to_string());
+            return Err(
+                "O conteúdo decifrado não possui uma codificação UTF-8 válida.".to_string(),
+            );
         }
     };
 
     if !session.is_unlocked() || session.current_epoch() != epoch_at_start {
         plaintext.zeroize();
         return Err(
-            "A sessão do cofre foi invalidada durante a exportação. Operação cancelada.".to_string(),
+            "A sessão do cofre foi invalidada durante a exportação. Operação cancelada."
+                .to_string(),
         );
     }
 

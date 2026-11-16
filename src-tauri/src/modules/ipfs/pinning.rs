@@ -99,9 +99,9 @@ pub fn is_managed_pin(cid: &str) -> bool {
 /// Verifica se um CID está registrado sob um contexto de repositório específico.
 pub fn is_managed_pin_in_context(cid: &str, repo_context: &str) -> bool {
     let _lock = CATALOG_MUTEX.lock().unwrap_or_else(|p| p.into_inner());
-    load_records_internal().iter().any(|r| {
-        r.cid == cid && r.repo_context == repo_context
-    })
+    load_records_internal()
+        .iter()
+        .any(|r| r.cid == cid && r.repo_context == repo_context)
 }
 
 /// Registra um novo pin no catálogo gerenciado.

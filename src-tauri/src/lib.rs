@@ -122,100 +122,87 @@ pub fn run() {
         }
     };
 
-    let builder = tauri::Builder::default()
-        .setup(move |app| {
-            #[cfg(debug_assertions)]
-            {
-                app.handle().plugin(
-                    tauri_plugin_log::Builder::default()
-                        .level(log::LevelFilter::Info)
-                        .build(),
-                )?;
-            }
+    let builder = tauri::Builder::default().setup(move |app| {
+        #[cfg(debug_assertions)]
+        {
+            app.handle().plugin(
+                tauri_plugin_log::Builder::default()
+                    .level(log::LevelFilter::Info)
+                    .build(),
+            )?;
+        }
 
-            // 0. Inicializar imutavelmente a edição do módulo de documentos no boot
-            modules::documents::initialize_application_edition(edition).map_err(|error| {
-                log::error!(
-                    "[Startup] Falha crítica ao inicializar a edição de documentos da aplicação: {}",
-                    error
-                );
-                startup_error(
-                    "Falha crítica ao inicializar a edição de documentos da aplicação",
-                    error,
-                )
-            })?;
+        // 0. Inicializar imutavelmente a edição do módulo de documentos no boot
+        modules::documents::initialize_application_edition(edition).map_err(|error| {
+            log::error!(
+                "[Startup] Falha crítica ao inicializar a edição de documentos da aplicação: {}",
+                error
+            );
+            startup_error(
+                "Falha crítica ao inicializar a edição de documentos da aplicação",
+                error,
+            )
+        })?;
 
-            // 1. Resolver diretórios de dados nativos
-            let app_handle = app.handle();
-            let app_data_dir = app_handle
-                .path()
-                .app_data_dir()
-                .map_err(|error| {
-                    log::error!(
-                        "[Startup] Falha ao resolver o diretório de dados: {}",
-                        error
-                    );
-                    startup_error("Falha ao resolver o diretório de dados", error)
-                })?;
+        // 1. Resolver diretórios de dados nativos
+        let app_handle = app.handle();
+        let app_data_dir = app_handle.path().app_data_dir().map_err(|error| {
+            log::error!(
+                "[Startup] Falha ao resolver o diretório de dados: {}",
+                error
+            );
+            startup_error("Falha ao resolver o diretório de dados", error)
+        })?;
 
-            // 2. Inicializar banco do cofre (devos_vault.sqlite) com migrações centralizadas
-            let vault_dir = app_data_dir.join("devos_vault");
-            let vault_db = storage::LocalDatabase::new(vault_dir);
-            storage::MigrationManager::run_migrations(&vault_db)
-                .map_err(|error| {
-                    log::error!(
-                        "[Startup] Falha nas migrações do cofre: {}",
-                        error
-                    );
-                    startup_error("Falha nas migrações do cofre", error)
-                })?;
+        // 2. Inicializar banco do cofre (devos_vault.sqlite) com migrações centralizadas
+        let vault_dir = app_data_dir.join("devos_vault");
+        let vault_db = storage::LocalDatabase::new(vault_dir);
+        storage::MigrationManager::run_migrations(&vault_db).map_err(|error| {
+            log::error!("[Startup] Falha nas migrações do cofre: {}", error);
+            startup_error("Falha nas migrações do cofre", error)
+        })?;
 
-            if !app.manage(vault_db) {
+        if !app.manage(vault_db) {
+            let error = startup_error(
+                "Falha ao registrar o banco do cofre",
+                "o estado LocalDatabase já estava registrado",
+            );
+            log::error!("[Startup] {}", error);
+            return Err(Box::new(error) as Box<dyn Error>);
+        }
+
+        if !app.manage(modules::vault::VaultSession::new()) {
+            let error = startup_error(
+                "Falha ao registrar a sessão do cofre",
+                "o estado VaultSession já estava registrado",
+            );
+            log::error!("[Startup] {}", error);
+            return Err(Box::new(error) as Box<dyn Error>);
+        }
+
+        // 3. Inicializar banco do Cadastro Imobiliário (real_estate.sqlite) exclusivamente na edição Cockpit
+        if is_cockpit {
+            let real_estate_dir = app_data_dir.join("real_estate");
+            let real_estate_db = storage::RealEstateDatabase::new(real_estate_dir);
+            storage::RealEstateMigrationManager::run_migrations(&real_estate_db).map_err(
+                |error| {
+                    log::error!("[Startup] Falha nas migrações imobiliárias: {}", error);
+                    startup_error("Falha nas migrações do cadastro imobiliário", error)
+                },
+            )?;
+
+            if !app.manage(real_estate_db) {
                 let error = startup_error(
-                    "Falha ao registrar o banco do cofre",
-                    "o estado LocalDatabase já estava registrado",
+                    "Falha ao registrar o banco imobiliário",
+                    "o estado RealEstateDatabase já estava registrado",
                 );
                 log::error!("[Startup] {}", error);
                 return Err(Box::new(error) as Box<dyn Error>);
             }
+        }
 
-            if !app.manage(modules::vault::VaultSession::new()) {
-                let error = startup_error(
-                    "Falha ao registrar a sessão do cofre",
-                    "o estado VaultSession já estava registrado",
-                );
-                log::error!("[Startup] {}", error);
-                return Err(Box::new(error) as Box<dyn Error>);
-            }
-
-            // 3. Inicializar banco do Cadastro Imobiliário (real_estate.sqlite) exclusivamente na edição Cockpit
-            if is_cockpit {
-                let real_estate_dir = app_data_dir.join("real_estate");
-                let real_estate_db = storage::RealEstateDatabase::new(real_estate_dir);
-                storage::RealEstateMigrationManager::run_migrations(&real_estate_db)
-                    .map_err(|error| {
-                        log::error!(
-                            "[Startup] Falha nas migrações imobiliárias: {}",
-                            error
-                        );
-                        startup_error(
-                            "Falha nas migrações do cadastro imobiliário",
-                            error,
-                        )
-                    })?;
-
-                if !app.manage(real_estate_db) {
-                    let error = startup_error(
-                        "Falha ao registrar o banco imobiliário",
-                        "o estado RealEstateDatabase já estava registrado",
-                    );
-                    log::error!("[Startup] {}", error);
-                    return Err(Box::new(error) as Box<dyn Error>);
-                }
-            }
-
-            Ok(())
-        });
+        Ok(())
+    });
 
     let builder = if is_cockpit {
         builder.invoke_handler(app_invoke_handler!(

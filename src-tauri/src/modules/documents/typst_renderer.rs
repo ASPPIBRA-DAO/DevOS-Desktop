@@ -4,11 +4,11 @@ use rust_decimal::{Decimal, RoundingStrategy};
 
 use crate::modules::documents::models::{DocumentError, DocumentKind, DocumentRequest};
 use crate::modules::documents::ports::{DocumentRenderer, RenderedDocument};
-use crate::platform::typst_engine::{
-    compile_typst_document_to_pdf, compile_typst_document_with_preview, TypstCompileOptions,
-};
 #[cfg(test)]
 use crate::platform::typst_engine::compile_typst_document;
+use crate::platform::typst_engine::{
+    TypstCompileOptions, compile_typst_document_to_pdf, compile_typst_document_with_preview,
+};
 
 static CITIZEN_TEMPLATE: &str = include_str!("../../../templates/extrato_citizen_ledger.typ");
 
@@ -16,6 +16,9 @@ static INVOICE_TEMPLATE: &str = include_str!("../../../templates/invoice_bill.ty
 
 static CONTRATO_CESSAO_TEMPLATE: &str =
     include_str!("../../../templates/contrato_cessao_posse.typ");
+
+pub static CONTRATO_ADESAO_ASSOCIADO_TEMPLATE: &str =
+    include_str!("../../../templates/contrato_adesao_associado.typ");
 
 static RECONCILIATION_TEMPLATE: &str =
     include_str!("../../../templates/real_estate_reconciliation.typ");
@@ -47,6 +50,15 @@ static ROBOTO_REGULAR: &[u8] = include_bytes!("../../../assets/fonts/Roboto-Regu
 static ROBOTO_BOLD: &[u8] = include_bytes!("../../../assets/fonts/Roboto-Bold.ttf");
 
 static CANONICAL_FONTS: &[&[u8]] = &[ROBOTO_REGULAR, ROBOTO_BOLD];
+
+static ASPPIBRA_LOGO_PNG: &[u8] = include_bytes!("../../../assets/logo/asppibra.png");
+
+pub static CANONICAL_TYPST_STATIC_FILES: &[(&str, &[u8])] = &[
+    ("asppibra.png", ASPPIBRA_LOGO_PNG),
+    ("logo.png", ASPPIBRA_LOGO_PNG),
+    ("assets/logo/asppibra.png", ASPPIBRA_LOGO_PNG),
+    ("core/asppibra.png", ASPPIBRA_LOGO_PNG),
+];
 
 /// Adaptador de renderização documental baseado no compilador nativo Typst.
 ///
@@ -171,7 +183,10 @@ impl TypstDocumentRenderer {
                         .iter()
                         .map(|item| {
                             let mut item_map = serde_json::Map::new();
-                            item_map.insert("id".to_string(), serde_json::Value::String(item.id.clone()));
+                            item_map.insert(
+                                "id".to_string(),
+                                serde_json::Value::String(item.id.clone()),
+                            );
                             item_map.insert(
                                 "description".to_string(),
                                 serde_json::Value::String(item.description.clone()),
@@ -210,7 +225,10 @@ impl TypstDocumentRenderer {
                         })
                         .collect();
 
-                    map.insert("items".to_string(), serde_json::Value::Array(formatted_items));
+                    map.insert(
+                        "items".to_string(),
+                        serde_json::Value::Array(formatted_items),
+                    );
                 }
 
                 let json_value = serde_json::json!({
@@ -228,6 +246,13 @@ impl TypstDocumentRenderer {
                     .map_err(|error| DocumentError::SerializationError(error.to_string()))?;
 
                 Ok((CONTRATO_CESSAO_TEMPLATE, json_str))
+            }
+
+            DocumentRequest::ContratoAssociado(payload) => {
+                let json_str = serde_json::to_string(&payload)
+                    .map_err(|error| DocumentError::SerializationError(error.to_string()))?;
+
+                Ok((CONTRATO_ADESAO_ASSOCIADO_TEMPLATE, json_str))
             }
 
             DocumentRequest::RealEstateReconciliation(payload) => {
@@ -253,6 +278,7 @@ impl TypstDocumentRenderer {
             fonts: CANONICAL_FONTS,
             string_inputs,
             static_sources: CANONICAL_TYPST_STATIC_SOURCES,
+            static_files: CANONICAL_TYPST_STATIC_FILES,
         })
     }
 }
@@ -264,6 +290,7 @@ impl DocumentRenderer for TypstDocumentRenderer {
             DocumentKind::CitizenLedger
                 | DocumentKind::InvoiceBill
                 | DocumentKind::CessaoPosse
+                | DocumentKind::ContratoAssociado
                 | DocumentKind::RealEstateReconciliation
         )
     }
@@ -497,6 +524,7 @@ mod tests {
             fonts: &[ROBOTO_REGULAR, ROBOTO_BOLD],
             string_inputs: HashMap::new(),
             static_sources: CANONICAL_TYPST_STATIC_SOURCES,
+            static_files: CANONICAL_TYPST_STATIC_FILES,
         };
 
         let pdf_bytes = compile_typst_document(options)
@@ -534,6 +562,7 @@ mod tests {
             fonts: &[ROBOTO_REGULAR, ROBOTO_BOLD],
             string_inputs: HashMap::new(),
             static_sources: CANONICAL_TYPST_STATIC_SOURCES,
+            static_files: CANONICAL_TYPST_STATIC_FILES,
         };
 
         let pdf_bytes = compile_typst_document(options)
@@ -564,6 +593,7 @@ mod tests {
             fonts: &[ROBOTO_REGULAR, ROBOTO_BOLD],
             string_inputs: HashMap::new(),
             static_sources: CANONICAL_TYPST_STATIC_SOURCES,
+            static_files: CANONICAL_TYPST_STATIC_FILES,
         };
 
         let pdf_bytes = compile_typst_document(options)
@@ -597,6 +627,7 @@ mod tests {
             fonts: &[ROBOTO_REGULAR, ROBOTO_BOLD],
             string_inputs: HashMap::new(),
             static_sources: CANONICAL_TYPST_STATIC_SOURCES,
+            static_files: CANONICAL_TYPST_STATIC_FILES,
         };
 
         let pdf_bytes = compile_typst_document(options)
@@ -647,6 +678,7 @@ mod tests {
                 fonts: &[],
                 string_inputs: HashMap::new(),
                 static_sources: CANONICAL_TYPST_STATIC_SOURCES,
+                static_files: CANONICAL_TYPST_STATIC_FILES,
             };
             assert!(
                 compile_typst_document(options).is_err(),
@@ -670,6 +702,7 @@ mod tests {
                 fonts: &[],
                 string_inputs: HashMap::new(),
                 static_sources: CANONICAL_TYPST_STATIC_SOURCES,
+                static_files: CANONICAL_TYPST_STATIC_FILES,
             };
             assert!(
                 compile_typst_document(options).is_err(),
@@ -699,6 +732,7 @@ mod tests {
                 fonts: &[],
                 string_inputs: HashMap::new(),
                 static_sources: CANONICAL_TYPST_STATIC_SOURCES,
+                static_files: CANONICAL_TYPST_STATIC_FILES,
             };
             assert!(
                 compile_typst_document(options).is_err(),
@@ -744,6 +778,7 @@ mod tests {
                 fonts: &[ROBOTO_REGULAR, ROBOTO_BOLD],
                 string_inputs,
                 static_sources: CANONICAL_TYPST_STATIC_SOURCES,
+                static_files: CANONICAL_TYPST_STATIC_FILES,
             };
 
             assert!(
@@ -926,6 +961,7 @@ mod tests {
                 fonts: &[ROBOTO_REGULAR, ROBOTO_BOLD],
                 string_inputs,
                 static_sources: CANONICAL_TYPST_STATIC_SOURCES,
+                static_files: CANONICAL_TYPST_STATIC_FILES,
             };
             assert!(
                 compile_typst_document(options).is_err(),
@@ -945,6 +981,7 @@ mod tests {
                 fonts: &[ROBOTO_REGULAR, ROBOTO_BOLD],
                 string_inputs,
                 static_sources: CANONICAL_TYPST_STATIC_SOURCES,
+                static_files: CANONICAL_TYPST_STATIC_FILES,
             };
             assert!(
                 compile_typst_document(options).is_err(),
@@ -964,6 +1001,7 @@ mod tests {
                 fonts: &[ROBOTO_REGULAR, ROBOTO_BOLD],
                 string_inputs,
                 static_sources: CANONICAL_TYPST_STATIC_SOURCES,
+                static_files: CANONICAL_TYPST_STATIC_FILES,
             };
             assert!(
                 compile_typst_document(options).is_err(),
@@ -1233,5 +1271,71 @@ mod tests {
                 "PDF da fatura deve conter '{expected_total_marker}' para amount={amount}, taxes={taxes:?}, discount={discount:?}"
             );
         }
+    }
+
+    #[test]
+    fn test_contrato_adesao_associado_template_compiles_successfully_to_pdf() {
+        use serde_json::json;
+
+        let sample_payload = json!({
+            "document_number": "DOC-ASSOC-2026-0001",
+            "auth_code": "AUTH-ASP-2026-X89",
+            "data": {
+                "associado_nome": "JOÃO SILVA DOS SANTOS",
+                "associado_nacionalidade": "Brasileiro",
+                "associado_estado_civil": "Casado",
+                "associado_profissao": "Agricultor Familiar",
+                "associado_rg": "20.123.456-7 SSP/RJ",
+                "associado_cpf": "123.456.789-00",
+                "associado_endereco": "Estrada de Bambuí, Km 4, Maricá/RJ, CEP 24900-000",
+                "associado_email": "joao.silva@asppibra.org",
+                "associado_telefone": "(21) 98765-4321",
+                "associado_categoria": "Associado Titular Efetivo",
+                "associado_id": "ASP-0042",
+                "contribuicao_valor": "R$ 150,00",
+                "contribuicao_periodicidade": "Mensal",
+                "contribuicao_vencimento": "10",
+                "cidade_foro": "Maricá",
+                "estado_foro": "Rio de Janeiro",
+                "cidade_emissao": "Maricá/RJ",
+                "data_extenso": "15 de Novembro de 2026",
+                "testemunha1_nome": "MARIA DE SOUZA OLIVEIRA",
+                "testemunha1_cpf": "234.567.890-11",
+                "testemunha2_nome": "PEDRO HENRIQUE LIMA",
+                "testemunha2_cpf": "345.678.901-22"
+            }
+        });
+
+        let mut string_inputs = HashMap::new();
+        string_inputs.insert("data", sample_payload.to_string());
+
+        let options = TypstCompileOptions {
+            template_source: CONTRATO_ADESAO_ASSOCIADO_TEMPLATE,
+            fonts: &[ROBOTO_REGULAR, ROBOTO_BOLD],
+            string_inputs,
+            static_sources: CANONICAL_TYPST_STATIC_SOURCES,
+            static_files: CANONICAL_TYPST_STATIC_FILES,
+        };
+
+        let result = compile_typst_document(options);
+        assert!(
+            result.is_ok(),
+            "O template contrato_adesao_associado.typ deve compilar com sucesso: {:?}",
+            result.err()
+        );
+
+        let pdf_bytes = result.unwrap();
+        assert!(
+            pdf_bytes.starts_with(b"%PDF-"),
+            "O resultado da compilação deve ser um PDF binário válido"
+        );
+
+        let pages = crate::platform::typst_engine::inspect_pdf_bytes_pages(&pdf_bytes)
+            .expect("A inspeção de páginas do PDF gerado deve ter sucesso");
+        assert!(
+            pages.len() >= 2,
+            "O Contrato de Associado deve gerar no mínimo 2 páginas (gerou {})",
+            pages.len()
+        );
     }
 }

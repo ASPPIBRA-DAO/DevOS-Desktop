@@ -1,0 +1,161 @@
+{
+  "audit_metadata": {
+    "module": "Documents / PDF / Typst",
+    "application": "DevOS Desktop",
+    "commit_hash": "f2d78b0c972a9a1e61360f7b97edaeb422283450",
+    "branch": "main",
+    "audit_timestamp": "2026-11-15T17:45:00-03:00",
+    "operating_system": "Linux x86_64 Ubuntu",
+    "rustc_version": "1.99.0",
+    "cargo_version": "1.99.0",
+    "node_version": "BLOCKED (Node/npm not installed in sandbox environment)"
+  },
+  "scope_metrics": {
+    "total_in_scope_files": 71,
+    "reviewed_files": 71,
+    "not_reviewed_files": 0,
+    "fully_read_files": 71,
+    "coverage_percentage": 100.0
+  },
+  "findings_summary": {
+    "p0_critical": 0,
+    "p1_high": 0,
+    "p2_medium": 4,
+    "p3_low": 3,
+    "total_findings": 7
+  },
+  "findings_detail": [
+    {
+      "id": "FINDING-P2-01",
+      "severity": "P2",
+      "confidence": "alta",
+      "title": "Fallback genérico em inspect_pdf_bytes_pages para contagem binária de PDFs arbitrários",
+      "location": "src-tauri/src/platform/typst_engine.rs:242-258",
+      "description": "A função inspect_pdf_bytes_pages realiza contagem de páginas por varredura textual de /Type /Page em buffers brutos quando um renderer externo mockado não utiliza o compilador Typst. Embora o fluxo de produção utilize document.pages().len(), o fallback para buffers arbitrários pode ser impreciso em PDFs complexos de terceiros.",
+      "proposed_regression_test": "test_inspect_pdf_bytes_pages_with_embedded_text_containing_page_keyword"
+    },
+    {
+      "id": "FINDING-P2-02",
+      "severity": "P2",
+      "confidence": "alta",
+      "title": "Formatação de código cargo fmt com divergências em múltiplos módulos",
+      "location": "src-tauri/src/commands/document_commands.rs, src-tauri/src/modules/documents/models.rs, etc.",
+      "description": "A execução de cargo fmt -- --check acusa inconsistências de formatação automática em arquivos do backend Rust em linhas recém-adicionadas e em testes legados.",
+      "proposed_regression_test": "Executar cargo fmt no workspace Rust"
+    },
+    {
+      "id": "FINDING-P2-03",
+      "severity": "P2",
+      "confidence": "alta",
+      "title": "Uso de file.flush() em vez de file.sync_all() na persistência do arquivo PDF exportado",
+      "location": "src-tauri/src/commands/document_commands.rs:328",
+      "description": "O método std::io::Write::flush descarrega o buffer em espaço de usuário para o kernel do SO, mas não executa fsync(), deixando uma janela de corrupção em caso de queda brusca de energia ou kernel panic antes da descarga da página física.",
+      "proposed_regression_test": "test_export_document_calls_sync_all"
+    },
+    {
+      "id": "FINDING-P2-04",
+      "severity": "P2",
+      "confidence": "alta",
+      "title": "Renderização e transmissão redundante de SVGs via IPC não consumidos pelo Frontend",
+      "location": "src-tauri/src/platform/typst_engine.rs e src/shared/components/documents/PdfPageCanvas.tsx",
+      "description": "O backend renderiza cada página em SVG e envia um array de strings Base64 no payload do preview. No entanto, o frontend consome exclusivamente o stream PDF via PDF.js em Canvas HTML5, gerando sobrecarga desnecessária de CPU e tráfego IPC.",
+      "proposed_regression_test": "Tornar geração de SVG condicional ou migrar para PDF canônico exclusivo"
+    },
+    {
+      "id": "FINDING-P3-01",
+      "severity": "P3",
+      "confidence": "média",
+      "title": "Módulo abnt-document em React/DOM mantido como legado paralelo",
+      "location": "src/shared/components/abnt-document/",
+      "description": "Existe uma pasta com 12 componentes React para renderização DOM de ABNT que convive com o motor nativo Typst + PDF.js. Não interfere na geração de PDFs oficiais, mas representa código legado a ser descontinuado ou unificado.",
+      "proposed_regression_test": "Verificar consumidores de abnt-document"
+    },
+    {
+      "id": "FINDING-P3-02",
+      "severity": "P3",
+      "confidence": "média",
+      "title": "Dependência de binário externo kubo/ipfs ausente no ambiente de testes unitários",
+      "location": "src/tests/ipfs_integration_tests.rs:1127",
+      "description": "O teste de integração do módulo IPFS falha em ambientes de sandbox isolados onde o binário externo kubo não está presente no PATH do sistema operacional.",
+      "proposed_regression_test": "Executar teste com IPFS mockado ou kubo instalado"
+    },
+    {
+      "id": "FINDING-P3-03",
+      "severity": "P3",
+      "confidence": "média",
+      "title": "Possibilidade de DoS por estouro de pilha na deserialização de JSON com recursão profunda",
+      "location": "src-tauri/src/modules/documents/models.rs",
+      "description": "Embora o CountingWriter limite o tamanho do payload a 10 MB, uma estrutura JSON com dezenas de milhares de níveis aninhados pode estourar o limite de recursão da pilha do serde_json antes de a validação de limites de negócio ser concluída.",
+      "proposed_regression_test": "test_json_deserializer_deep_recursion_guard"
+    }
+  ],
+  "test_execution_matrix": {
+    "documents_and_reports_suite": {
+      "command": "cargo test --lib -- document",
+      "directory": "src-tauri",
+      "result": "PASS",
+      "passed": 87,
+      "failed": 0,
+      "ignored": 0,
+      "duration_seconds": 72.22
+    },
+    "documents_total_suite_count": {
+      "total_tests_in_documents_ecosystem": 94,
+      "breakdown": {
+        "modules_documents": 58,
+        "commands_document_commands": 14,
+        "platform_typst_engine": 10,
+        "document_integration_test": 11,
+        "modules_reports_engine": 1
+      },
+      "filter_explanation": "O comando 'cargo test --lib -- document' executa 87 testes porque 7 dos 10 testes de typst_engine não contêm a substring 'document' em seus identificadores. Todos os 94 testes passam 100% quando invocados diretamente."
+    },
+    "full_native_suite": {
+      "command": "cargo test",
+      "directory": "src-tauri",
+      "result": "FAIL (Exit code 101 - Falha no teste de integração IPFS por ausência de binário kubo externo no PATH da sandbox)",
+      "passed": 204,
+      "failed": 1,
+      "ignored": 4,
+      "duration_seconds": 99.56
+    },
+    "cargo_fmt_check": {
+      "command": "cargo fmt -- --check",
+      "directory": "src-tauri",
+      "result": "FAIL (Exit code 1 - Formatação inconsistente)"
+    },
+    "clippy_documents_check": {
+      "command": "cargo clippy --lib -- -D warnings (filtro documents)",
+      "directory": "src-tauri",
+      "result": "PASS (0 warnings no módulo documents, document_commands e typst_engine)"
+    },
+    "clippy_global_check": {
+      "command": "cargo clippy --lib -- -D warnings",
+      "directory": "src-tauri",
+      "result": "FAIL (Exit code 101 - 21 warnings em submódulos fora do escopo de documents: ipfs, real_estate, wallets, storage)"
+    },
+    "frontend_vitest_suite": {
+      "command": "npm test / vitest run",
+      "directory": "DevOS-Desktop",
+      "result": "BLOCKED (Exit code 127 - Node.js não disponível no sandbox local)"
+    }
+  },
+  "dimension_scores": {
+    "architecture_and_separation": 9.2,
+    "rust_implementation_quality": 9.0,
+    "data_validation_and_business_rules": 9.5,
+    "security_and_scope_authorization": 9.2,
+    "document_integrity_and_cryptography": 9.4,
+    "memory_management_and_limits": 8.8,
+    "rendering_performance_and_preview": 9.0,
+    "error_handling_and_fail_closed": 9.0,
+    "test_coverage_and_determinism": 8.8,
+    "maintainability_and_typst_vfs": 9.3,
+    "general_average_score": 9.12
+  },
+  "readiness_verdict": {
+    "development": "GO",
+    "controlled_pilot": "GO",
+    "production_general_availability": "CONDITIONAL GO (Requer formatação cargo fmt, migração para file.sync_all() e validação do pipeline frontend em CI/CD)"
+  }
+}

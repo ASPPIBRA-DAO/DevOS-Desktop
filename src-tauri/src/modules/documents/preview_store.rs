@@ -88,7 +88,9 @@ pub enum PreviewStoreError {
     #[error("O documento gerado excede o limite de memória permitido para visualização.")]
     PayloadTooLarge,
 
-    #[error("A capacidade máxima do repositório foi atingida e todos os itens estão em exportação ativa.")]
+    #[error(
+        "A capacidade máxima do repositório foi atingida e todos os itens estão em exportação ativa."
+    )]
     CapacityExceeded,
 
     #[error("O bilhete de reserva de exportação é inválido ou já foi finalizado.")]
@@ -142,7 +144,10 @@ impl std::fmt::Debug for ExportReservation {
             .field("sha256_checksum", &self.metadata.sha256_checksum)
             .field("edition_scope", &self.edition_scope)
             .field("reservation_token", &self.reservation_token)
-            .field("finished", &self.finished.load(std::sync::atomic::Ordering::Relaxed))
+            .field(
+                "finished",
+                &self.finished.load(std::sync::atomic::Ordering::Relaxed),
+            )
             .finish()
     }
 }
@@ -210,9 +215,7 @@ impl ExportReservation {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
 
-        if let Some(mapped_preview_id) = guard
-            .active_reservations
-            .remove(&self.reservation_token)
+        if let Some(mapped_preview_id) = guard.active_reservations.remove(&self.reservation_token)
             && let Some(entry) = guard
                 .entries
                 .iter_mut()
@@ -228,15 +231,17 @@ impl ExportReservation {
 
 impl Drop for ExportReservation {
     fn drop(&mut self) {
-        if !self.finished.swap(true, std::sync::atomic::Ordering::SeqCst) {
+        if !self
+            .finished
+            .swap(true, std::sync::atomic::Ordering::SeqCst)
+        {
             let mut guard = self
                 .state
                 .lock()
                 .unwrap_or_else(|poisoned| poisoned.into_inner());
 
-            if let Some(mapped_preview_id) = guard
-                .active_reservations
-                .remove(&self.reservation_token)
+            if let Some(mapped_preview_id) =
+                guard.active_reservations.remove(&self.reservation_token)
                 && let Some(entry) = guard
                     .entries
                     .iter_mut()
@@ -435,10 +440,7 @@ impl DocumentPreviewStore {
             || (guard.total_retained_bytes + entry_retained_bytes > self.max_total_bytes
                 && !guard.entries.is_empty())
         {
-            let evict_idx = guard
-                .entries
-                .iter()
-                .position(|e| e.in_flight_exports == 0);
+            let evict_idx = guard.entries.iter().position(|e| e.in_flight_exports == 0);
 
             if let Some(idx) = evict_idx {
                 if let Some(evicted) = guard.entries.remove(idx) {
@@ -776,7 +778,8 @@ mod tests {
     use crate::platform::typst_engine::encode_base64;
 
     fn sample_output(kind: DocumentKind, content_suffix: &str) -> DocumentOutput {
-        let bytes = format!("%PDF-1.7\n% mock content payload stream: {content_suffix}\n%%EOF").into_bytes();
+        let bytes = format!("%PDF-1.7\n% mock content payload stream: {content_suffix}\n%%EOF")
+            .into_bytes();
         let sha256 = hex::encode(Sha256::digest(&bytes));
         DocumentOutput {
             metadata: DocumentMetadata {
@@ -915,9 +918,11 @@ mod tests {
             store.verify_and_get_for_export(&p1.preview_id, &sha1, DocumentScope::CockpitOnly),
             Err(PreviewStoreError::NotFound)
         );
-        assert!(store
-            .verify_and_get_for_export(&p3.preview_id, &sha3, DocumentScope::CockpitOnly)
-            .is_ok());
+        assert!(
+            store
+                .verify_and_get_for_export(&p3.preview_id, &sha3, DocumentScope::CockpitOnly)
+                .is_ok()
+        );
     }
 
     #[test]
@@ -982,9 +987,11 @@ mod tests {
 
         // p1 ainda deve existir (pois estava protegido)
         res1.confirm().unwrap();
-        assert!(store
-            .verify_and_get_for_export(&p1.preview_id, &sha1, DocumentScope::NodeOnly)
-            .is_ok());
+        assert!(
+            store
+                .verify_and_get_for_export(&p1.preview_id, &sha1, DocumentScope::NodeOnly)
+                .is_ok()
+        );
 
         // p2 foi despejado
         assert_eq!(
@@ -993,9 +1000,11 @@ mod tests {
         );
 
         // p3 está ativo
-        assert!(store
-            .verify_and_get_for_export(&p3.preview_id, &sha3, DocumentScope::NodeOnly)
-            .is_ok());
+        assert!(
+            store
+                .verify_and_get_for_export(&p3.preview_id, &sha3, DocumentScope::NodeOnly)
+                .is_ok()
+        );
     }
 
     #[test]
@@ -1088,7 +1097,9 @@ mod tests {
 
         // 3. Novas requisições de exportação devem ser rejeitadas como Expired
         assert_eq!(
-            store.begin_export(&stored.preview_id, &sha, DocumentScope::NodeOnly).map(|_| ()),
+            store
+                .begin_export(&stored.preview_id, &sha, DocumentScope::NodeOnly)
+                .map(|_| ()),
             Err(PreviewStoreError::Expired)
         );
 
@@ -1101,9 +1112,14 @@ mod tests {
 
     #[test]
     fn test_preview_store_error_public_message_sanitizes_internal_details() {
-        let err = PreviewStoreError::StructuralValidationError("/secret/path: PDF stream malformed".to_string());
+        let err = PreviewStoreError::StructuralValidationError(
+            "/secret/path: PDF stream malformed".to_string(),
+        );
         let public_msg = err.public_message();
         assert!(!public_msg.contains("/secret/path"));
-        assert_eq!(public_msg, "O documento gerado contém inconsistências estruturais e não pôde ser verificado.");
+        assert_eq!(
+            public_msg,
+            "O documento gerado contém inconsistências estruturais e não pôde ser verificado."
+        );
     }
 }

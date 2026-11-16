@@ -3,16 +3,15 @@
 //! A comunicação é estritamente vinculada a `127.0.0.1:5001`, sem exposição
 //! de credenciais ou rotas administrativas à rede pública.
 
-use std::time::Duration;
 use reqwest::multipart::{Form, Part};
 use reqwest::{Body, Client, Response};
 use sha2::Digest;
+use std::time::Duration;
 
 use super::models::{
-    IpfsAllPinsVerifyResult, IpfsDaemonStatus, IpfsPinType, IpfsProviderPeer,
-    KuboAddResponse, KuboIdResponse, KuboPinAddResponse, KuboPinLsResponse,
-    KuboPinRmResponse, KuboPinVerifyItem, KuboRepoStatResponse,
-    KuboRoutingFindprovsItem, KuboSwarmPeersResponse, KuboVersionResponse,
+    IpfsAllPinsVerifyResult, IpfsDaemonStatus, IpfsPinType, IpfsProviderPeer, KuboAddResponse,
+    KuboIdResponse, KuboPinAddResponse, KuboPinLsResponse, KuboPinRmResponse, KuboPinVerifyItem,
+    KuboRepoStatResponse, KuboRoutingFindprovsItem, KuboSwarmPeersResponse, KuboVersionResponse,
 };
 
 pub const DEFAULT_KUBO_RPC_BASE_URL: &str = "http://127.0.0.1:5001/api/v0";
@@ -130,7 +129,9 @@ impl KuboClient {
 
         if !res.status().is_success() {
             let err_text = res.text().await.unwrap_or_default();
-            return Err(format!("Kubo RPC (/swarm/connect) retornou erro: {err_text}"));
+            return Err(format!(
+                "Kubo RPC (/swarm/connect) retornou erro: {err_text}"
+            ));
         }
         Ok(())
     }
@@ -147,9 +148,7 @@ impl KuboClient {
         let repo_stat = self.get_repo_stat().await.ok();
         let swarm_peers = self.get_swarm_peers().await.ok();
 
-        let peers_count = swarm_peers
-            .and_then(|s| s.peers)
-            .map(|p| p.len() as u32);
+        let peers_count = swarm_peers.and_then(|s| s.peers).map(|p| p.len() as u32);
 
         let repo_size = repo_stat.and_then(|r| r.repo_size);
         let peer_id = node_id.and_then(|n| n.id);
@@ -191,7 +190,9 @@ impl KuboClient {
         if !res.status().is_success() {
             let status = res.status();
             let err_text = res.text().await.unwrap_or_default();
-            return Err(format!("Kubo RPC (/add) retornou status {status}: {err_text}"));
+            return Err(format!(
+                "Kubo RPC (/add) retornou status {status}: {err_text}"
+            ));
         }
 
         let response_text = res
@@ -207,15 +208,20 @@ impl KuboClient {
                 continue;
             }
 
-            let obj: KuboAddResponse = serde_json::from_str(trimmed)
-                .map_err(|e| format!("Falha ao decodificar linha JSON de /add ('{trimmed}'): {e}"))?;
+            let obj: KuboAddResponse = serde_json::from_str(trimmed).map_err(|e| {
+                format!("Falha ao decodificar linha JSON de /add ('{trimmed}'): {e}")
+            })?;
 
             // Se Kubo comunicar um erro terminal em qualquer linha da resposta
-            if obj.r#type.as_deref() == Some("error") || (obj.message.is_some() && obj.hash.is_none()) {
+            if obj.r#type.as_deref() == Some("error")
+                || (obj.message.is_some() && obj.hash.is_none())
+            {
                 let msg = obj
                     .message
                     .unwrap_or_else(|| "Erro desconhecido informado pelo Kubo em /add".to_string());
-                return Err(format!("Kubo /api/v0/add encerrou com erro terminal: {msg}"));
+                return Err(format!(
+                    "Kubo /api/v0/add encerrou com erro terminal: {msg}"
+                ));
             }
 
             if obj.hash.is_some() {
@@ -249,7 +255,9 @@ impl KuboClient {
         if !res.status().is_success() {
             let status = res.status();
             let err_text = res.text().await.unwrap_or_default();
-            return Err(format!("Kubo RPC (/cat) retornou status {status}: {err_text}"));
+            return Err(format!(
+                "Kubo RPC (/cat) retornou status {status}: {err_text}"
+            ));
         }
 
         Ok(res)
@@ -310,7 +318,10 @@ impl KuboClient {
         if !status_line.contains("200") {
             let mut remaining_headers = String::new();
             while let Ok(n) = buf_reader.read_line(&mut remaining_headers).await {
-                if n == 0 || remaining_headers.ends_with("\r\n\r\n") || remaining_headers.ends_with("\n\n") {
+                if n == 0
+                    || remaining_headers.ends_with("\r\n\r\n")
+                    || remaining_headers.ends_with("\n\n")
+                {
                     break;
                 }
             }
@@ -410,7 +421,9 @@ impl KuboClient {
         if !res.status().is_success() {
             let status = res.status();
             let err_text = res.text().await.unwrap_or_default();
-            return Err(format!("Kubo RPC (/pin/add) retornou status {status}: {err_text}"));
+            return Err(format!(
+                "Kubo RPC (/pin/add) retornou status {status}: {err_text}"
+            ));
         }
 
         let body = res
@@ -439,7 +452,9 @@ impl KuboClient {
         if !res.status().is_success() {
             let status = res.status();
             let err_text = res.text().await.unwrap_or_default();
-            return Err(format!("Kubo RPC (/pin/rm) retornou status {status}: {err_text}"));
+            return Err(format!(
+                "Kubo RPC (/pin/rm) retornou status {status}: {err_text}"
+            ));
         }
 
         let body = res
@@ -506,7 +521,9 @@ impl KuboClient {
         if !res.status().is_success() {
             let status = res.status();
             let err_text = res.text().await.unwrap_or_default();
-            return Err(format!("Kubo RPC (/pin/verify) retornou status {status}: {err_text}"));
+            return Err(format!(
+                "Kubo RPC (/pin/verify) retornou status {status}: {err_text}"
+            ));
         }
 
         let text = res
@@ -567,13 +584,12 @@ impl KuboClient {
         if !res.status().is_success() {
             let status = res.status();
             let err_text = res.text().await.unwrap_or_default();
-            return Err(format!("Kubo RPC (/routing/findprovs) retornou status {status}: {err_text}"));
+            return Err(format!(
+                "Kubo RPC (/routing/findprovs) retornou status {status}: {err_text}"
+            ));
         }
 
-        let text = res
-            .text()
-            .await
-            .unwrap_or_default();
+        let text = res.text().await.unwrap_or_default();
 
         let mut providers = Vec::new();
 
@@ -621,7 +637,10 @@ pub fn parse_http_target(base_url: &str) -> Result<(String, u16, String), String
 
     let mut hp = host_port.splitn(2, ':');
     let host = hp.next().unwrap_or("127.0.0.1").to_string();
-    let port = hp.next().and_then(|p| p.parse::<u16>().ok()).unwrap_or(5001);
+    let port = hp
+        .next()
+        .and_then(|p| p.parse::<u16>().ok())
+        .unwrap_or(5001);
 
     Ok((host, port, base_path))
 }
@@ -650,7 +669,10 @@ where
             .map_err(|e| format!("Falha de transporte ao ler tamanho de chunk HTTP: {e}"))?;
 
         if n == 0 {
-            return Err("Conexão com Kubo encerrada prematuramente antes do término do stream chunked.".to_string());
+            return Err(
+                "Conexão com Kubo encerrada prematuramente antes do término do stream chunked."
+                    .to_string(),
+            );
         }
 
         let trimmed = line.trim();
@@ -660,8 +682,9 @@ where
 
         // Chunk header: <hex_size>[;extensions]
         let hex_part = trimmed.split(';').next().unwrap_or(trimmed).trim();
-        let chunk_size = usize::from_str_radix(hex_part, 16)
-            .map_err(|e| format!("Tamanho de chunk HTTP hexadecimal inválido ('{hex_part}'): {e}"))?;
+        let chunk_size = usize::from_str_radix(hex_part, 16).map_err(|e| {
+            format!("Tamanho de chunk HTTP hexadecimal inválido ('{hex_part}'): {e}")
+        })?;
 
         if chunk_size == 0 {
             // Último chunk recebido (0\r\n). Agora lemos os trailers HTTP até linha vazia.

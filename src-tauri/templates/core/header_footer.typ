@@ -24,7 +24,7 @@
 #let asppibra_header_first_page(
   doc_number: none,
   require_registration: true,
-  subtitle: "DOCUMENTO OFICIAL • PROTOCOLO DE REGULARIZAÇÃO",
+  subtitle: none,
 ) = {
   if require_registration {
     assert(
@@ -37,23 +37,17 @@
       message: "asppibra_header_first_page: quando informado, 'doc_number' não pode ser vazio ou conter apenas espaços",
     )
   }
-  assert(
-    _is_non_empty_str(subtitle),
-    message: "asppibra_header_first_page: 'subtitle' não pode ser nulo, vazio ou conter apenas espaços",
-  )
   block(width: 100%, inset: (bottom: 2pt))[
     #grid(
       columns: (auto, 1fr, auto),
-      gutter: 10pt,
+      gutter: 12pt,
       align: (left + horizon, left + horizon, right + horizon),
-      // Lado Esquerdo 1: Logo Globo Institucional (28pt = 38px proporcional)
-      image(bytes(asppibra_globe_svg), width: 28pt),
-      // Lado Esquerdo 2: Título e Subtítulo Institucional (alinhados à esquerda, indent 0)
+      // Lado Esquerdo 1: Logo Oficial ASPPIBRA (Brasão Institucional de Alta Resolução)
+      asppibra_logo_image(width: 46pt),
+      // Lado Esquerdo 2: Título Institucional (alinhado com o logo, indent 0)
       [
-        #set par(first-line-indent: 0pt, leading: leading_header, justify: false)
-        #text(size: font_size_title, weight: "bold", fill: color_primary)[#asppibra_sigla] \
-        #v(1.5pt)
-        #text(size: font_size_subtitle, fill: color_muted_text, weight: "bold")[#str(subtitle).trim()]
+        #set par(first-line-indent: 0pt, justify: false)
+        #text(size: font_size_title, weight: "bold", fill: color_primary)[#asppibra_sigla]
       ],
       // Lado Direito: Caixa de Registro Institucional (somente quando há doc_number real) ou Identificação CNPJ
       [

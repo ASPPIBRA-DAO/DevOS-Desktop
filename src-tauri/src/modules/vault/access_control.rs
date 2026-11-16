@@ -296,11 +296,7 @@ impl VaultSession {
     ///
     /// Se a operação for rejeitada, `key` sai de escopo e o tipo
     /// Zeroizing solicita a zeragem do conteúdo ao ser descartado.
-    pub fn try_unlock_with_session_key(
-        &self,
-        expected_epoch: u64,
-        key: Zeroizing<String>,
-    ) -> bool {
+    pub fn try_unlock_with_session_key(&self, expected_epoch: u64, key: Zeroizing<String>) -> bool {
         match self.state.lock() {
             Ok(mut state) => {
                 if state.epoch_exhausted || state.epoch != expected_epoch {
@@ -480,10 +476,7 @@ mod tests {
             "O desbloqueio iniciado na época antiga deve ser recusado."
         );
 
-        assert!(
-            !session.is_unlocked(),
-            "O cofre deve permanecer bloqueado."
-        );
+        assert!(!session.is_unlocked(), "O cofre deve permanecer bloqueado.");
     }
 
     #[test]
@@ -520,10 +513,7 @@ mod tests {
 
         let unlock_result = handle.join().expect("Thread de teste falhou.");
 
-        assert!(
-            !unlock_result,
-            "A tentativa atrasada deve ser recusada."
-        );
+        assert!(!unlock_result, "A tentativa atrasada deve ser recusada.");
 
         assert!(
             !session.is_unlocked(),

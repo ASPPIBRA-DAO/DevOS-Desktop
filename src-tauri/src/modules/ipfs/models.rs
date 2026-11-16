@@ -346,4 +346,3 @@ pub struct KuboRoutingProviderResponse {
     pub id: Option<String>,
     pub addrs: Option<Vec<String>>,
 }
-

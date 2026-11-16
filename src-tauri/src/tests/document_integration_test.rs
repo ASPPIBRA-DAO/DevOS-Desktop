@@ -1,12 +1,12 @@
 use crate::commands::document_commands::{
+    ExportPreviewPayload, GenerateDocumentPayload, PreviewDocumentPayload,
     export_previewed_document_in_directory_with_store_and_scope,
     generate_document_in_directory_with_scope, preview_document_with_store_and_scope,
-    ExportPreviewPayload, GenerateDocumentPayload, PreviewDocumentPayload,
 };
+use crate::modules::documents::models::InvoiceStatus;
 use crate::modules::documents::{
     DocumentKind, DocumentPreviewStore, DocumentRequest, DocumentScope,
 };
-use crate::modules::documents::models::InvoiceStatus;
 use crate::modules::reports::models::{
     CessaoPossePayload, CitizenLedgerPayload, InvoiceReportItem, InvoiceReportPayload,
     RealEstateReconciliationPayload,
@@ -449,251 +449,261 @@ fn test_preview_and_export_previewed_document_end_to_end_all_models() {
 
 #[test]
 fn test_uninitialized_application_edition_blocks_all_document_operations() {
-        use crate::modules::documents::models::{
-            ApplicationEdition, DocumentError, DocumentVisibility,
-        };
-        use crate::modules::documents::service::DocumentsService;
-        use crate::modules::documents::typst_renderer::TypstDocumentRenderer;
-        use std::sync::Arc;
+    use crate::modules::documents::models::{
+        ApplicationEdition, DocumentError, DocumentVisibility,
+    };
+    use crate::modules::documents::service::DocumentsService;
+    use crate::modules::documents::typst_renderer::TypstDocumentRenderer;
+    use std::sync::Arc;
 
-        // 1. try_from_bundle_identifier rejeita bundles desconhecidos com erro
-        let unknown_res = ApplicationEdition::try_from_bundle_identifier("com.malicious.fake");
-        assert!(matches!(unknown_res, Err(DocumentError::UnauthorizedScope(_))));
+    // 1. try_from_bundle_identifier rejeita bundles desconhecidos com erro
+    let unknown_res = ApplicationEdition::try_from_bundle_identifier("com.malicious.fake");
+    assert!(matches!(
+        unknown_res,
+        Err(DocumentError::UnauthorizedScope(_))
+    ));
 
-        // 2. Criação de serviço com DocumentVisibility::Uninitialized falha imediatamente
-        let renderer = Arc::new(TypstDocumentRenderer::new());
-        let uninitialized_res =
-            DocumentsService::with_scope(renderer, DocumentVisibility::Uninitialized);
-        assert!(
-            matches!(uninitialized_res, Err(DocumentError::UnauthorizedScope(_))),
-            "Emissão documental deve falhar categoricamente quando a edição da aplicação não foi inicializada"
-        );
-    }
+    // 2. Criação de serviço com DocumentVisibility::Uninitialized falha imediatamente
+    let renderer = Arc::new(TypstDocumentRenderer::new());
+    let uninitialized_res =
+        DocumentsService::with_scope(renderer, DocumentVisibility::Uninitialized);
+    assert!(
+        matches!(uninitialized_res, Err(DocumentError::UnauthorizedScope(_))),
+        "Emissão documental deve falhar categoricamente quando a edição da aplicação não foi inicializada"
+    );
+}
 
-    #[test]
-    fn test_monetary_decimal_precision_transport_matrix_full_pipeline() {
-        use crate::modules::documents::service::DocumentsService;
-        use crate::modules::documents::typst_renderer::TypstDocumentRenderer;
-        use std::sync::Arc;
+#[test]
+fn test_monetary_decimal_precision_transport_matrix_full_pipeline() {
+    use crate::modules::documents::service::DocumentsService;
+    use crate::modules::documents::typst_renderer::TypstDocumentRenderer;
+    use std::sync::Arc;
 
-        // Matriz exata exigida pelo parecer técnico: { 1500.50, 0.10, 0.20, 999999999.99, 0.01 }
-        // 1. Simular transporte via JSON IPC (React -> IPC -> Rust Serde)
-        let raw_ipc_json = json!({
-            "id": "INV-PRECISION-MATRIX",
-            "member_name": "Validação Centesimal Rastreável",
-            "member_doc": "CPF 000.000.000-00",
-            "member_email": "auditoria@asppibra.org",
-            "description": "Fatura de Verificação de Precisão Arbitrária Decimal",
-            "reference_month": "2026-11",
-            "amount": 1000001500.80, // 1500.50 + 0.10 + 0.20 + 999999999.99 + 0.01 = 1000001500.80
-            "due_date": "2026-11-30",
-            "settled_date": null,
-            "payment_method": "Pix / D1",
-            "status": "pending",
-            "taxes": 0.0,
-            "discount": 0.0,
-            "items": [
-                {
-                    "id": "it-1",
-                    "description": "Cota Padrão",
-                    "quantity": 1.0,
-                    "price": 1500.50,
-                    "total": 1500.50
+    // Matriz exata exigida pelo parecer técnico: { 1500.50, 0.10, 0.20, 999999999.99, 0.01 }
+    // 1. Simular transporte via JSON IPC (React -> IPC -> Rust Serde)
+    let raw_ipc_json = json!({
+        "id": "INV-PRECISION-MATRIX",
+        "member_name": "Validação Centesimal Rastreável",
+        "member_doc": "CPF 000.000.000-00",
+        "member_email": "auditoria@asppibra.org",
+        "description": "Fatura de Verificação de Precisão Arbitrária Decimal",
+        "reference_month": "2026-11",
+        "amount": 1000001500.80, // 1500.50 + 0.10 + 0.20 + 999999999.99 + 0.01 = 1000001500.80
+        "due_date": "2026-11-30",
+        "settled_date": null,
+        "payment_method": "Pix / D1",
+        "status": "pending",
+        "taxes": 0.0,
+        "discount": 0.0,
+        "items": [
+            {
+                "id": "it-1",
+                "description": "Cota Padrão",
+                "quantity": 1.0,
+                "price": 1500.50,
+                "total": 1500.50
+            },
+            {
+                "id": "it-2",
+                "description": "Taxa Micropagamento A",
+                "quantity": 1.0,
+                "price": 0.10,
+                "total": 0.10
+            },
+            {
+                "id": "it-3",
+                "description": "Taxa Micropagamento B",
+                "quantity": 1.0,
+                "price": 0.20,
+                "total": 0.20
+            },
+            {
+                "id": "it-4",
+                "description": "Aporte Patrimonial Institucional Máximo",
+                "quantity": 1.0,
+                "price": 999999999.99,
+                "total": 999999999.99
+            },
+            {
+                "id": "it-5",
+                "description": "Ajuste de Arredondamento Mínimo",
+                "quantity": 1.0,
+                "price": 0.01,
+                "total": 0.01
+            }
+        ]
+    });
+
+    let payload: InvoiceReportPayload = serde_json::from_value(raw_ipc_json)
+        .expect("Payload com a matriz dos 5 valores monetários deve deserializar perfeitamente");
+
+    // 2. Validação aritmética exata sem desvios IEEE 754
+    assert!(payload.validate().is_ok());
+    assert_eq!(payload.amount, dec!(1000001500.80));
+    assert_eq!(payload.final_total().unwrap(), dec!(1000001500.80));
+
+    // 3. Execução pelo pipeline completo do DocumentsService -> Typst -> PDF
+    let renderer = Arc::new(TypstDocumentRenderer::new());
+    let service = DocumentsService::with_scope(renderer, DocumentScope::CockpitOnly).unwrap();
+
+    let output = service
+        .generate_document(DocumentRequest::InvoiceBill(payload))
+        .expect("O pipeline completo Typst deve compilar o documento com os 5 valores da matriz");
+
+    assert!(!output.pdf_bytes.is_empty());
+    assert!(output.pdf_bytes.starts_with(b"%PDF-"));
+
+    // 4. Verificação de integridade no PDF gerado
+    let pdf_lossy = String::from_utf8_lossy(&output.pdf_bytes);
+    assert!(pdf_lossy.contains("1.000.001.500,80") || pdf_lossy.contains("1000001500"));
+}
+
+#[test]
+fn test_phase_b_deterministic_monotonic_clock_and_ttl_expiration() {
+    use crate::modules::documents::preview_store::MockMonotonicClock;
+    use std::time::{Duration, Instant};
+
+    let clock = std::sync::Arc::new(MockMonotonicClock::new(Instant::now()));
+    let store = DocumentPreviewStore::with_clock_and_limits(
+        clock.clone(),
+        Duration::from_secs(30),
+        4,
+        1024 * 1024,
+    );
+
+    let temp_dir = TempIntegrationDir::new("clock-ttl");
+    let payload = PreviewDocumentPayload {
+        request: DocumentRequest::CitizenLedger(CitizenLedgerPayload {
+            associate_id: Some("CLOCK_TEST_01".to_string()),
+            data: json!({
+                "meta": {
+                    "generated_at": "14/11/2026",
+                    "reference_period": "2026-11",
+                    "audit_hash": "mock_hash_clock"
                 },
-                {
-                    "id": "it-2",
-                    "description": "Taxa Micropagamento A",
-                    "quantity": 1.0,
-                    "price": 0.10,
-                    "total": 0.10
+                "associate": {
+                    "id": "CLOCK_TEST_01",
+                    "name": "Maria Silva Teste",
+                    "cpf": "111.222.333-44",
+                    "email": "maria@asppibra.org.br",
+                    "avatar_letter": "M",
+                    "address_line1": "Rua 1",
+                    "address_line2": "Bairro 2"
                 },
-                {
-                    "id": "it-3",
-                    "description": "Taxa Micropagamento B",
-                    "quantity": 1.0,
-                    "price": 0.20,
-                    "total": 0.20
+                "summary": {
+                    "total_contracted": "1.000,00",
+                    "total_paid": "1.000,00",
+                    "outstanding_balance": "0,00"
                 },
-                {
-                    "id": "it-4",
-                    "description": "Aporte Patrimonial Institucional Máximo",
-                    "quantity": 1.0,
-                    "price": 999999999.99,
-                    "total": 999999999.99
-                },
-                {
-                    "id": "it-5",
-                    "description": "Ajuste de Arredondamento Mínimo",
-                    "quantity": 1.0,
-                    "price": 0.01,
-                    "total": 0.01
-                }
-            ]
-        });
-
-        let payload: InvoiceReportPayload = serde_json::from_value(raw_ipc_json)
-            .expect("Payload com a matriz dos 5 valores monetários deve deserializar perfeitamente");
-
-        // 2. Validação aritmética exata sem desvios IEEE 754
-        assert!(payload.validate().is_ok());
-        assert_eq!(payload.amount, dec!(1000001500.80));
-        assert_eq!(payload.final_total().unwrap(), dec!(1000001500.80));
-
-        // 3. Execução pelo pipeline completo do DocumentsService -> Typst -> PDF
-        let renderer = Arc::new(TypstDocumentRenderer::new());
-        let service = DocumentsService::with_scope(renderer, DocumentScope::CockpitOnly).unwrap();
-
-        let output = service
-            .generate_document(DocumentRequest::InvoiceBill(payload))
-            .expect("O pipeline completo Typst deve compilar o documento com os 5 valores da matriz");
-
-        assert!(!output.pdf_bytes.is_empty());
-        assert!(output.pdf_bytes.starts_with(b"%PDF-"));
-
-        // 4. Verificação de integridade no PDF gerado
-        let pdf_lossy = String::from_utf8_lossy(&output.pdf_bytes);
-        assert!(pdf_lossy.contains("1.000.001.500,80") || pdf_lossy.contains("1000001500"));
-    }
-
-    #[test]
-    fn test_phase_b_deterministic_monotonic_clock_and_ttl_expiration() {
-        use crate::modules::documents::preview_store::MockMonotonicClock;
-        use std::time::{Duration, Instant};
-
-        let clock = std::sync::Arc::new(MockMonotonicClock::new(Instant::now()));
-        let store = DocumentPreviewStore::with_clock_and_limits(
-            clock.clone(),
-            Duration::from_secs(30),
-            4,
-            1024 * 1024,
-        );
-
-        let temp_dir = TempIntegrationDir::new("clock-ttl");
-        let payload = PreviewDocumentPayload {
-            request: DocumentRequest::CitizenLedger(CitizenLedgerPayload {
-                associate_id: Some("CLOCK_TEST_01".to_string()),
-                data: json!({
-                    "meta": {
-                        "generated_at": "14/11/2026",
-                        "reference_period": "2026-11",
-                        "audit_hash": "mock_hash_clock"
-                    },
-                    "associate": {
-                        "id": "CLOCK_TEST_01",
-                        "name": "Maria Silva Teste",
-                        "cpf": "111.222.333-44",
-                        "email": "maria@asppibra.org.br",
-                        "avatar_letter": "M",
-                        "address_line1": "Rua 1",
-                        "address_line2": "Bairro 2"
-                    },
-                    "summary": {
-                        "total_contracted": "1.000,00",
-                        "total_paid": "1.000,00",
-                        "outstanding_balance": "0,00"
-                    },
-                    "transactions": []
-                }),
+                "transactions": []
             }),
-        };
+        }),
+    };
 
-        let preview = preview_document_with_store_and_scope(payload, &store, DocumentScope::NodeOnly)
-            .expect("Deve gerar preview com relógio mockado");
+    let preview = preview_document_with_store_and_scope(payload, &store, DocumentScope::NodeOnly)
+        .expect("Deve gerar preview com relógio mockado");
 
-        assert_eq!(store.active_count(), 1);
+    assert_eq!(store.active_count(), 1);
 
-        // Avança 20 segundos: o preview ainda deve estar ativo (< 30s)
-        clock.advance(Duration::from_secs(20));
-        assert_eq!(store.active_count(), 1);
+    // Avança 20 segundos: o preview ainda deve estar ativo (< 30s)
+    clock.advance(Duration::from_secs(20));
+    assert_eq!(store.active_count(), 1);
 
-        // Avança mais 15 segundos (total 35s > 30s): o preview deve expirar deterministamente
-        clock.advance(Duration::from_secs(15));
+    // Avança mais 15 segundos (total 35s > 30s): o preview deve expirar deterministamente
+    clock.advance(Duration::from_secs(15));
 
-        let export_payload = ExportPreviewPayload {
-            preview_id: preview.preview_id,
-            expected_sha256: preview.metadata.sha256_checksum,
-            open_after_export: Some(false),
-            target_file_name: Some("expired.pdf".to_string()),
-        };
+    let export_payload = ExportPreviewPayload {
+        preview_id: preview.preview_id,
+        expected_sha256: preview.metadata.sha256_checksum,
+        open_after_export: Some(false),
+        target_file_name: Some("expired.pdf".to_string()),
+    };
 
-        let result = export_previewed_document_in_directory_with_store_and_scope(
-            export_payload,
-            temp_dir.path(),
-            &store,
-            DocumentScope::NodeOnly,
-        );
+    let result = export_previewed_document_in_directory_with_store_and_scope(
+        export_payload,
+        temp_dir.path(),
+        &store,
+        DocumentScope::NodeOnly,
+    );
 
-        assert!(result.is_err());
-        assert!(result.unwrap_err().contains("expirou"));
-        assert_eq!(store.active_count(), 0);
-    }
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("expirou"));
+    assert_eq!(store.active_count(), 0);
+}
 
-    #[test]
-    fn test_phase_b_structural_pdf_integrity_validation() {
-        use crate::modules::documents::ports::RenderedDocument;
+#[test]
+fn test_phase_b_structural_pdf_integrity_validation() {
+    use crate::modules::documents::ports::RenderedDocument;
 
-        // 1. Buffer sem cabeçalho %PDF-
-        let invalid_header = b"NOT_A_PDF_STREAM_INVALID".to_vec();
-        assert!(RenderedDocument::try_new(invalid_header).is_err());
+    // 1. Buffer sem cabeçalho %PDF-
+    let invalid_header = b"NOT_A_PDF_STREAM_INVALID".to_vec();
+    assert!(RenderedDocument::try_new(invalid_header).is_err());
 
-        // 2. Buffer sem marcador %%EOF
-        let truncated = b"%PDF-1.7\nthis-content-is-missing-eof-marker-at-end".to_vec();
-        assert!(RenderedDocument::try_new(truncated).is_err());
+    // 2. Buffer sem marcador %%EOF
+    let truncated = b"%PDF-1.7\nthis-content-is-missing-eof-marker-at-end".to_vec();
+    assert!(RenderedDocument::try_new(truncated).is_err());
 
-        // 3. Buffer estruturalmente canônico com %PDF- e %%EOF
-        let valid_minimal = b"%PDF-1.7\nstream content payload buffer institutional\n%%EOF".to_vec();
-        let rendered = RenderedDocument::try_new(valid_minimal).expect("Buffer canônico com %PDF- e %%EOF deve ser aceito");
-        assert_eq!(rendered.pdf_bytes.starts_with(b"%PDF-"), true);
-    }
+    // 3. Buffer estruturalmente canônico com %PDF- e %%EOF
+    let valid_minimal = b"%PDF-1.7\nstream content payload buffer institutional\n%%EOF".to_vec();
+    let rendered = RenderedDocument::try_new(valid_minimal)
+        .expect("Buffer canônico com %PDF- e %%EOF deve ser aceito");
+    assert_eq!(rendered.pdf_bytes.starts_with(b"%PDF-"), true);
+}
 
-    #[test]
-    fn test_phase_b_direct_pdf_generation_skips_svg_vector_rendering() {
-        use crate::modules::documents::typst_renderer::TypstDocumentRenderer;
-        use crate::modules::documents::DocumentsService;
+#[test]
+fn test_phase_b_direct_pdf_generation_skips_svg_vector_rendering() {
+    use crate::modules::documents::DocumentsService;
+    use crate::modules::documents::typst_renderer::TypstDocumentRenderer;
 
-        let renderer = std::sync::Arc::new(TypstDocumentRenderer::new());
-        let service = DocumentsService::with_scope(renderer, DocumentScope::CockpitOnly).unwrap();
+    let renderer = std::sync::Arc::new(TypstDocumentRenderer::new());
+    let service = DocumentsService::with_scope(renderer, DocumentScope::CockpitOnly).unwrap();
 
-        let payload = DocumentRequest::InvoiceBill(InvoiceReportPayload {
-            id: "FAT-SVG-SKIP-001".to_string(),
-            member_name: "Associado Teste Otimizacao".to_string(),
-            member_doc: "000.000.000-00".to_string(),
-            member_email: None,
-            member_address: None,
-            description: "Fatura Teste Otimizacao Vetorial".to_string(),
-            reference_month: "2026-11".to_string(),
-            amount: dec!(250.00),
-            due_date: "2026-11-30".to_string(),
-            settled_date: None,
-            payment_method: "Pix".to_string(),
-            status: InvoiceStatus::Pending,
-            taxes: None,
-            discount: None,
-            d1_protocol: None,
-            items: vec![InvoiceReportItem {
-                id: "it-1".to_string(),
-                description: "Item Fatura".to_string(),
-                service: None,
-                quantity: dec!(1.0),
-                price: dec!(250.00),
-                total: dec!(250.00),
-            }],
-        });
+    let payload = DocumentRequest::InvoiceBill(InvoiceReportPayload {
+        id: "FAT-SVG-SKIP-001".to_string(),
+        member_name: "Associado Teste Otimizacao".to_string(),
+        member_doc: "000.000.000-00".to_string(),
+        member_email: None,
+        member_address: None,
+        description: "Fatura Teste Otimizacao Vetorial".to_string(),
+        reference_month: "2026-11".to_string(),
+        amount: dec!(250.00),
+        due_date: "2026-11-30".to_string(),
+        settled_date: None,
+        payment_method: "Pix".to_string(),
+        status: InvoiceStatus::Pending,
+        taxes: None,
+        discount: None,
+        d1_protocol: None,
+        items: vec![InvoiceReportItem {
+            id: "it-1".to_string(),
+            description: "Item Fatura".to_string(),
+            service: None,
+            quantity: dec!(1.0),
+            price: dec!(250.00),
+            total: dec!(250.00),
+        }],
+    });
 
-        // generate_document executa render_pdf_only (caminho rápido sem SVGs)
-        let output = service
-            .generate_document(payload.clone())
-            .expect("generate_document deve executar com sucesso gerando PDF canônico");
+    // generate_document executa render_pdf_only (caminho rápido sem SVGs)
+    let output = service
+        .generate_document(payload.clone())
+        .expect("generate_document deve executar com sucesso gerando PDF canônico");
 
-        assert!(!output.pdf_bytes.is_empty());
-        assert!(output.pdf_bytes.starts_with(b"%PDF-"));
+    assert!(!output.pdf_bytes.is_empty());
+    assert!(output.pdf_bytes.starts_with(b"%PDF-"));
 
-        // generate_document_with_pages executa render (caminho de preview com SVGs)
-        let (output_preview, pages) = service
-            .generate_document_with_pages(payload)
-            .expect("generate_document_with_pages deve executar retornando páginas SVG");
+    // generate_document_with_pages executa render (caminho de preview com SVGs)
+    let (output_preview, pages) = service
+        .generate_document_with_pages(payload)
+        .expect("generate_document_with_pages deve executar retornando páginas SVG");
 
-        assert_eq!(output_preview.metadata.sha256_checksum, output.metadata.sha256_checksum);
-        assert!(!pages.is_empty(), "Caminho de preview deve conter páginas SVG");
-        assert!(!pages[0].svg_base64.is_empty());
-    }
+    assert_eq!(
+        output_preview.metadata.sha256_checksum,
+        output.metadata.sha256_checksum
+    );
+    assert!(
+        !pages.is_empty(),
+        "Caminho de preview deve conter páginas SVG"
+    );
+    assert!(!pages[0].svg_base64.is_empty());
+}

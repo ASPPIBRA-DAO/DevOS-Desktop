@@ -13,7 +13,7 @@ pub use crate::modules::documents::models::{
 mod tests {
     use super::*;
     use rust_decimal_macros::dec;
-    use serde_json::{json, Value};
+    use serde_json::{Value, json};
 
     fn sample_invoice_payload_json() -> Value {
         json!({

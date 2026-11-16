@@ -9,6 +9,7 @@ export type DocumentKind =
   | 'citizen_ledger'
   | 'invoice_bill'
   | 'cessao_posse'
+  | 'contrato_associado'
   | 'real_estate_reconciliation';
 
 export interface DocumentMetadata {
@@ -88,6 +89,12 @@ export interface CessaoPossePayload {
   data?: Record<string, unknown>;
 }
 
+export interface ContratoAssociadoPayload {
+  document_number: string;
+  auth_code: string;
+  data?: Record<string, unknown>;
+}
+
 export interface RealEstateReconciliationPayload {
   data: Record<string, unknown>;
 }
@@ -96,6 +103,7 @@ export type DocumentRequest =
   | { kind: 'citizen_ledger'; payload: CitizenLedgerPayload }
   | { kind: 'invoice_bill'; payload: InvoiceReportPayload }
   | { kind: 'cessao_posse'; payload: CessaoPossePayload }
+  | { kind: 'contrato_associado'; payload: ContratoAssociadoPayload }
   | { kind: 'real_estate_reconciliation'; payload: RealEstateReconciliationPayload };
 
 export interface GenerateDocumentPayload {

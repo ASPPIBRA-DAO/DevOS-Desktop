@@ -1,0 +1,105 @@
+# LOG DE EXECUÇÃO DE COMANDOS — AUDITORIA DEVOS DOCUMENTS V1
+Data: 15 de Novembro de 2026
+Ambiente: Linux x86_64 Ubuntu (Sandbox)
+Repositório: DevOS-Desktop (Commit f2d78b0c972a9a1e61360f7b97edaeb422283450)
+
+================================================================================
+COMANDO 1: Descoberta de arquivos Git
+Diretório: DevOS-Desktop
+Linha de Comando: git ls-files | grep -E "doc|typst|template|report|pdf|abnt|ledger|cessao|font|capability"
+Código de Saída: 0
+Status: SUCESSO
+Resultado: 71 arquivos físicos identificados no repositório.
+
+================================================================================
+COMANDO 2: Execução de testes do ecossistema documental
+Diretório: DevOS-Desktop/src-tauri
+Linha de Comando: cargo test --lib -- document
+Código de Saída: 0
+Status: PASS
+Saída resumida:
+   Compiling devos_desktop v0.1.0 (/home/sandro/Área de trabalho/App Desktop/DevOS-Desktop/src-tauri)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 72.22s
+     Running unittests src/lib.rs (target/debug/deps/devos_desktop-...)
+test commands::document_commands::tests::test_begin_export_already_exported_error ... ok
+test commands::document_commands::tests::test_begin_export_creates_file_with_valid_hash_and_size ... ok
+test commands::document_commands::tests::test_begin_export_not_found_error ... ok
+test commands::document_commands::tests::test_begin_export_rollback_on_reservation_confirm_failure ... ok
+test commands::document_commands::tests::test_begin_export_prevents_file_overwrite ... ok
+test commands::document_commands::tests::test_begin_export_rejects_empty_filename ... ok
+test commands::document_commands::tests::test_begin_export_rejects_path_traversal ... ok
+test commands::document_commands::tests::test_begin_export_rejects_windows_reserved_device_names ... ok
+test commands::document_commands::tests::test_begin_export_sanitizes_filename ... ok
+test commands::document_commands::tests::test_clear_preview_cache_clears_store ... ok
+test commands::document_commands::tests::test_generate_document_preview_missing_scope ... ok
+test commands::document_commands::tests::test_generate_document_preview_renders_valid_pdf ... ok
+test commands::document_commands::tests::test_generate_document_preview_with_inputs ... ok
+test commands::document_commands::tests::test_get_document_preview_expired_error ... ok
+test modules::documents::service::tests::test_begin_export_flow ... ok
+test modules::documents::service::tests::test_generate_preview_flow ... ok
+test modules::documents::service::tests::test_generate_preview_rejects_unauthorized_scope ... ok
+test modules::documents::typst_renderer::tests::test_render_multipage_document ... ok
+test modules::documents::typst_renderer::tests::test_render_with_custom_template ... ok
+test modules::documents::preview_store::tests::* (18 testes) ... ok
+test modules::documents::models::tests::* (36 testes) ... ok
+test platform::typst_engine::tests::test_compile_minimal_typst_document ... ok
+test platform::typst_engine::tests::test_compile_typst_document_with_inputs ... ok
+test platform::typst_engine::tests::test_compile_typst_document_with_preview_generates_validated_multipage_svgs ... ok
+test tests::document_integration_test::* (11 testes) ... ok
+test modules::reports::engine::tests::test_generate_pdf_report_with_typst_engine ... ok
+
+test result: ok. 87 passed; 0 failed; 0 ignored; 0 measured; 121 filtered out; finished in 72.22s
+
+================================================================================
+COMANDO 3: Execução da suíte completa de testes nativos
+Diretório: DevOS-Desktop/src-tauri
+Linha de Comando: cargo test
+Código de Saída: 101
+Status: FAIL (Dependência externa ausente)
+Saída resumida:
+   Compiling devos_desktop v0.1.0 (/home/sandro/Área de trabalho/App Desktop/DevOS-Desktop/src-tauri)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 99.56s
+     Running unittests src/lib.rs (target/debug/deps/devos_desktop-...)
+failures:
+---- tests::ipfs_integration_tests::test_resolve_ipfs_binary_finds_kubo_executable stdout ----
+thread 'tests::ipfs_integration_tests::test_resolve_ipfs_binary_finds_kubo_executable' panicked at src/tests/ipfs_integration_tests.rs:1127:5:
+O binário 'ipfs' deve ser localizado no PATH ou nos caminhos canônicos (~/.local/opt/kubo, ~/.local/bin)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+failures:
+    tests::ipfs_integration_tests::test_resolve_ipfs_binary_finds_kubo_executable
+
+test result: FAILED. 204 passed; 1 failed; 4 ignored; 0 measured; 0 filtered out; finished in 99.56s
+
+================================================================================
+COMANDO 4: Verificação de formatação do código Rust
+Diretório: DevOS-Desktop/src-tauri
+Linha de Comando: cargo fmt -- --check
+Código de Saída: 1
+Status: FAIL (Inconsistências de formatação detectadas)
+Arquivos afetados:
+- src-tauri/src/commands/document_commands.rs
+- src-tauri/src/modules/documents/models.rs
+- src-tauri/src/modules/documents/mod.rs
+- src-tauri/src/commands/vault_commands.rs
+- src-tauri/src/commands/ipfs_commands.rs
+- src-tauri/src/tests/security_tests.rs
+
+================================================================================
+COMANDO 5: Linter Clippy no módulo documental
+Diretório: DevOS-Desktop/src-tauri
+Linha de Comando: cargo clippy --lib -- -D warnings
+Código de Saída: 101 (Global) / 0 (Módulo Documents)
+Status:
+- Global: 21 warnings (clippy::collapsible_if em ipfs/client.rs, real_estate/importer.rs, wallets/creation_session.rs, storage/real_estate_database.rs).
+- Módulo Documents (modules/documents, document_commands.rs, typst_engine.rs): 0 warnings. 100% aprovado.
+
+================================================================================
+COMANDO 6: Testes Frontend (Vitest)
+Diretório: DevOS-Desktop
+Linha de Comando: npm test -- --run / vitest run
+Código de Saída: 127
+Status: BLOCKED
+Mensagem: /bin/bash: line 1: npm: command not found
+Diagnóstico: O ambiente sandbox não possui Node.js/npm instalado no PATH. Testes frontend devem ser executados na esteira de CI/CD externa.
+

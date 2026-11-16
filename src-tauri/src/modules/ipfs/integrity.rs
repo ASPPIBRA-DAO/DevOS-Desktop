@@ -10,8 +10,8 @@ use sha2::{Digest, Sha256};
 use super::client::KuboClient;
 use super::content::normalize_hex_hash;
 use super::models::{
-    AvailabilityState, CustodyState, IntegrityState, IpfsAllPinsVerifyResult,
-    IpfsCidCustodyStatus, IpfsPinType,
+    AvailabilityState, CustodyState, IntegrityState, IpfsAllPinsVerifyResult, IpfsCidCustodyStatus,
+    IpfsPinType,
 };
 use super::pinning::{is_managed_pin, list_managed_pins};
 
@@ -42,7 +42,9 @@ pub async fn verify_cid_custody(
     let pin_type_res = client.pin_ls(cid).await;
     let mut custody = match pin_type_res {
         Ok(Some(IpfsPinType::Direct)) => CustodyState::DirectPin,
-        Ok(Some(IpfsPinType::Recursive)) | Ok(Some(IpfsPinType::Indirect)) => CustodyState::RecursivePin,
+        Ok(Some(IpfsPinType::Recursive)) | Ok(Some(IpfsPinType::Indirect)) => {
+            CustodyState::RecursivePin
+        }
         Ok(None) => CustodyState::NotPinned,
         Err(e) => {
             log::warn!("[IPFS Integrity] Falha ao consultar pin_ls para {cid}: {e}");
@@ -57,7 +59,10 @@ pub async fn verify_cid_custody(
     let mut dev_null = std::io::sink();
     let mut hasher = Sha256::new();
 
-    if let Ok(bytes) = client.cat_to_writer(cid, true, &mut dev_null, &mut hasher).await {
+    if let Ok(bytes) = client
+        .cat_to_writer(cid, true, &mut dev_null, &mut hasher)
+        .await
+    {
         if bytes > 0 {
             let digest = hasher.finalize();
             recovered_sha256 = Some(format!("0x{}", hex::encode(digest)));
@@ -66,7 +71,9 @@ pub async fn verify_cid_custody(
     }
 
     // Se o conteúdo estava supostamente fixado mas a recuperação local offline falhou, pin incompleto!
-    if !local_recovery_ok && (custody == CustodyState::RecursivePin || custody == CustodyState::DirectPin) {
+    if !local_recovery_ok
+        && (custody == CustodyState::RecursivePin || custody == CustodyState::DirectPin)
+    {
         custody = CustodyState::IncompletePin;
     }
 

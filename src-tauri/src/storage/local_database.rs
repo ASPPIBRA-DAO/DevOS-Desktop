@@ -318,9 +318,8 @@ impl LocalDatabase {
         }
 
         // Confirma que a tabela possui as colunas esperadas
-        let _statement = conn.prepare(
-            "SELECT id, version, canary_envelope, created_at FROM vault_header LIMIT 0",
-        )?;
+        let _statement = conn
+            .prepare("SELECT id, version, canary_envelope, created_at FROM vault_header LIMIT 0")?;
 
         // Quando existe um cabeçalho, confirma que o envelope pode ser desserializado
         let envelope_json: Option<String> = conn
@@ -549,7 +548,12 @@ impl LocalDatabase {
                 target = excluded.target,
                 envelope = excluded.envelope,
                 created_at = excluded.created_at",
-            params![secret.vault_id, secret.target, envelope_json, secret.created_at],
+            params![
+                secret.vault_id,
+                secret.target,
+                envelope_json,
+                secret.created_at
+            ],
         )?;
 
         tx.commit()?;
@@ -646,11 +650,10 @@ impl LocalDatabase {
         }
 
         let conn = self.get_connection()?;
-        let (busy, _log_frames, _checkpointed_frames): (i64, i64, i64) = conn.query_row(
-            "PRAGMA wal_checkpoint(TRUNCATE)",
-            [],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-        )?;
+        let (busy, _log_frames, _checkpointed_frames): (i64, i64, i64) =
+            conn.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |row| {
+                Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+            })?;
 
         if busy != 0 {
             return Err(StorageError::InvalidData(
@@ -864,7 +867,8 @@ mod tests {
         assert!(secret_none.is_none());
 
         let fake_envelope =
-            crate::modules::vault::encryption::VaultCrypto::encrypt("master_123", b"secret_words").unwrap();
+            crate::modules::vault::encryption::VaultCrypto::encrypt("master_123", b"secret_words")
+                .unwrap();
         let stored_secret = StoredSecret {
             vault_id: "dao_vault_1".to_string(),
             target: "DAO".to_string(),
@@ -899,7 +903,8 @@ mod tests {
         drop(conn);
 
         let canary =
-            crate::modules::vault::encryption::VaultCrypto::encrypt("master_123", b"canary_canary").unwrap();
+            crate::modules::vault::encryption::VaultCrypto::encrypt("master_123", b"canary_canary")
+                .unwrap();
         let header = VaultHeader {
             version: 1,
             canary_envelope: canary.clone(),
@@ -954,9 +959,11 @@ mod tests {
         let derived_address = previews[0].address.clone();
         let derivation_path = previews[0].derivation_path.clone();
 
-        let envelope =
-            crate::modules::vault::encryption::VaultCrypto::encrypt(master_password, mnemonic.as_bytes())
-                .expect("Cifragem AEAD");
+        let envelope = crate::modules::vault::encryption::VaultCrypto::encrypt(
+            master_password,
+            mnemonic.as_bytes(),
+        )
+        .expect("Cifragem AEAD");
         let vault_id = "dao_vault_lifecycle_test".to_string();
         let secret_record = StoredSecret {
             vault_id: vault_id.clone(),
@@ -1019,14 +1026,15 @@ mod tests {
         let recovered_seed =
             crate::modules::wallets::mnemonic::MnemonicService::to_seed(&recovered_mnemonic, "")
                 .expect("Seed recuperada");
-        let recovered_previews = crate::modules::wallets::derivation::DerivationService::derive_batch(
-            &recovered_seed,
-            0,
-            1,
-            "Teste",
-            "Arbitrum One",
-        )
-        .expect("Derivação conferida");
+        let recovered_previews =
+            crate::modules::wallets::derivation::DerivationService::derive_batch(
+                &recovered_seed,
+                0,
+                1,
+                "Teste",
+                "Arbitrum One",
+            )
+            .expect("Derivação conferida");
         assert_eq!(
             recovered_previews[0].address, wallets[0].address,
             "Endereço decifrado deve coincidir com o salvo"
@@ -1164,8 +1172,8 @@ mod tests {
 
     #[test]
     fn test_restore_rejects_invalid_sqlite_without_replacing_active_db() {
-        let test_dir = std::env::temp_dir()
-            .join(format!("devos_restore_invalid_{}", rand::random::<u64>()));
+        let test_dir =
+            std::env::temp_dir().join(format!("devos_restore_invalid_{}", rand::random::<u64>()));
         let db = LocalDatabase::new(test_dir.clone());
 
         let conn = db.get_connection().unwrap();
@@ -1175,7 +1183,7 @@ mod tests {
                 version INTEGER NOT NULL,
                 canary_envelope TEXT NOT NULL,
                 created_at TEXT NOT NULL
-            );"
+            );",
         )
         .unwrap();
 
@@ -1212,7 +1220,7 @@ mod tests {
                 version INTEGER NOT NULL,
                 canary_envelope TEXT NOT NULL,
                 created_at TEXT NOT NULL
-            );"
+            );",
         )
         .unwrap();
         drop(conn);

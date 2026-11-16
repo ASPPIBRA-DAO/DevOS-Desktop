@@ -21,7 +21,9 @@ static EXCLUSIVE_REPO_OVERRIDE: Mutex<Option<bool>> = Mutex::new(None);
 
 #[cfg(test)]
 pub fn set_exclusive_repo_override_for_test(val: Option<bool>) {
-    let mut g = EXCLUSIVE_REPO_OVERRIDE.lock().unwrap_or_else(|p| p.into_inner());
+    let mut g = EXCLUSIVE_REPO_OVERRIDE
+        .lock()
+        .unwrap_or_else(|p| p.into_inner());
     *g = val;
 }
 
@@ -134,7 +136,9 @@ impl DaemonManager {
     pub async fn check_daemon_origin() -> DaemonOrigin {
         let client = KuboClient::new();
         if client.is_alive().await {
-            let guard = SPAWNED_DAEMON_CHILD.lock().unwrap_or_else(|p| p.into_inner());
+            let guard = SPAWNED_DAEMON_CHILD
+                .lock()
+                .unwrap_or_else(|p| p.into_inner());
             if guard.is_some() {
                 DaemonOrigin::DevOsSpawned
             } else {
@@ -171,7 +175,9 @@ impl DaemonManager {
         let bin_path = Self::resolve_ipfs_binary()
             .ok_or_else(|| "Binário 'ipfs' (Kubo) não encontrado no PATH do sistema nem nos caminhos canônicos (~/.local/opt/kubo, ~/.local/bin, /usr/local/bin).".to_string())?;
 
-        let mut guard = SPAWNED_DAEMON_CHILD.lock().unwrap_or_else(|p| p.into_inner());
+        let mut guard = SPAWNED_DAEMON_CHILD
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
         if guard.is_some() {
             return Ok(DaemonOrigin::DevOsSpawned);
         }
@@ -210,7 +216,10 @@ impl DaemonManager {
     pub async fn is_exclusive_devos_repo() -> bool {
         #[cfg(test)]
         {
-            if let Some(val) = *EXCLUSIVE_REPO_OVERRIDE.lock().unwrap_or_else(|p| p.into_inner()) {
+            if let Some(val) = *EXCLUSIVE_REPO_OVERRIDE
+                .lock()
+                .unwrap_or_else(|p| p.into_inner())
+            {
                 return val;
             }
         }
@@ -259,12 +268,17 @@ impl DaemonManager {
 
     /// Encerra controladamente o daemon SOMENTE se ele tiver sido iniciado pelo DevOS.
     pub fn shutdown_if_spawned_by_devos() -> Result<bool, String> {
-        let mut guard = SPAWNED_DAEMON_CHILD.lock().unwrap_or_else(|p| p.into_inner());
+        let mut guard = SPAWNED_DAEMON_CHILD
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
         let mut repo_guard = SPAWNED_REPO_PATH.lock().unwrap_or_else(|p| p.into_inner());
         *repo_guard = None;
 
         if let Some(mut child) = guard.take() {
-            log::info!("[IPFS Daemon] Encerrando daemon iniciado pelo DevOS (PID: {:?})", child.id());
+            log::info!(
+                "[IPFS Daemon] Encerrando daemon iniciado pelo DevOS (PID: {:?})",
+                child.id()
+            );
             let _ = child.kill();
             let _ = child.wait();
             Ok(true)

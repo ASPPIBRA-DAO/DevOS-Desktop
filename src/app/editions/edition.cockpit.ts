@@ -52,13 +52,14 @@ export const currentEdition: EditionConfig = {
           path: paths.devos.cadastre,
           icon: 'solar:city-bold',
         },
+      ],
+    },
+    {
+      id: 'documents',
+      subheader: 'DOCUMENTOS',
+      items: [
         {
-          title: 'Cessão de Posse',
-          path: paths.devos.cessaoPosse,
-          icon: 'solar:document-text-bold-duotone',
-        },
-        {
-          title: 'Catálogo de Modelos',
+          title: 'Catálogo',
           path: paths.devos.documents,
           icon: 'solar:documents-bold',
         },

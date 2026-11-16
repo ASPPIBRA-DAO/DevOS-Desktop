@@ -7,22 +7,21 @@
 //! 4. Controle explícito de sobrescrita (`overwrite: bool`, padrão `false`) com publicação atômica sem substituição acidental.
 //! 5. Registro em catálogo associado ao contexto do repositório (`repo_context`).
 
+use chrono::Utc;
+use sha2::{Digest, Sha256};
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
-use chrono::Utc;
-use sha2::{Digest, Sha256};
 use tokio::fs::File as TokioFile;
 use tokio::io::{AsyncRead, ReadBuf};
 
 use super::client::KuboClient;
 use super::daemon::DaemonManager;
 use super::models::{
-    IpfsDownloadOptions, IpfsDownloadResult, IpfsUploadOptions, IpfsUploadResult,
-    ManagedPinRecord,
+    IpfsDownloadOptions, IpfsDownloadResult, IpfsUploadOptions, IpfsUploadResult, ManagedPinRecord,
 };
 use super::pinning::{list_managed_pins, register_managed_pin};
 
@@ -49,7 +48,8 @@ impl<R: AsyncRead + Unpin> AsyncRead for HashingAsyncReader<R> {
                 if !added.is_empty() {
                     let mut guard = self.hasher.lock().unwrap_or_else(|p| p.into_inner());
                     guard.update(added);
-                    let mut bytes_guard = self.total_bytes.lock().unwrap_or_else(|p| p.into_inner());
+                    let mut bytes_guard =
+                        self.total_bytes.lock().unwrap_or_else(|p| p.into_inner());
                     *bytes_guard += added.len() as u64;
                 }
                 Poll::Ready(Ok(()))
@@ -108,7 +108,10 @@ pub async fn upload_file(
         return Err(format!("Arquivo não encontrado: '{}'", path.display()));
     }
     if !path.is_file() {
-        return Err(format!("O caminho informado não é um arquivo: '{}'", path.display()));
+        return Err(format!(
+            "O caminho informado não é um arquivo: '{}'",
+            path.display()
+        ));
     }
 
     let file_name = path
@@ -257,7 +260,9 @@ pub async fn download_file(
 
     if let Err(e) = tmp_file.flush() {
         let _ = fs::remove_file(&tmp_path);
-        return Err(format!("Falha ao descarregar buffer do arquivo temporário: {e}"));
+        return Err(format!(
+            "Falha ao descarregar buffer do arquivo temporário: {e}"
+        ));
     }
     if let Err(e) = tmp_file.sync_all() {
         let _ = fs::remove_file(&tmp_path);
@@ -292,7 +297,9 @@ pub async fn download_file(
     if options.overwrite {
         if let Err(e) = fs::rename(&tmp_path, &target_path) {
             let _ = fs::remove_file(&tmp_path);
-            return Err(format!("Falha ao publicar arquivo final com sobrescrita: {e}"));
+            return Err(format!(
+                "Falha ao publicar arquivo final com sobrescrita: {e}"
+            ));
         }
     } else {
         // Tenta link físico atômico: falha com AlreadyExists se target_path foi criado concorrentemente

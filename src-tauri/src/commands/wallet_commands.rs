@@ -1,12 +1,12 @@
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
-use crate::storage::local_database::{LocalDatabase, StoredSecret, StoredWallet};
 use crate::modules::vault::access_control::VaultSession;
 use crate::modules::vault::encryption::VaultCrypto;
 use crate::modules::wallets::creation_session::GLOBAL_CREATION_STORE;
 use crate::modules::wallets::derivation::{DerivationService, DerivedWalletPreview};
 use crate::modules::wallets::mnemonic::MnemonicService;
+use crate::storage::local_database::{LocalDatabase, StoredSecret, StoredWallet};
 use zeroize::Zeroize;
 
 #[derive(Debug, Serialize, Deserialize)]

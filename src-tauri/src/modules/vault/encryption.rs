@@ -158,10 +158,7 @@ impl VaultCrypto {
     /// - Iterações: 3.
     /// - Paralelismo: 1.
     /// - Comprimento da chave: 32 bytes.
-    fn derive_key(
-        password: &str,
-        salt: &[u8; SALT_BYTES],
-    ) -> Result<DerivedKey, VaultCryptoError> {
+    fn derive_key(password: &str, salt: &[u8; SALT_BYTES]) -> Result<DerivedKey, VaultCryptoError> {
         Self::validate_password_size(password)?;
 
         let params = Params::new(
@@ -297,8 +294,8 @@ impl VaultCrypto {
         }
 
         // 5. Derivação e decifragem com chave em DerivedKey (protegida por ZeroizeOnDrop)
-        let derived_key = Self::derive_key(password, &salt)
-            .map_err(|_| VaultCryptoError::DecryptionFailed)?;
+        let derived_key =
+            Self::derive_key(password, &salt).map_err(|_| VaultCryptoError::DecryptionFailed)?;
 
         let cipher = Aes256Gcm::new_from_slice(&derived_key.0)
             .map_err(|_| VaultCryptoError::DecryptionFailed)?;
@@ -335,8 +332,7 @@ mod tests {
         let secret = b"sensitive_wallet_seed";
         let password = "SuperMasterPasswordDevOS#2026";
 
-        let envelope =
-            VaultCrypto::encrypt(password, secret).expect("Encryption should succeed");
+        let envelope = VaultCrypto::encrypt(password, secret).expect("Encryption should succeed");
 
         assert_eq!(envelope.version, ENVELOPE_VERSION);
         assert_eq!(envelope.cipher, CIPHER_NAME);
@@ -354,8 +350,7 @@ mod tests {
         let password = "CorrectPassword123";
         let wrong_password = "WrongPassword456";
 
-        let envelope =
-            VaultCrypto::encrypt(password, secret).expect("Encryption should succeed");
+        let envelope = VaultCrypto::encrypt(password, secret).expect("Encryption should succeed");
 
         let result = VaultCrypto::decrypt(wrong_password, &envelope);
 
@@ -370,8 +365,8 @@ mod tests {
         let mut envelope =
             VaultCrypto::encrypt(password, secret).expect("Encryption should succeed");
 
-        let mut tampered_bytes = hex::decode(&envelope.ciphertext_hex)
-            .expect("Generated ciphertext must be valid hex");
+        let mut tampered_bytes =
+            hex::decode(&envelope.ciphertext_hex).expect("Generated ciphertext must be valid hex");
 
         assert!(
             !tampered_bytes.is_empty(),

@@ -4,15 +4,14 @@
 //! - `get_ipfs_daemon_status`: Diagnóstico em tempo real do daemon Kubo local.
 //! - `execute_storage_proof`: Computação determinística de prova de desafio DePIN (ADR-012).
 
-use sha2::{Digest, Sha256};
 use crate::modules::ipfs::{
-    download_file, safe_unpin, upload_file, verify_all_pins, verify_cid_custody,
-    DaemonManager, IpfsAllPinsVerifyResult, IpfsCidCustodyStatus,
-    IpfsDaemonStatus, IpfsDownloadOptions, IpfsDownloadResult, IpfsPinRequest,
-    IpfsPinResult, IpfsPinType, IpfsProvidersResult, IpfsUnpinRequest,
-    IpfsUnpinResult, IpfsUploadOptions, IpfsUploadResult, KuboClient,
-    StorageProofChallenge, StorageProofResponse,
+    DaemonManager, IpfsAllPinsVerifyResult, IpfsCidCustodyStatus, IpfsDaemonStatus,
+    IpfsDownloadOptions, IpfsDownloadResult, IpfsPinRequest, IpfsPinResult, IpfsPinType,
+    IpfsProvidersResult, IpfsUnpinRequest, IpfsUnpinResult, IpfsUploadOptions, IpfsUploadResult,
+    KuboClient, StorageProofChallenge, StorageProofResponse, download_file, safe_unpin,
+    upload_file, verify_all_pins, verify_cid_custody,
 };
+use sha2::{Digest, Sha256};
 
 /// Consulta o estado operacional do daemon Kubo local.
 ///
@@ -28,7 +27,7 @@ pub async fn get_ipfs_daemon_status() -> Result<IpfsDaemonStatus, String> {
 /// NOTA ARQUITETURAL IMPORTANTE:
 /// Esta operação computa a prova criptográfica baseada no nonce do servidor e no CID
 /// do conteúdo requisitado (`SHA256(ServerNonce || ":" || CID)`).
-/// 
+///
 /// O resultado comprova a integridade e a resolução computacional do desafio no nó local.
 /// NÃO constitui garantia de persistência eterna ou replicação global na rede IPFS,
 /// cuja comprovação plena depende de evidências de múltiplos nós ou acordos de custódia.
@@ -54,10 +53,11 @@ pub async fn execute_storage_proof(
     let digest = hasher.finalize();
 
     let proof_hash = format!("0x{}", hex::encode(digest));
-    
+
     // Assinatura de comprovação operacional (demonstrativa do nó DePIN)
     let signature = format!("0x{}", hex::encode(&digest[0..16]));
-    let node_operational_pubkey = "0x02a1633cafcc01ebfb6d78e39c652588f239453bc26f61247b13d16c401aa0d10b".to_string();
+    let node_operational_pubkey =
+        "0x02a1633cafcc01ebfb6d78e39c652588f239453bc26f61247b13d16c401aa0d10b".to_string();
 
     Ok(StorageProofResponse {
         challenge_id: challenge.challenge_id,
@@ -72,17 +72,25 @@ pub async fn execute_storage_proof(
 pub async fn ipfs_upload_file(options: IpfsUploadOptions) -> Result<IpfsUploadResult, String> {
     let client = KuboClient::new();
     if !client.is_alive().await {
-        return Err("Nó IPFS (Kubo) não está em execução. Inicie o daemon antes de realizar uploads.".to_string());
+        return Err(
+            "Nó IPFS (Kubo) não está em execução. Inicie o daemon antes de realizar uploads."
+                .to_string(),
+        );
     }
     upload_file(&client, options).await
 }
 
 /// Recupera um arquivo do nó IPFS por CID em streaming, gravando atomicamente no destino.
 #[tauri::command]
-pub async fn ipfs_download_file(options: IpfsDownloadOptions) -> Result<IpfsDownloadResult, String> {
+pub async fn ipfs_download_file(
+    options: IpfsDownloadOptions,
+) -> Result<IpfsDownloadResult, String> {
     let client = KuboClient::new();
     if !client.is_alive().await {
-        return Err("Nó IPFS (Kubo) não está em execução. Inicie o daemon antes de recuperar arquivos.".to_string());
+        return Err(
+            "Nó IPFS (Kubo) não está em execução. Inicie o daemon antes de recuperar arquivos."
+                .to_string(),
+        );
     }
     download_file(&client, options).await
 }
@@ -138,7 +146,9 @@ pub async fn ipfs_verify_cid_custody(
 ) -> Result<IpfsCidCustodyStatus, String> {
     let client = KuboClient::new();
     if !client.is_alive().await {
-        return Err("Nó IPFS (Kubo) inativo. Não foi possível auditar a custódia do conteúdo.".to_string());
+        return Err(
+            "Nó IPFS (Kubo) inativo. Não foi possível auditar a custódia do conteúdo.".to_string(),
+        );
     }
     verify_cid_custody(&client, &cid, expected_sha256).await
 }
@@ -148,7 +158,9 @@ pub async fn ipfs_verify_cid_custody(
 pub async fn ipfs_verify_all_pins() -> Result<IpfsAllPinsVerifyResult, String> {
     let client = KuboClient::new();
     if !client.is_alive().await {
-        return Err("Nó IPFS (Kubo) inativo. Não foi possível auditar os pins do repositório.".to_string());
+        return Err(
+            "Nó IPFS (Kubo) inativo. Não foi possível auditar os pins do repositório.".to_string(),
+        );
     }
     verify_all_pins(&client).await
 }
@@ -169,7 +181,8 @@ pub async fn ipfs_query_providers(cid: String) -> Result<IpfsProvidersResult, St
 
 /// Retorna a lista de conteúdos gerenciados pelo DevOS registrados no catálogo local `managed-pins.json`.
 #[tauri::command]
-pub async fn ipfs_list_managed_pins() -> Result<Vec<crate::modules::ipfs::ManagedPinRecord>, String> {
+pub async fn ipfs_list_managed_pins() -> Result<Vec<crate::modules::ipfs::ManagedPinRecord>, String>
+{
     Ok(crate::modules::ipfs::list_managed_pins())
 }
 
@@ -220,5 +233,3 @@ pub async fn ipfs_restart_daemon() -> Result<IpfsDaemonStatus, String> {
 
     Ok(DaemonManager::get_status().await)
 }
-
-

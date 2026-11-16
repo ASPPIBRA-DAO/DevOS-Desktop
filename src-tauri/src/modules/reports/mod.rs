@@ -18,10 +18,7 @@ pub mod engine;
 pub mod models;
 
 // Operações públicas de compilação dos relatórios.
-pub use engine::{
-    compile_citizen_ledger_pdf,
-    compile_invoice_pdf,
-};
+pub use engine::{compile_citizen_ledger_pdf, compile_invoice_pdf};
 
 // Modelos e contratos públicos do módulo.
 pub use models::*;

@@ -6,10 +6,10 @@ use std::path::{Component, Path, PathBuf};
 
 use crate::modules::documents::models::DocumentError;
 use crate::modules::documents::{
-    active_document_scope, documents_service_with_scope, global_preview_store, DocumentKind,
-    DocumentMetadata, DocumentPreviewStore, DocumentRequest, DocumentScope,
+    DocumentKind, DocumentMetadata, DocumentPreviewStore, DocumentRequest, DocumentScope,
+    active_document_scope, documents_service_with_scope, global_preview_store,
 };
-use crate::platform::typst_engine::{encode_base64, RenderedPagePreview};
+use crate::platform::typst_engine::{RenderedPagePreview, encode_base64};
 
 pub type DocumentPreviewPage = RenderedPagePreview;
 
@@ -326,6 +326,9 @@ fn default_file_name(kind: DocumentKind) -> String {
         DocumentKind::CessaoPosse => {
             format!("contrato_cessao_posse_{timestamp}_{entropy}.pdf")
         }
+        DocumentKind::ContratoAssociado => {
+            format!("contrato_associado_{timestamp}_{entropy}.pdf")
+        }
         DocumentKind::RealEstateReconciliation => {
             format!("reconciliacao_imobiliaria_{timestamp}_{entropy}.pdf")
         }
@@ -411,9 +414,7 @@ fn normalize_pdf_file_name(file_name: &str) -> Result<String, String> {
     );
 
     if is_reserved_windows {
-        return Err(
-            "O nome informado é uma palavra reservada do sistema operacional.".to_string(),
-        );
+        return Err("O nome informado é uma palavra reservada do sistema operacional.".to_string());
     }
 
     Ok(final_name)
@@ -434,17 +435,19 @@ fn write_pdf_without_overwrite(target_path: &Path, pdf_bytes: &[u8]) -> Result<(
         options.mode(0o600);
     }
 
-    let mut file = options
-        .open(target_path)
-        .map_err(|error| {
-            if error.kind() == std::io::ErrorKind::AlreadyExists {
-                "Já existe um arquivo com esse nome. Escolha outro nome.".to_string()
-            } else {
-                "Não foi possível criar o arquivo PDF no diretório de destino.".to_string()
-            }
-        })?;
+    let mut file = options.open(target_path).map_err(|error| {
+        if error.kind() == std::io::ErrorKind::AlreadyExists {
+            "Já existe um arquivo com esse nome. Escolha outro nome.".to_string()
+        } else {
+            "Não foi possível criar o arquivo PDF no diretório de destino.".to_string()
+        }
+    })?;
 
-    if file.write_all(pdf_bytes).and_then(|_| file.flush()).is_err() {
+    if file
+        .write_all(pdf_bytes)
+        .and_then(|_| file.flush())
+        .is_err()
+    {
         drop(file);
         let _ = fs::remove_file(target_path);
 
@@ -459,10 +462,10 @@ mod tests {
     use super::*;
     use rust_decimal_macros::dec;
 
+    use crate::modules::documents::models::InvoiceStatus;
     use crate::modules::reports::models::{
         CitizenLedgerPayload, InvoiceReportItem, InvoiceReportPayload,
     };
-    use crate::modules::documents::models::InvoiceStatus;
 
     use serde_json::json;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -833,10 +836,11 @@ mod tests {
         });
         let res1 = serde_json::from_value::<GenerateDocumentPayload>(missing_doc_num);
         assert!(res1.is_err());
-        assert!(res1
-            .unwrap_err()
-            .to_string()
-            .contains("missing field `document_number`"));
+        assert!(
+            res1.unwrap_err()
+                .to_string()
+                .contains("missing field `document_number`")
+        );
 
         // 2. auth_code ausente
         let missing_auth = serde_json::json!({
@@ -849,10 +853,11 @@ mod tests {
         });
         let res2 = serde_json::from_value::<GenerateDocumentPayload>(missing_auth);
         assert!(res2.is_err());
-        assert!(res2
-            .unwrap_err()
-            .to_string()
-            .contains("missing field `auth_code`"));
+        assert!(
+            res2.unwrap_err()
+                .to_string()
+                .contains("missing field `auth_code`")
+        );
     }
 
     #[test]
@@ -1044,7 +1049,9 @@ mod tests {
     fn test_preview_and_export_enforce_scope_hash_and_expiration_guards() {
         let directory = TestDirectory::new();
         let start_time = std::time::Instant::now();
-        let clock = std::sync::Arc::new(crate::modules::documents::MockMonotonicClock::new(start_time));
+        let clock = std::sync::Arc::new(crate::modules::documents::MockMonotonicClock::new(
+            start_time,
+        ));
         let store = DocumentPreviewStore::with_clock_and_limits(
             clock.clone(),
             std::time::Duration::from_secs(10),
@@ -1152,7 +1159,12 @@ mod tests {
         );
         assert!(expired_res.is_err());
         assert!(expired_res.unwrap_err().contains("expirou"));
-        assert!(!directory.path().join("nao_deve_gravar_expirado.pdf").exists());
+        assert!(
+            !directory
+                .path()
+                .join("nao_deve_gravar_expirado.pdf")
+                .exists()
+        );
     }
 
     #[test]
@@ -1176,6 +1188,10 @@ mod tests {
         write_pdf_without_overwrite(&target, b"%PDF-1.7\ntest").expect("gravar com sucesso");
 
         let permissions = fs::metadata(&target).unwrap().permissions();
-        assert_eq!(permissions.mode() & 0o777, 0o600, "Permissões devem ser 0600 (rw-------)");
+        assert_eq!(
+            permissions.mode() & 0o777,
+            0o600,
+            "Permissões devem ser 0600 (rw-------)"
+        );
     }
 }

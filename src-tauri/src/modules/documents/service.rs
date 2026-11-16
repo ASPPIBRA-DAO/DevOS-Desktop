@@ -163,9 +163,9 @@ mod tests {
     use rust_decimal_macros::dec;
     use sha2::{Digest, Sha256};
 
+    use crate::modules::documents::models::InvoiceStatus;
     use crate::modules::documents::ports::RenderedDocument;
     use crate::modules::documents::typst_renderer::TypstDocumentRenderer;
-    use crate::modules::documents::models::InvoiceStatus;
     use crate::modules::reports::models::{
         CitizenLedgerPayload, InvoiceReportItem, InvoiceReportPayload,
     };
@@ -586,7 +586,8 @@ mod tests {
     fn test_documents_service_authorizes_scope_matching() {
         let mock = std::sync::Arc::new(MockRenderer::new(vec![DocumentKind::InvoiceBill]));
         // Serviço configurado com escopo CockpitOnly
-        let service = DocumentsService::with_scope(mock.clone(), DocumentScope::CockpitOnly).unwrap();
+        let service =
+            DocumentsService::with_scope(mock.clone(), DocumentScope::CockpitOnly).unwrap();
 
         let payload = InvoiceReportPayload {
             id: "FAT-SCOPE-001".to_string(),
@@ -713,18 +714,26 @@ mod tests {
         // 1. Edição Cockpit (CockpitOnly): aceita Universal e CockpitOnly
         let cockpit_service =
             DocumentsService::with_scope(mock.clone(), DocumentScope::CockpitOnly).unwrap();
-        assert!(cockpit_service
-            .generate_document(ledger_req.clone())
-            .is_ok());
-        assert!(cockpit_service
-            .generate_document(invoice_req.clone())
-            .is_ok());
-        assert!(cockpit_service
-            .generate_document(cessao_req.clone())
-            .is_ok());
-        assert!(cockpit_service
-            .generate_document(reconciliation_req.clone())
-            .is_ok());
+        assert!(
+            cockpit_service
+                .generate_document(ledger_req.clone())
+                .is_ok()
+        );
+        assert!(
+            cockpit_service
+                .generate_document(invoice_req.clone())
+                .is_ok()
+        );
+        assert!(
+            cockpit_service
+                .generate_document(cessao_req.clone())
+                .is_ok()
+        );
+        assert!(
+            cockpit_service
+                .generate_document(reconciliation_req.clone())
+                .is_ok()
+        );
         assert_eq!(mock.invocations(), 4);
 
         // 2. Edição Node (NodeOnly): aceita Universal (CitizenLedger, InvoiceBill),

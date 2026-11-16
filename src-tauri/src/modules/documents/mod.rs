@@ -26,28 +26,28 @@ pub mod typst_renderer;
 
 // Mantém os modelos disponíveis diretamente na raiz do módulo (exceto módulos auxiliares internos).
 pub use models::{
-    ApplicationEdition, CessaoPossePayload, CitizenLedgerPayload, DocumentError, DocumentKind,
-    DocumentMetadata, DocumentOutput, DocumentRequest, DocumentScope, DocumentVisibility,
-    InvoiceReportItem, InvoiceReportPayload, InvoiceStatus, RealEstateReconciliationPayload,
-    COCKPIT_APP_IDENTIFIER, NODE_APP_IDENTIFIER,
+    ApplicationEdition, COCKPIT_APP_IDENTIFIER, CessaoPossePayload, CitizenLedgerPayload,
+    DocumentError, DocumentKind, DocumentMetadata, DocumentOutput, DocumentRequest, DocumentScope,
+    DocumentVisibility, InvoiceReportItem, InvoiceReportPayload, InvoiceStatus,
+    NODE_APP_IDENTIFIER, RealEstateReconciliationPayload,
 };
 
 // Mantém as abstrações e portas disponíveis na raiz do módulo.
 pub use ports::{DocumentRenderer, RenderedDocument};
 
 // Mantém o store de previews em memória e reserva de exportação disponíveis na raiz do módulo.
-pub use preview_store::{
-    global_preview_store, DocumentPreviewStore, ExportReservation, PreviewStoreError,
-    StoredDocumentPreview,
-};
 #[cfg(test)]
 pub use preview_store::MockMonotonicClock;
+pub use preview_store::{
+    DocumentPreviewStore, ExportReservation, PreviewStoreError, StoredDocumentPreview,
+    global_preview_store,
+};
 
 // Mantém os serviços de geração disponíveis na raiz do módulo.
 pub use service::DocumentsService;
 
 // Mantém o renderizador Typst e helpers de formatação disponíveis na raiz do módulo.
-pub use typst_renderer::{format_decimal_br, TypstDocumentRenderer};
+pub use typst_renderer::{TypstDocumentRenderer, format_decimal_br};
 
 use std::sync::OnceLock;
 
@@ -55,26 +55,21 @@ static ACTIVE_APPLICATION_EDITION: OnceLock<ApplicationEdition> = OnceLock::new(
 
 /// Define a edição uma única vez no boot; chamadas seguintes retornam erro.
 pub fn initialize_application_edition(edition: ApplicationEdition) -> Result<(), DocumentError> {
-    ACTIVE_APPLICATION_EDITION
-        .set(edition)
-        .map_err(|_| {
-            DocumentError::UnauthorizedScope(
-                "A edição da aplicação já foi previamente configurada e é imutável.".to_string(),
-            )
-        })
+    ACTIVE_APPLICATION_EDITION.set(edition).map_err(|_| {
+        DocumentError::UnauthorizedScope(
+            "A edição da aplicação já foi previamente configurada e é imutável.".to_string(),
+        )
+    })
 }
 
 /// Retorna a edição ativa da aplicação, ou erro se o sistema ainda não foi inicializado.
 pub fn get_active_application_edition() -> Result<ApplicationEdition, DocumentError> {
-    ACTIVE_APPLICATION_EDITION
-        .get()
-        .copied()
-        .ok_or_else(|| {
-            DocumentError::UnauthorizedScope(
-                "Operações documentais bloqueadas: a edição da aplicação não foi inicializada."
-                    .to_string(),
-            )
-        })
+    ACTIVE_APPLICATION_EDITION.get().copied().ok_or_else(|| {
+        DocumentError::UnauthorizedScope(
+            "Operações documentais bloqueadas: a edição da aplicação não foi inicializada."
+                .to_string(),
+        )
+    })
 }
 
 // TODO(dívida): remover após migrar document_commands.rs e reports/engine.rs.

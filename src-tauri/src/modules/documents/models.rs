@@ -118,6 +118,9 @@ pub enum DocumentKind {
     /// Contrato de Cessão de Posse de Imóvel.
     CessaoPosse,
 
+    /// Contrato de Adesão e Filiação do Associado (ASPPIBRA DAO).
+    ContratoAssociado,
+
     /// Relatório Analítico de Reconciliação Imobiliária.
     RealEstateReconciliation,
 }
@@ -129,6 +132,7 @@ impl DocumentKind {
             DocumentKind::CitizenLedger => DocumentVisibility::Universal,
             DocumentKind::InvoiceBill => DocumentVisibility::Universal,
             DocumentKind::CessaoPosse => DocumentVisibility::CockpitOnly,
+            DocumentKind::ContratoAssociado => DocumentVisibility::CockpitOnly,
             DocumentKind::RealEstateReconciliation => DocumentVisibility::CockpitOnly,
         }
     }
@@ -145,6 +149,7 @@ impl DocumentKind {
             DocumentKind::CitizenLedger => "extrato_citizen_ledger.typ",
             DocumentKind::InvoiceBill => "invoice_bill.typ",
             DocumentKind::CessaoPosse => "contrato_cessao_posse.typ",
+            DocumentKind::ContratoAssociado => "contrato_adesao_associado.typ",
             DocumentKind::RealEstateReconciliation => "real_estate_reconciliation.typ",
         }
     }
@@ -267,7 +272,10 @@ impl DocumentMetadata {
             ))
         })?;
         if self.sha256_checksum.len() != 64
-            || !self.sha256_checksum.chars().all(|c| matches!(c, '0'..='9' | 'a'..='f'))
+            || !self
+                .sha256_checksum
+                .chars()
+                .all(|c| matches!(c, '0'..='9' | 'a'..='f'))
         {
             return Err(DocumentError::ValidationError(
                 "O checksum sha256 deve ser uma string hexadecimal de exatamente 64 caracteres em minúsculas."
@@ -417,9 +425,7 @@ impl InvoiceReportItem {
             )));
         }
         let expected_total = match self.quantity.checked_mul(self.price) {
-            Some(res) => {
-                res.round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero)
-            }
+            Some(res) => res.round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero),
             None => {
                 return Err(DocumentError::ValidationError(format!(
                     "O item {} da fatura causou overflow aritmético no cálculo de quantidade × preço.",
@@ -646,7 +652,10 @@ impl std::fmt::Debug for InvoiceReportPayload {
             .field("member_name", &"***")
             .field("member_doc", &"***")
             .field("member_email", &self.member_email.as_ref().map(|_| "***"))
-            .field("member_address", &self.member_address.as_ref().map(|_| "***"))
+            .field(
+                "member_address",
+                &self.member_address.as_ref().map(|_| "***"),
+            )
             .field("description", &self.description)
             .field("reference_month", &self.reference_month)
             .field("amount", &self.amount)
@@ -706,12 +715,14 @@ impl InvoiceReportPayload {
         }
         if self.member_doc.chars().count() > 32 {
             return Err(DocumentError::ValidationError(
-                "O documento do associado (member_doc) excede o limite de 32 caracteres.".to_string(),
+                "O documento do associado (member_doc) excede o limite de 32 caracteres."
+                    .to_string(),
             ));
         }
         if self.description.chars().count() > 500 {
             return Err(DocumentError::ValidationError(
-                "A descrição da fatura (description) excede o limite de 500 caracteres.".to_string(),
+                "A descrição da fatura (description) excede o limite de 500 caracteres."
+                    .to_string(),
             ));
         }
         if let Some(ref address) = self.member_address
@@ -811,7 +822,9 @@ impl InvoiceReportPayload {
         let ref_month_trimmed = self.reference_month.trim();
         let is_valid_ref_month = ref_month_trimmed.len() == 7
             && ref_month_trimmed.as_bytes()[4] == b'-'
-            && ref_month_trimmed.chars().all(|c| c.is_ascii_digit() || c == '-')
+            && ref_month_trimmed
+                .chars()
+                .all(|c| c.is_ascii_digit() || c == '-')
             && NaiveDate::parse_from_str(&format!("{ref_month_trimmed}-01"), "%Y-%m-%d").is_ok();
 
         if !is_valid_ref_month {
@@ -878,7 +891,8 @@ impl InvoiceReportPayload {
             if !seen_ids.insert(trimmed_id) {
                 return Err(DocumentError::ValidationError(format!(
                     "O item {} da fatura possui identificador duplicado: '{}'.",
-                    i + 1, item.id
+                    i + 1,
+                    item.id
                 )));
             }
         }
@@ -1037,7 +1051,8 @@ impl CessaoPossePayload {
         }
         if self.auth_code.chars().count() > 64 {
             return Err(DocumentError::ValidationError(
-                "O código de autenticação (auth_code) excede o limite de 64 caracteres.".to_string(),
+                "O código de autenticação (auth_code) excede o limite de 64 caracteres."
+                    .to_string(),
             ));
         }
 
@@ -1071,6 +1086,54 @@ impl CessaoPossePayload {
     }
 }
 
+/// Payload estruturado para emissão de Contrato de Adesão do Associado (ASPPIBRA DAO).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ContratoAssociadoPayload {
+    pub document_number: String,
+    pub auth_code: String,
+    pub data: serde_json::Value,
+}
+
+impl ContratoAssociadoPayload {
+    pub fn validate(&self) -> Result<(), DocumentError> {
+        let doc_num = self.document_number.trim();
+        if doc_num.is_empty() {
+            return Err(DocumentError::ValidationError(
+                "O número do documento (document_number) não pode ser vazio.".to_string(),
+            ));
+        }
+        if doc_num.len() > 64 {
+            return Err(DocumentError::ValidationError(
+                "O número do documento (document_number) excede o limite de 64 caracteres."
+                    .to_string(),
+            ));
+        }
+
+        let auth_code = self.auth_code.trim();
+        if auth_code.is_empty() {
+            return Err(DocumentError::ValidationError(
+                "O código de autenticação (auth_code) não pode ser vazio.".to_string(),
+            ));
+        }
+        if auth_code.len() > 64 {
+            return Err(DocumentError::ValidationError(
+                "O código de autenticação (auth_code) excede o limite de 64 caracteres."
+                    .to_string(),
+            ));
+        }
+
+        validate_json_limits(&self.data)?;
+
+        match &self.data {
+            serde_json::Value::Object(map) if !map.is_empty() => Ok(()),
+            _ => Err(DocumentError::ValidationError(
+                "O campo data do contrato de associado deve ser um objeto JSON não vazio."
+                    .to_string(),
+            )),
+        }
+    }
+}
+
 /// Requisição fortemente tipada para o pipeline de geração.
 ///
 /// A representação serializada contém o discriminador `kind` e o
@@ -1082,6 +1145,7 @@ pub enum DocumentRequest {
     CitizenLedger(CitizenLedgerPayload),
     InvoiceBill(InvoiceReportPayload),
     CessaoPosse(CessaoPossePayload),
+    ContratoAssociado(ContratoAssociadoPayload),
     RealEstateReconciliation(RealEstateReconciliationPayload),
 }
 
@@ -1092,6 +1156,7 @@ impl DocumentRequest {
             DocumentRequest::CitizenLedger(_) => DocumentKind::CitizenLedger,
             DocumentRequest::InvoiceBill(_) => DocumentKind::InvoiceBill,
             DocumentRequest::CessaoPosse(_) => DocumentKind::CessaoPosse,
+            DocumentRequest::ContratoAssociado(_) => DocumentKind::ContratoAssociado,
             DocumentRequest::RealEstateReconciliation(_) => DocumentKind::RealEstateReconciliation,
         }
     }
@@ -1100,6 +1165,7 @@ impl DocumentRequest {
     pub fn validate(&self) -> Result<(), DocumentError> {
         match self {
             DocumentRequest::CessaoPosse(payload) => payload.validate(),
+            DocumentRequest::ContratoAssociado(payload) => payload.validate(),
             DocumentRequest::InvoiceBill(payload) => payload.validate(),
 
             DocumentRequest::CitizenLedger(payload) => {
@@ -1145,7 +1211,8 @@ impl DocumentRequest {
 
                 if ref_period.is_empty() {
                     return Err(DocumentError::ValidationError(
-                        "Campo obrigatório ausente ou vazio: 'data.meta.reference_period'.".to_string(),
+                        "Campo obrigatório ausente ou vazio: 'data.meta.reference_period'."
+                            .to_string(),
                     ));
                 }
 
@@ -1435,18 +1502,22 @@ mod tests {
         };
 
         // 1. Valor positivo válido -> OK
-        assert!(DocumentRequest::InvoiceBill(base_invoice.clone())
-            .validate()
-            .is_ok());
+        assert!(
+            DocumentRequest::InvoiceBill(base_invoice.clone())
+                .validate()
+                .is_ok()
+        );
 
         // 2. Valor zero -> OK (com item gratuito coerente)
         let mut zero_invoice = base_invoice.clone();
         zero_invoice.amount = dec!(0.00);
         zero_invoice.items[0].price = dec!(0.00);
         zero_invoice.items[0].total = dec!(0.00);
-        assert!(DocumentRequest::InvoiceBill(zero_invoice)
-            .validate()
-            .is_ok());
+        assert!(
+            DocumentRequest::InvoiceBill(zero_invoice)
+                .validate()
+                .is_ok()
+        );
 
         // 3. Valor negativo -> Err
         let mut negative_invoice = base_invoice.clone();
@@ -1509,9 +1580,11 @@ mod tests {
 
         let mut zero_discount = base_invoice;
         zero_discount.discount = Some(dec!(0.00));
-        assert!(DocumentRequest::InvoiceBill(zero_discount)
-            .validate()
-            .is_ok());
+        assert!(
+            DocumentRequest::InvoiceBill(zero_discount)
+                .validate()
+                .is_ok()
+        );
     }
 
     #[test]

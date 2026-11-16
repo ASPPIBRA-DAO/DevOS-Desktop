@@ -123,7 +123,7 @@ export function DocumentTemplatesGalleryView() {
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
           <Iconify icon="solar:ruler-angular-bold" width={22} sx={{ color: 'primary.main' }} />
           <Typography variant="h6" sx={{ fontWeight: 800 }}>
-            Padrões de Folhas & Geometrias Disponíveis
+            Padrões de Folhas
           </Typography>
         </Box>
 
@@ -142,7 +142,7 @@ export function DocumentTemplatesGalleryView() {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Iconify icon="solar:documents-bold" width={22} sx={{ color: 'primary.main' }} />
             <Typography variant="h6" sx={{ fontWeight: 800 }}>
-              Modelos Institucionais Prontos (Typst Engine)
+              Modelos Institucionais
             </Typography>
           </Box>
 

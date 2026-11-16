@@ -49,6 +49,7 @@ pub struct TypstCompileOptions<'a> {
     pub fonts: &'a [&'a [u8]],
     pub string_inputs: HashMap<&'a str, String>,
     pub static_sources: &'a [(&'a str, &'a str)],
+    pub static_files: &'a [(&'a str, &'a [u8])],
 }
 
 /// Codifica um slice binário em Base64 padrão (RFC 4648) com aceleração SIMD.
@@ -118,6 +119,10 @@ pub fn compile_typst_document_to_pdf(
         builder = builder.with_static_source_file_resolver(options.static_sources.iter().copied());
     }
 
+    if !options.static_files.is_empty() {
+        builder = builder.with_static_file_resolver(options.static_files.iter().copied());
+    }
+
     let engine = builder.build();
 
     let document = engine
@@ -165,6 +170,10 @@ pub fn compile_typst_document_with_preview(
 
     if !options.static_sources.is_empty() {
         builder = builder.with_static_source_file_resolver(options.static_sources.iter().copied());
+    }
+
+    if !options.static_files.is_empty() {
+        builder = builder.with_static_file_resolver(options.static_files.iter().copied());
     }
 
     let engine = builder.build();
@@ -275,6 +284,7 @@ mod tests {
             fonts: &[],
             string_inputs: HashMap::new(),
             static_sources: &[],
+            static_files: &[],
         };
 
         let bytes = compile_typst_document(options)
@@ -298,6 +308,7 @@ mod tests {
             fonts: &[],
             string_inputs,
             static_sources: &[],
+            static_files: &[],
         };
 
         let bytes = compile_typst_document(options).unwrap_or_else(|error| {
@@ -315,6 +326,7 @@ mod tests {
             fonts: &[],
             string_inputs: HashMap::new(),
             static_sources: &[],
+            static_files: &[],
         };
 
         let error = compile_typst_document(options)
@@ -339,6 +351,7 @@ mod tests {
             fonts: &[],
             string_inputs: HashMap::new(),
             static_sources: &[],
+            static_files: &[],
         };
 
         let bytes = compile_typst_document(options).expect("Falha ao compilar Typst com SVG");
@@ -360,6 +373,7 @@ mod tests {
             fonts: &[],
             string_inputs: HashMap::new(),
             static_sources: &[],
+            static_files: &[],
         };
 
         let bytes = compile_typst_document(options).expect("Falha ao compilar");
@@ -383,6 +397,7 @@ mod tests {
             fonts: &[],
             string_inputs: HashMap::new(),
             static_sources: &static_sources,
+            static_files: &[],
         };
 
         let bytes = compile_typst_document(options)
@@ -412,6 +427,7 @@ mod tests {
             fonts: &[],
             string_inputs: HashMap::new(),
             static_sources: &static_sources,
+            static_files: &[],
         };
 
         let bytes = compile_typst_document(options)
@@ -445,6 +461,7 @@ mod tests {
             fonts: &[],
             string_inputs: HashMap::new(),
             static_sources: &static_sources,
+            static_files: &[],
         };
 
         let bytes = compile_typst_document(options).expect(
@@ -492,6 +509,7 @@ mod tests {
             fonts: &[TEST_FONT],
             string_inputs: HashMap::new(),
             static_sources: &[],
+            static_files: &[],
         };
 
         let compiled = compile_typst_document_with_preview(options)

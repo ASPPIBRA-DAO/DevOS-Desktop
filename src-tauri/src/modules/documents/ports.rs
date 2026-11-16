@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::modules::documents::models::{DocumentError, DocumentKind, DocumentRequest};
 use crate::platform::typst_engine::{
-    inspect_pdf_bytes_pages, validate_pdf_structure, RenderedPagePreview,
+    RenderedPagePreview, inspect_pdf_bytes_pages, validate_pdf_structure,
 };
 
 /// Resultado bruto da compilação documental emitida por um renderizador.

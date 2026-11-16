@@ -41,7 +41,9 @@ async fn test_storage_proof_computation_deterministic() {
         deadline_utc: "2026-11-01T15:00:00Z".to_string(),
     };
 
-    let res = execute_storage_proof(challenge.clone()).await.expect("Computação da prova deve ser bem-sucedida");
+    let res = execute_storage_proof(challenge.clone())
+        .await
+        .expect("Computação da prova deve ser bem-sucedida");
     assert_eq!(res.challenge_id, "challenge-test-001");
     assert!(res.proof_hash.starts_with("0x"));
     assert_eq!(res.proof_hash.len(), 66); // 0x + 64 caracteres hex (SHA-256)
@@ -49,7 +51,9 @@ async fn test_storage_proof_computation_deterministic() {
     assert!(!res.node_operational_pubkey.is_empty());
 
     // Determinismo: mesma entrada deve gerar exatamente a mesma prova
-    let res2 = execute_storage_proof(challenge).await.expect("Segunda computação deve ter sucesso");
+    let res2 = execute_storage_proof(challenge)
+        .await
+        .expect("Segunda computação deve ter sucesso");
     assert_eq!(res.proof_hash, res2.proof_hash);
     assert_eq!(res.signature, res2.signature);
 }
@@ -73,7 +77,10 @@ async fn test_storage_proof_different_nonces_produce_different_hashes() {
     let res_a = execute_storage_proof(challenge_a).await.unwrap();
     let res_b = execute_storage_proof(challenge_b).await.unwrap();
 
-    assert_ne!(res_a.proof_hash, res_b.proof_hash, "Nonces distintos devem produzir provas distintas");
+    assert_ne!(
+        res_a.proof_hash, res_b.proof_hash,
+        "Nonces distintos devem produzir provas distintas"
+    );
 }
 
 #[tokio::test]
@@ -105,8 +112,8 @@ async fn test_storage_proof_rejects_empty_inputs() {
 
 #[test]
 fn test_incremental_file_sha256_computation() {
-    use std::io::Write;
     use crate::modules::ipfs::content::compute_file_sha256;
+    use std::io::Write;
 
     let temp_dir = std::env::temp_dir().join(format!("devos_test_{}", uuid::Uuid::new_v4()));
     let _ = std::fs::create_dir_all(&temp_dir);
@@ -163,7 +170,9 @@ async fn test_managed_pins_catalog_lifecycle() {
     assert_eq!(list.len(), 1);
     assert_eq!(list[0].cid, cid);
 
-    let ipc_list = ipfs_list_managed_pins().await.expect("Comando IPC ipfs_list_managed_pins deve responder com sucesso");
+    let ipc_list = ipfs_list_managed_pins()
+        .await
+        .expect("Comando IPC ipfs_list_managed_pins deve responder com sucesso");
     assert_eq!(ipc_list.len(), 1);
     assert_eq!(ipc_list[0].cid, cid);
 
@@ -195,7 +204,8 @@ async fn test_safe_unpin_shared_repo_requires_confirmation_for_managed_pin() {
         pin_type: "recursive".to_string(),
         origin: "unit_test".to_string(),
         repo_context: "shared_or_external".to_string(),
-    }).expect("Registrar pin gerenciado");
+    })
+    .expect("Registrar pin gerenciado");
 
     use crate::modules::ipfs::daemon::set_exclusive_repo_override_for_test;
     set_exclusive_repo_override_for_test(Some(false));
@@ -314,7 +324,9 @@ async fn test_offline_recovery_does_not_confirm_decentralized_availability() {
 
     // Correção 01: Verificação hermética. Quando o daemon está offline ou quando DHT não responde,
     // a disponibilidade é LookupFailed (ou Unavailable se responder 0 provedores), NUNCA RecoveryConfirmed.
-    let report = verify_cid_custody(&client, cid, None).await.expect("Auditoria de custódia");
+    let report = verify_cid_custody(&client, cid, None)
+        .await
+        .expect("Auditoria de custódia");
 
     assert_ne!(
         report.availability,
@@ -328,9 +340,18 @@ async fn test_offline_recovery_does_not_confirm_decentralized_availability() {
 #[test]
 fn test_providers_found_differentiated_from_recovery_confirmed() {
     // Correção 01: ProvidersFound indica anúncios na DHT, RecoveryConfirmed exige recuperação remota independente
-    assert_ne!(AvailabilityState::ProvidersFound, AvailabilityState::RecoveryConfirmed);
-    assert_ne!(AvailabilityState::ProvidersFound, AvailabilityState::Unavailable);
-    assert_ne!(AvailabilityState::LookupFailed, AvailabilityState::Unavailable);
+    assert_ne!(
+        AvailabilityState::ProvidersFound,
+        AvailabilityState::RecoveryConfirmed
+    );
+    assert_ne!(
+        AvailabilityState::ProvidersFound,
+        AvailabilityState::Unavailable
+    );
+    assert_ne!(
+        AvailabilityState::LookupFailed,
+        AvailabilityState::Unavailable
+    );
 }
 
 #[tokio::test]
@@ -342,7 +363,10 @@ async fn test_concurrent_downloads_do_not_share_temp_files() {
     let mut paths = std::collections::HashSet::new();
     for _ in 0..100 {
         let tmp = parent_dir.join(format!(".{file_stem}.{}.devos.tmp", uuid::Uuid::new_v4()));
-        assert!(paths.insert(tmp), "Cada arquivo temporário deve ter identificador UUID exclusivo");
+        assert!(
+            paths.insert(tmp),
+            "Cada arquivo temporário deve ter identificador UUID exclusivo"
+        );
     }
     assert_eq!(paths.len(), 100);
 }
@@ -402,8 +426,15 @@ async fn test_download_failures_clean_up_temp_files() {
     assert!(res.is_err());
 
     // NENHUM arquivo temporário deve restar no diretório
-    let entries: Vec<_> = std::fs::read_dir(&temp_dir).unwrap().filter_map(|e| e.ok()).collect();
-    assert_eq!(entries.len(), 0, "Arquivos temporários devem ser removidos em caso de falha");
+    let entries: Vec<_> = std::fs::read_dir(&temp_dir)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .collect();
+    assert_eq!(
+        entries.len(),
+        0,
+        "Arquivos temporários devem ser removidos em caso de falha"
+    );
 
     let _ = std::fs::remove_dir_all(&temp_dir);
 }
@@ -415,7 +446,10 @@ fn test_kubo_add_response_terminal_error_parsing() {
     let normal_parsed: Result<KuboAddResponse, _> = serde_json::from_str(normal_json);
     assert!(normal_parsed.is_ok());
     let ok_obj = normal_parsed.unwrap();
-    assert_eq!(ok_obj.hash.as_deref(), Some("QmXoypizjW3WknFiJnKLwHCnL72vedxjQkDDP1mXWo6uco"));
+    assert_eq!(
+        ok_obj.hash.as_deref(),
+        Some("QmXoypizjW3WknFiJnKLwHCnL72vedxjQkDDP1mXWo6uco")
+    );
 
     // Erro terminal com Type error
     let error_json = r#"{"Message":"no space left on device","Code":1,"Type":"error"}"#;
@@ -456,13 +490,17 @@ async fn test_decode_chunked_response_detects_trailer_error() {
     use std::io::Cursor;
 
     // Correção 03: Kubo inicia transmissão normal (HTTP 200) e emite X-Stream-Error no trailer final
-    let chunked_with_trailer = b"5\r\nHello\r\n0\r\nX-Stream-Error: context deadline exceeded\r\n\r\n";
+    let chunked_with_trailer =
+        b"5\r\nHello\r\n0\r\nX-Stream-Error: context deadline exceeded\r\n\r\n";
     let reader = Cursor::new(chunked_with_trailer);
     let mut writer = Vec::new();
     let mut hasher = Sha256::new();
 
     let res = decode_chunked_response(reader, &mut writer, &mut hasher).await;
-    assert!(res.is_err(), "Stream com trailer X-Stream-Error DEVE falhar");
+    assert!(
+        res.is_err(),
+        "Stream com trailer X-Stream-Error DEVE falhar"
+    );
     let err_msg = res.unwrap_err();
     assert!(err_msg.contains("X-Stream-Error"));
     assert!(err_msg.contains("context deadline exceeded"));
@@ -481,14 +519,17 @@ async fn test_decode_chunked_response_detects_premature_eof() {
     let mut hasher = Sha256::new();
 
     let res = decode_chunked_response(reader, &mut writer, &mut hasher).await;
-    assert!(res.is_err(), "Conexão prematuramente encerrada DEVE ser rejeitada");
+    assert!(
+        res.is_err(),
+        "Conexão prematuramente encerrada DEVE ser rejeitada"
+    );
 }
 
 #[tokio::test]
 async fn test_hashing_async_reader_exact_stream_digest() {
+    use sha2::{Digest, Sha256};
     use std::io::Write;
     use std::sync::{Arc, Mutex};
-    use sha2::{Digest, Sha256};
     use tokio::fs::File as TokioFile;
     use tokio::io::AsyncReadExt;
 
@@ -518,10 +559,16 @@ async fn test_hashing_async_reader_exact_stream_digest() {
     assert_eq!(read_buf.len(), 65536);
     assert_eq!(*total_bytes_arc.lock().unwrap(), 65536);
 
-    let stream_hash = format!("0x{}", hex::encode(hasher_arc.lock().unwrap().clone().finalize()));
+    let stream_hash = format!(
+        "0x{}",
+        hex::encode(hasher_arc.lock().unwrap().clone().finalize())
+    );
     let expected_hash = format!("0x{}", hex::encode(Sha256::digest(&sample_data)));
 
-    assert_eq!(stream_hash, expected_hash, "Hash calculado pelo stream DEVE ser idêntico ao digest dos bytes transmitidos");
+    assert_eq!(
+        stream_hash, expected_hash,
+        "Hash calculado pelo stream DEVE ser idêntico ao digest dos bytes transmitidos"
+    );
 
     let _ = std::fs::remove_dir_all(&temp_dir);
 }
@@ -552,7 +599,8 @@ async fn test_unpin_authorization_in_exclusive_devos_repo() {
         pin_type: "recursive".to_string(),
         origin: "devos_upload".to_string(),
         repo_context: repo_ctx.clone(),
-    }).expect("Registrar pin exclusivo");
+    })
+    .expect("Registrar pin exclusivo");
 
     // Em repositório exclusivo demonstrado, o unpin de CID pertencente a este repositório
     // passa pela autorização de segurança sem exigir confirm_shared_repo_unpin = true!
@@ -573,7 +621,8 @@ async fn test_unpin_rejected_when_devos_spawned_but_repo_is_shared() {
     use crate::modules::ipfs::daemon::set_exclusive_repo_override_for_test;
     use crate::modules::ipfs::pinning::{register_managed_pin, safe_unpin, set_custom_catalog_dir};
 
-    let temp_dir = std::env::temp_dir().join(format!("devos_shared_spawn_{}", uuid::Uuid::new_v4()));
+    let temp_dir =
+        std::env::temp_dir().join(format!("devos_shared_spawn_{}", uuid::Uuid::new_v4()));
     let _ = std::fs::create_dir_all(&temp_dir);
     set_custom_catalog_dir(Some(temp_dir.clone()));
 
@@ -592,7 +641,8 @@ async fn test_unpin_rejected_when_devos_spawned_but_repo_is_shared() {
         pin_type: "recursive".to_string(),
         origin: "devos_upload".to_string(),
         repo_context: "shared_or_external".to_string(),
-    }).expect("Registrar pin");
+    })
+    .expect("Registrar pin");
 
     // Mesmo sendo gerenciado e iniciado pelo DevOS, se o repositório é compartilhado, EXIGE confirmação!
     let res = safe_unpin(&client, cid, true, false, false).await;
@@ -647,14 +697,19 @@ fn test_upload_terminal_error_response_aborts_operation() {
             continue;
         }
         if let Ok(obj) = serde_json::from_str::<KuboAddResponse>(trimmed) {
-            if obj.r#type.as_deref() == Some("error") || (obj.message.is_some() && obj.hash.is_none()) {
+            if obj.r#type.as_deref() == Some("error")
+                || (obj.message.is_some() && obj.hash.is_none())
+            {
                 had_terminal_error = true;
                 break;
             }
         }
     }
 
-    assert!(had_terminal_error, "Erro terminal durante stream de upload DEVE ser identificado");
+    assert!(
+        had_terminal_error,
+        "Erro terminal durante stream de upload DEVE ser identificado"
+    );
 }
 
 #[tokio::test]
@@ -690,8 +745,14 @@ fn test_rfc7230_trailer_negotiation_headers_present() {
          \r\n"
     );
 
-    assert!(req.contains("TE: trailers"), "Requisição HTTP DEVE enviar 'TE: trailers'");
-    assert!(req.contains("Connection: close, TE"), "Requisição HTTP DEVE enviar 'Connection: close, TE'");
+    assert!(
+        req.contains("TE: trailers"),
+        "Requisição HTTP DEVE enviar 'TE: trailers'"
+    );
+    assert!(
+        req.contains("Connection: close, TE"),
+        "Requisição HTTP DEVE enviar 'Connection: close, TE'"
+    );
 }
 
 #[tokio::test]
@@ -708,7 +769,8 @@ async fn test_tcp_server_captures_reqwest_multipart_te_trailers_header() {
         let n = socket.read(&mut buf).await.unwrap();
         let request_str = String::from_utf8_lossy(&buf[..n]).to_string();
 
-        let body = "{\"Name\":\"test.txt\",\"Hash\":\"QmXoypizjW3WknFiJnKLwHCnL72vedxjQkDDP1mXWo6uco\"}\n";
+        let body =
+            "{\"Name\":\"test.txt\",\"Hash\":\"QmXoypizjW3WknFiJnKLwHCnL72vedxjQkDDP1mXWo6uco\"}\n";
         let response = format!(
             "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
             body.len(),
@@ -723,7 +785,11 @@ async fn test_tcp_server_captures_reqwest_multipart_te_trailers_header() {
         .add_file_multipart("test.txt", reqwest::Body::from("dados_de_teste"), true)
         .await;
 
-    assert!(res.is_ok(), "Upload multipart simulado deve ter sucesso: {:?}", res);
+    assert!(
+        res.is_ok(),
+        "Upload multipart simulado deve ter sucesso: {:?}",
+        res
+    );
     let captured_request = server_task.await.unwrap();
     let lower = captured_request.to_lowercase();
 
@@ -740,9 +806,9 @@ async fn test_tcp_server_captures_reqwest_multipart_te_trailers_header() {
 
 #[tokio::test]
 async fn test_tcp_server_captures_cat_to_writer_te_trailers_header() {
+    use sha2::Sha256;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::TcpListener;
-    use sha2::Sha256;
 
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let port = listener.local_addr().unwrap().port();
@@ -753,7 +819,8 @@ async fn test_tcp_server_captures_cat_to_writer_te_trailers_header() {
         let n = socket.read(&mut buf).await.unwrap();
         let request_str = String::from_utf8_lossy(&buf[..n]).to_string();
 
-        let response = "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nHello\r\n0\r\n\r\n";
+        let response =
+            "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nHello\r\n0\r\n\r\n";
         let _ = socket.write_all(response.as_bytes()).await;
         request_str
     });
@@ -762,10 +829,19 @@ async fn test_tcp_server_captures_cat_to_writer_te_trailers_header() {
     let mut writer = Vec::new();
     let mut hasher = Sha256::new();
     let res = client
-        .cat_to_writer("QmXoypizjW3WknFiJnKLwHCnL72vedxjQkDDP1mXWo6uco", false, &mut writer, &mut hasher)
+        .cat_to_writer(
+            "QmXoypizjW3WknFiJnKLwHCnL72vedxjQkDDP1mXWo6uco",
+            false,
+            &mut writer,
+            &mut hasher,
+        )
         .await;
 
-    assert!(res.is_ok(), "cat_to_writer simulado deve ter sucesso: {:?}", res);
+    assert!(
+        res.is_ok(),
+        "cat_to_writer simulado deve ter sucesso: {:?}",
+        res
+    );
     assert_eq!(&writer, b"Hello");
 
     let captured_request = server_task.await.unwrap();
@@ -783,10 +859,8 @@ async fn test_tcp_server_captures_cat_to_writer_te_trailers_header() {
 
 #[test]
 fn test_daemon_manager_tracks_explicit_child_repo_path() {
+    use crate::modules::ipfs::daemon::{DaemonManager, set_spawned_repo_path_for_test};
     use std::path::PathBuf;
-    use crate::modules::ipfs::daemon::{
-        set_spawned_repo_path_for_test, DaemonManager,
-    };
 
     let dedicated_path = PathBuf::from("/tmp/devos_mock_dedicated_repo/ipfs");
     set_spawned_repo_path_for_test(Some(dedicated_path.clone()));
@@ -801,11 +875,11 @@ fn test_daemon_manager_tracks_explicit_child_repo_path() {
 
 #[tokio::test]
 async fn test_full_operational_kubo_homologation_lifecycle() {
-    use std::fs;
-    use std::time::Duration;
-    use sha2::{Digest, Sha256};
     use crate::modules::ipfs::daemon::{DaemonManager, DaemonOrigin};
     use crate::modules::ipfs::pinning::is_managed_pin;
+    use sha2::{Digest, Sha256};
+    use std::fs;
+    use std::time::Duration;
 
     if !DaemonManager::is_binary_installed() {
         println!("Binário 'ipfs' não encontrado. Pulando homologação operacional.");
@@ -814,7 +888,11 @@ async fn test_full_operational_kubo_homologation_lifecycle() {
 
     // 1. Iniciar daemon pelo DevOS
     let origin = DaemonManager::start_daemon_if_needed().await;
-    assert!(origin.is_ok(), "Falha ao acionar DaemonManager::start_daemon_if_needed: {:?}", origin);
+    assert!(
+        origin.is_ok(),
+        "Falha ao acionar DaemonManager::start_daemon_if_needed: {:?}",
+        origin
+    );
 
     let client = KuboClient::new();
     let mut ready = false;
@@ -829,25 +907,51 @@ async fn test_full_operational_kubo_homologation_lifecycle() {
 
     // 2. Verificações de Isolamento e RPC
     let detected_origin = DaemonManager::check_daemon_origin().await;
-    assert_eq!(detected_origin, DaemonOrigin::DevOsSpawned, "Origem deve ser DevOsSpawned");
+    assert_eq!(
+        detected_origin,
+        DaemonOrigin::DevOsSpawned,
+        "Origem deve ser DevOsSpawned"
+    );
 
     let is_exclusive = DaemonManager::is_exclusive_devos_repo().await;
-    assert!(is_exclusive, "Repositório do DevOS deve ser identificado como exclusivo");
+    assert!(
+        is_exclusive,
+        "Repositório do DevOS deve ser identificado como exclusivo"
+    );
 
-    let version_info = client.get_version().await.expect("Consulta /version deve responder");
-    assert!(version_info.version.is_some(), "Versão Kubo deve estar presente");
+    let version_info = client
+        .get_version()
+        .await
+        .expect("Consulta /version deve responder");
+    assert!(
+        version_info.version.is_some(),
+        "Versão Kubo deve estar presente"
+    );
     let version_str = version_info.version.unwrap();
     println!("[Homologação] Versão Kubo: {}", version_str);
 
-    let node_id_info = client.get_node_id().await.expect("Consulta /id deve responder");
+    let node_id_info = client
+        .get_node_id()
+        .await
+        .expect("Consulta /id deve responder");
     let node1_peer_id = node_id_info.id.expect("Peer ID deve estar presente");
     println!("[Homologação] Nó 1 Peer ID: {}", node1_peer_id);
 
-    let repo_stat = client.get_repo_stat().await.expect("Consulta /repo/stat deve responder");
-    println!("[Homologação] Repo Stat: size={:?}, objects={:?}", repo_stat.repo_size, repo_stat.num_objects);
+    let repo_stat = client
+        .get_repo_stat()
+        .await
+        .expect("Consulta /repo/stat deve responder");
+    println!(
+        "[Homologação] Repo Stat: size={:?}, objects={:?}",
+        repo_stat.repo_size, repo_stat.num_objects
+    );
 
     let repo_ctx = DaemonManager::get_repo_context().await;
-    assert!(repo_ctx.contains(&node1_peer_id), "Contexto deve incluir o Peer ID: {}", repo_ctx);
+    assert!(
+        repo_ctx.contains(&node1_peer_id),
+        "Contexto deve incluir o Peer ID: {}",
+        repo_ctx
+    );
 
     // 3. Preparação dos arquivos temporários
     let test_dir = std::env::temp_dir().join("devos-ipfs-homologation");
@@ -859,7 +963,11 @@ async fn test_full_operational_kubo_homologation_lifecycle() {
     let file_2mb_path = test_dir.join("arquivo_2mb.dat");
     let file_special_path = test_dir.join("relatório de auditoria (2026) #1.pdf");
 
-    fs::write(&file_text_path, b"Homologacao Oficial Modulo 11 DevOS IPFS - ASPPIBRA").unwrap();
+    fs::write(
+        &file_text_path,
+        b"Homologacao Oficial Modulo 11 DevOS IPFS - ASPPIBRA",
+    )
+    .unwrap();
 
     let mut bin_data = vec![0u8; 5000];
     for (i, b) in bin_data.iter_mut().enumerate() {
@@ -875,7 +983,11 @@ async fn test_full_operational_kubo_homologation_lifecycle() {
     data_2mb[500] = 0x77;
     fs::write(&file_2mb_path, &data_2mb).unwrap();
 
-    fs::write(&file_special_path, "Documento Especial com caracteres acentuados e símbolos #1".as_bytes()).unwrap();
+    fs::write(
+        &file_special_path,
+        "Documento Especial com caracteres acentuados e símbolos #1".as_bytes(),
+    )
+    .unwrap();
 
     let compute_sha256 = |path: &std::path::Path| -> String {
         let bytes = fs::read(path).unwrap();
@@ -894,60 +1006,102 @@ async fn test_full_operational_kubo_homologation_lifecycle() {
         file_path: file_text_path.to_string_lossy().to_string(),
         pin: true,
         expected_sha256: Some(text_sha256.clone()),
-    }).await.expect("Upload de arquivo_texto.txt deve suceder");
-    assert_eq!(upload_text.sha256_checksum, text_sha256, "SHA-256 do upload deve bater exatamente");
-    assert!(upload_text.pinned, "Upload com pin=true deve retornar pinned=true");
-    assert!(is_managed_pin(&upload_text.cid), "CID do upload deve estar no catalogo de managed-pins");
+    })
+    .await
+    .expect("Upload de arquivo_texto.txt deve suceder");
+    assert_eq!(
+        upload_text.sha256_checksum, text_sha256,
+        "SHA-256 do upload deve bater exatamente"
+    );
+    assert!(
+        upload_text.pinned,
+        "Upload com pin=true deve retornar pinned=true"
+    );
+    assert!(
+        is_managed_pin(&upload_text.cid),
+        "CID do upload deve estar no catalogo de managed-pins"
+    );
     println!("[Homologação] Upload texto CID: {}", upload_text.cid);
 
     let upload_special = ipfs_upload_file(IpfsUploadOptions {
         file_path: file_special_path.to_string_lossy().to_string(),
         pin: false,
         expected_sha256: Some(special_sha256.clone()),
-    }).await.expect("Upload de relatório especial sem pin deve suceder");
+    })
+    .await
+    .expect("Upload de relatório especial sem pin deve suceder");
     assert_eq!(upload_special.sha256_checksum, special_sha256);
-    assert!(!upload_special.pinned, "Upload com pin=false deve retornar pinned=false");
-    println!("[Homologação] Upload relatório especial CID: {}", upload_special.cid);
+    assert!(
+        !upload_special.pinned,
+        "Upload com pin=false deve retornar pinned=false"
+    );
+    println!(
+        "[Homologação] Upload relatório especial CID: {}",
+        upload_special.cid
+    );
 
     // Upload dos demais arquivos de tamanhos variados
     let upload_bin = ipfs_upload_file(IpfsUploadOptions {
         file_path: file_bin_path.to_string_lossy().to_string(),
         pin: true,
         expected_sha256: None,
-    }).await.expect("Upload binario deve suceder");
+    })
+    .await
+    .expect("Upload binario deve suceder");
     assert_eq!(upload_bin.sha256_checksum, bin_sha256);
 
     let upload_256k = ipfs_upload_file(IpfsUploadOptions {
         file_path: file_256k_path.to_string_lossy().to_string(),
         pin: true,
         expected_sha256: None,
-    }).await.expect("Upload 256k deve suceder");
+    })
+    .await
+    .expect("Upload 256k deve suceder");
     assert_eq!(upload_256k.sha256_checksum, k256_sha256);
 
     let upload_2mb = ipfs_upload_file(IpfsUploadOptions {
         file_path: file_2mb_path.to_string_lossy().to_string(),
         pin: true,
         expected_sha256: None,
-    }).await.expect("Upload 2mb deve suceder");
+    })
+    .await
+    .expect("Upload 2mb deve suceder");
     assert_eq!(upload_2mb.sha256_checksum, mb2_sha256);
 
     // 5. Teste 02 — Pinning manual
     let pin_res = ipfs_pin_cid(IpfsPinRequest {
         cid: upload_special.cid.clone(),
         recursive: true,
-    }).await.expect("Pin do relatório especial deve suceder");
+    })
+    .await
+    .expect("Pin do relatório especial deve suceder");
     assert!(pin_res.pinned);
     assert_eq!(pin_res.pin_type, IpfsPinType::Recursive);
 
-    let pin_ls = client.pin_ls(&upload_special.cid).await.expect("pin/ls deve suceder");
-    assert_eq!(pin_ls, Some(IpfsPinType::Recursive), "pin/ls deve confirmar pin recursivo");
+    let pin_ls = client
+        .pin_ls(&upload_special.cid)
+        .await
+        .expect("pin/ls deve suceder");
+    assert_eq!(
+        pin_ls,
+        Some(IpfsPinType::Recursive),
+        "pin/ls deve confirmar pin recursivo"
+    );
 
     // 6. Teste 03 — Verificação de custódia
     let custody = ipfs_verify_cid_custody(upload_text.cid.clone(), Some(text_sha256.clone()))
         .await
         .expect("Verificação de custódia deve suceder");
-    assert_eq!(custody.integrity, IntegrityState::Confirmed, "Integridade deve ser Confirmed");
-    assert_eq!(custody.custody, CustodyState::RecursivePin, "Custódia deve ser RecursivePin");
+    assert_eq!(
+        custody.integrity,
+        IntegrityState::Confirmed,
+        "Integridade deve ser Confirmed"
+    );
+    assert_eq!(
+        custody.custody,
+        CustodyState::RecursivePin,
+        "Custódia deve ser RecursivePin"
+    );
 
     // 7. Teste 04 — Download (overwrite=false, overwrite=true, divergência de hash)
     let dest_down1 = test_dir.join("recuperado_texto.txt");
@@ -959,9 +1113,14 @@ async fn test_full_operational_kubo_homologation_lifecycle() {
         target_path: dest_down1.to_string_lossy().to_string(),
         expected_sha256: Some(text_sha256.clone()),
         overwrite: false,
-    }).await.expect("Download para novo arquivo com overwrite=false deve ter sucesso");
+    })
+    .await
+    .expect("Download para novo arquivo com overwrite=false deve ter sucesso");
     assert_eq!(down_res1.recovered_sha256, text_sha256);
-    assert_eq!(fs::read(&dest_down1).unwrap(), fs::read(&file_text_path).unwrap());
+    assert_eq!(
+        fs::read(&dest_down1).unwrap(),
+        fs::read(&file_text_path).unwrap()
+    );
 
     // Sobrescrita autorizada (overwrite=true)
     let down_res2 = ipfs_download_file(IpfsDownloadOptions {
@@ -969,7 +1128,9 @@ async fn test_full_operational_kubo_homologation_lifecycle() {
         target_path: dest_down1.to_string_lossy().to_string(),
         expected_sha256: Some(text_sha256.clone()),
         overwrite: true,
-    }).await.expect("Download com overwrite=true deve ter sucesso");
+    })
+    .await
+    .expect("Download com overwrite=true deve ter sucesso");
     assert_eq!(down_res2.recovered_sha256, text_sha256);
 
     // Download com hash esperado incorreto deve falhar e preservar o arquivo intacto
@@ -979,9 +1140,17 @@ async fn test_full_operational_kubo_homologation_lifecycle() {
         target_path: dest_down1.to_string_lossy().to_string(),
         expected_sha256: Some(fake_sha),
         overwrite: true,
-    }).await;
-    assert!(down_err.is_err(), "Download com checksum divergente DEVE falhar");
-    assert_eq!(fs::read(&dest_down1).unwrap(), fs::read(&file_text_path).unwrap(), "Arquivo de destino deve permanecer intacto");
+    })
+    .await;
+    assert!(
+        down_err.is_err(),
+        "Download com checksum divergente DEVE falhar"
+    );
+    assert_eq!(
+        fs::read(&dest_down1).unwrap(),
+        fs::read(&file_text_path).unwrap(),
+        "Arquivo de destino deve permanecer intacto"
+    );
 
     // 8. Teste 05 — Unpin seguro
     // 8a. Desfixação direta de conteúdo gerenciado no repositório exclusivo ativo
@@ -990,7 +1159,9 @@ async fn test_full_operational_kubo_homologation_lifecycle() {
         recursive: true,
         force_external_unpin: false,
         confirm_shared_repo_unpin: false,
-    }).await.expect("Unpin de pin gerenciado em repo exclusivo deve ter sucesso sem confirmacao");
+    })
+    .await
+    .expect("Unpin de pin gerenciado em repo exclusivo deve ter sucesso sem confirmacao");
     assert!(unpin_managed.unpinned);
     assert!(unpin_managed.was_managed_by_devos);
 
@@ -1000,8 +1171,12 @@ async fn test_full_operational_kubo_homologation_lifecycle() {
         recursive: true,
         force_external_unpin: false,
         confirm_shared_repo_unpin: false,
-    }).await;
-    assert!(unpin_unmanaged_blocked.is_err(), "Unpin de conteudo nao gerenciado sem forca deve ser rejeitado");
+    })
+    .await;
+    assert!(
+        unpin_unmanaged_blocked.is_err(),
+        "Unpin de conteudo nao gerenciado sem forca deve ser rejeitado"
+    );
 
     // 8c. Unpin de CID não gerenciado com confirmação expressa deve ter sucesso
     let unpin_forced = ipfs_unpin_cid(IpfsUnpinRequest {
@@ -1009,16 +1184,25 @@ async fn test_full_operational_kubo_homologation_lifecycle() {
         recursive: true,
         force_external_unpin: true,
         confirm_shared_repo_unpin: false,
-    }).await.expect("Unpin de conteudo nao gerenciado com force_external_unpin=true deve ter sucesso");
+    })
+    .await
+    .expect("Unpin de conteudo nao gerenciado com force_external_unpin=true deve ter sucesso");
     assert!(unpin_forced.unpinned);
 
     // 9. Teste 06 — Auditoria global de pins
-    let all_pins_verify = ipfs_verify_all_pins().await.expect("Auditoria global de pins deve responder");
+    let all_pins_verify = ipfs_verify_all_pins()
+        .await
+        .expect("Auditoria global de pins deve responder");
     assert!(all_pins_verify.total_pins_audited >= 1);
-    assert_eq!(all_pins_verify.bad_nodes_count, 0, "Nenhum pin recursivo deve estar corrompido");
+    assert_eq!(
+        all_pins_verify.bad_nodes_count, 0,
+        "Nenhum pin recursivo deve estar corrompido"
+    );
 
     // 10. Teste 07 — Consulta de provedores
-    let provs = ipfs_query_providers(upload_bin.cid.clone()).await.expect("Consulta de provedores deve executar");
+    let provs = ipfs_query_providers(upload_bin.cid.clone())
+        .await
+        .expect("Consulta de provedores deve executar");
     assert_eq!(provs.cid, upload_bin.cid);
 
     // 11. Teste de Falhas Operacionais
@@ -1026,8 +1210,12 @@ async fn test_full_operational_kubo_homologation_lifecycle() {
         file_path: "/tmp/caminho_inexistente_123456789.dat".to_string(),
         pin: true,
         expected_sha256: None,
-    }).await;
-    assert!(fail_up.is_err(), "Upload de caminho inexistente deve falhar");
+    })
+    .await;
+    assert!(
+        fail_up.is_err(),
+        "Upload de caminho inexistente deve falhar"
+    );
 
     // 12. Teste de Recuperação Descentralizada entre 2 Nós Independentes
     println!("[Homologação] Iniciando teste de recuperação entre 2 nós...");
@@ -1043,7 +1231,11 @@ async fn test_full_operational_kubo_homologation_lifecycle() {
         .arg("init")
         .output()
         .expect("ipfs init no nó 2 deve executar");
-    assert!(init_node2.status.success(), "Inicialização do nó 2 falhou: {:?}", String::from_utf8_lossy(&init_node2.stderr));
+    assert!(
+        init_node2.status.success(),
+        "Inicialização do nó 2 falhou: {:?}",
+        String::from_utf8_lossy(&init_node2.stderr)
+    );
 
     // Configurar portas independentes para o Nó 2
     let _ = std::process::Command::new("ipfs")
@@ -1056,7 +1248,12 @@ async fn test_full_operational_kubo_homologation_lifecycle() {
         .output();
     let _ = std::process::Command::new("ipfs")
         .env("IPFS_PATH", &node2_dir)
-        .args(&["config", "Addresses.Swarm", "[\"/ip4/0.0.0.0/tcp/4002\", \"/ip4/0.0.0.0/udp/4002/quic-v1\"]", "--json"])
+        .args(&[
+            "config",
+            "Addresses.Swarm",
+            "[\"/ip4/0.0.0.0/tcp/4002\", \"/ip4/0.0.0.0/udp/4002/quic-v1\"]",
+            "--json",
+        ])
         .output();
 
     // Spawna Nó 2
@@ -1079,34 +1276,62 @@ async fn test_full_operational_kubo_homologation_lifecycle() {
     }
     assert!(node2_ready, "Nó 2 deve responder na porta 5002");
 
-    let node2_id_info = client2.get_node_id().await.expect("Nó 2 deve responder a /id");
+    let node2_id_info = client2
+        .get_node_id()
+        .await
+        .expect("Nó 2 deve responder a /id");
     let node2_peer_id = node2_id_info.id.expect("Nó 2 deve ter PeerID");
     println!("[Homologação] Nó 2 iniciado. PeerID: {}", node2_peer_id);
-    assert_ne!(node1_peer_id, node2_peer_id, "Nó 1 e Nó 2 devem possuir PeerIDs distintos");
+    assert_ne!(
+        node1_peer_id, node2_peer_id,
+        "Nó 1 e Nó 2 devem possuir PeerIDs distintos"
+    );
 
     // Conectar Nó 2 ao Nó 1 através do multiaddr local do Nó 1
     let node1_multiaddr = format!("/ip4/127.0.0.1/tcp/4001/p2p/{}", node1_peer_id);
-    println!("[Homologação] Conectando Nó 2 ao Nó 1 via {}", node1_multiaddr);
+    println!(
+        "[Homologação] Conectando Nó 2 ao Nó 1 via {}",
+        node1_multiaddr
+    );
     let connect_res = client2.swarm_connect(&node1_multiaddr).await;
-    println!("[Homologação] Conexão Swarm Nó 2 -> Nó 1: {:?}", connect_res);
+    println!(
+        "[Homologação] Conexão Swarm Nó 2 -> Nó 1: {:?}",
+        connect_res
+    );
 
     // Nó 2 recupera o conteúdo de arquivo_binario.bin do Nó 1 via cat_to_writer
     let mut node2_writer = Vec::new();
     let mut node2_hasher = Sha256::new();
-    let node2_cat_res = client2.cat_to_writer(
-        &upload_bin.cid,
-        false, // online, buscando blocos na rede/peers
-        &mut node2_writer,
-        &mut node2_hasher,
-    ).await;
+    let node2_cat_res = client2
+        .cat_to_writer(
+            &upload_bin.cid,
+            false, // online, buscando blocos na rede/peers
+            &mut node2_writer,
+            &mut node2_hasher,
+        )
+        .await;
 
-    println!("[Homologação] Recuperação remota do Nó 2 via libp2p: {:?}", node2_cat_res);
-    assert!(node2_cat_res.is_ok(), "Nó 2 deve conseguir transferir os blocos do Nó 1 via P2P: {:?}", node2_cat_res);
+    println!(
+        "[Homologação] Recuperação remota do Nó 2 via libp2p: {:?}",
+        node2_cat_res
+    );
+    assert!(
+        node2_cat_res.is_ok(),
+        "Nó 2 deve conseguir transferir os blocos do Nó 1 via P2P: {:?}",
+        node2_cat_res
+    );
     let node2_recovered_bytes = node2_writer;
     let node2_recovered_sha = format!("0x{}", hex::encode(node2_hasher.finalize()));
 
-    assert_eq!(node2_recovered_bytes, fs::read(&file_bin_path).unwrap(), "Bytes recuperados pelo Nó 2 devem ser idênticos aos do Nó 1");
-    assert_eq!(node2_recovered_sha, bin_sha256, "SHA-256 no Nó 2 deve ser idêntico ao original");
+    assert_eq!(
+        node2_recovered_bytes,
+        fs::read(&file_bin_path).unwrap(),
+        "Bytes recuperados pelo Nó 2 devem ser idênticos aos do Nó 1"
+    );
+    assert_eq!(
+        node2_recovered_sha, bin_sha256,
+        "SHA-256 no Nó 2 deve ser idêntico ao original"
+    );
     println!("[Homologação] ✅ RECUPERAÇÃO DESCENTRALIZADA ENTRE 2 NÓS CONFIRMADA COM SUCESSO!");
 
     // Encerra Nó 2 e limpa diretório
@@ -1117,7 +1342,11 @@ async fn test_full_operational_kubo_homologation_lifecycle() {
     // 13. Limpeza dos testes e encerramento controlado do Nó 1
     let _ = fs::remove_dir_all(&test_dir);
     let shutdown_res = DaemonManager::shutdown_if_spawned_by_devos();
-    assert!(shutdown_res.is_ok(), "Encerramento do daemon DevOS deve ter sucesso: {:?}", shutdown_res);
+    assert!(
+        shutdown_res.is_ok(),
+        "Encerramento do daemon DevOS deve ter sucesso: {:?}",
+        shutdown_res
+    );
     println!("[Homologação] Daemon do Nó 1 encerrado com sucesso.");
 }
 
@@ -1137,13 +1366,14 @@ async fn test_daemon_control_ipc_commands_lifecycle() {
     // Valida que o comando ipfs_stop_daemon é seguro e não remove processos externos indevidos
     let status_before = crate::commands::get_ipfs_daemon_status().await.unwrap();
     let stop_res = crate::commands::ipfs_stop_daemon().await;
-    assert!(stop_res.is_ok(), "ipfs_stop_daemon deve executar sem erros: {:?}", stop_res);
+    assert!(
+        stop_res.is_ok(),
+        "ipfs_stop_daemon deve executar sem erros: {:?}",
+        stop_res
+    );
 
     let status_after_stop = stop_res.unwrap();
     if !status_before.running {
         assert!(!status_after_stop.running);
     }
 }
-
-
-
