@@ -36,7 +36,7 @@ export function AccountTwoFA() {
   };
 
   return (
-    <Card sx={{ p: 4, borderRadius: 2 }}>
+    <Card sx={{ width: 1, p: 4, borderRadius: 2 }}>
       <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
         <Box>
           <Typography variant="h6" sx={{ fontWeight: 800 }}>Autenticação em Dois Fatores (2FA)</Typography>

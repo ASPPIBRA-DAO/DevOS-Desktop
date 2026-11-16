@@ -53,7 +53,7 @@ export function AccountLayout({ children }: Props) {
   const currentTab = pathname.endsWith('/') && pathname.length > 1 ? pathname.slice(0, -1) : pathname;
 
   return (
-    <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1400, mx: 'auto' }}>
+    <Box sx={{ width: '100%', maxWidth: 1400, mx: 'auto', p: { xs: 2, md: 3 } }}>
       <CustomBreadcrumbs
         heading="Central de Identidade Digital"
         links={[

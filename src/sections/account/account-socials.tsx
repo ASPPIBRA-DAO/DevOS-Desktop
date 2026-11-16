@@ -45,7 +45,7 @@ export function AccountSocials({ socialLinks }: Props) {
 
   return (
     <Form methods={methods} onSubmit={onSubmit}>
-      <Card sx={{ p: 4, borderRadius: 2 }}>
+      <Card sx={{ width: 1, p: 4, borderRadius: 2 }}>
         <Typography variant="h6" sx={{ mb: 1, fontWeight: 800 }}>
           Presença Digital
         </Typography>

@@ -54,7 +54,7 @@ export function AccountChangePassword() {
   });
 
   return (
-    <Stack spacing={4}>
+    <Stack spacing={4} sx={{ width: 1 }}>
       <Form methods={methods} onSubmit={onSubmit}>
         <Card sx={{ p: 4, borderRadius: 2 }}>
           <Typography variant="h6" sx={{ mb: 1, fontWeight: 800 }}>

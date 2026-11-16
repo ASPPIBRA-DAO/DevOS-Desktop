@@ -92,7 +92,7 @@ export function ProfileCover({
         }}
       >
         {/* Lado Esquerdo: Avatar Circular e Nome */}
-        <Stack direction="row" spacing={2.5} sx={{ alignItems: 'flex-end', mb: { xs: 1.5, md: 0 } }}>
+        <Stack direction="row" spacing={2.5} sx={{ alignItems: 'flex-end', mb: { xs: 1.5, md: 0 }, flexShrink: 0 }}>
           <Avatar
             src={avatarUrl}
             alt={name}
@@ -110,13 +110,13 @@ export function ProfileCover({
             {name.charAt(0).toUpperCase()}
           </Avatar>
 
-          <Box sx={{ color: 'common.white', mb: 1 }}>
-            <Typography variant="h5" sx={{ fontWeight: 800, textShadow: '0 2px 8px rgba(0,0,0,0.5)' }}>
+          <Box sx={{ color: 'common.white', mb: 1, minWidth: 0, flexShrink: 0 }}>
+            <Typography variant="h5" sx={{ fontWeight: 800, textShadow: '0 2px 8px rgba(0,0,0,0.5)', whiteSpace: 'nowrap' }}>
               {name}
             </Typography>
             <Typography
               variant="body2"
-              sx={{ opacity: 0.85, fontWeight: 500, textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}
+              sx={{ opacity: 0.85, fontWeight: 500, textShadow: '0 1px 4px rgba(0,0,0,0.5)', whiteSpace: 'nowrap' }}
             >
               {role}
             </Typography>
@@ -126,6 +126,7 @@ export function ProfileCover({
         {/* Lado Direito: Barra de Abas (Tabs) */}
         <Box
           sx={{
+            maxWidth: { xs: '100%', md: 'calc(100% - 320px)' },
             width: { xs: '100%', md: 'auto' },
             bgcolor: 'rgba(255, 255, 255, 0.95)',
             backdropFilter: 'blur(10px)',

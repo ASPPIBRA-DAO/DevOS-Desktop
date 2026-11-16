@@ -37,7 +37,7 @@ export function UserProfileView() {
   };
 
   return (
-    <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1400, mx: 'auto' }}>
+    <Box sx={{ width: '100%', maxWidth: 1400, mx: 'auto', p: { xs: 2, md: 3 } }}>
       {/* Breadcrumbs de Navegação */}
       <CustomBreadcrumbs
         heading="Perfil do Usuário"

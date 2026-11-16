@@ -53,7 +53,7 @@ export function AccountNotifications() {
 
   return (
     <form onSubmit={onSubmit}>
-      <Stack spacing={4}>
+      <Stack spacing={4} sx={{ width: 1 }}>
         {NOTIFICATIONS.map((section) => (
           <Card key={section.subheader} sx={{ p: 4, borderRadius: 2 }}>
             <Typography variant="h6" sx={{ mb: 0.5, fontWeight: 800 }}>
