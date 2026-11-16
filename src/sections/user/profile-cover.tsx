@@ -6,6 +6,7 @@ import Card from '@mui/material/Card';
 import Tabs from '@mui/material/Tabs';
 import Stack from '@mui/material/Stack';
 import Avatar from '@mui/material/Avatar';
+import Tooltip from '@mui/material/Tooltip';
 import { useTheme } from '@mui/material/styles';
 import Typography from '@mui/material/Typography';
 
@@ -123,17 +124,17 @@ export function ProfileCover({
           </Box>
         </Stack>
 
-        {/* Lado Direito: Barra de Abas (Tabs) */}
+        {/* Lado Direito: Barra de Ícones de Navegação (Dock Otimizado) */}
         <Box
           sx={{
-            maxWidth: { xs: '100%', md: 'calc(100% - 320px)' },
-            width: { xs: '100%', md: 'auto' },
-            bgcolor: 'rgba(255, 255, 255, 0.95)',
-            backdropFilter: 'blur(10px)',
-            borderRadius: 1.5,
-            px: 1,
-            py: 0.5,
-            boxShadow: theme.shadows[2],
+            bgcolor: 'rgba(255, 255, 255, 0.94)',
+            backdropFilter: 'blur(12px)',
+            borderRadius: 2,
+            p: 0.5,
+            boxShadow: theme.shadows[3],
+            border: '1px solid rgba(255, 255, 255, 0.6)',
+            display: 'flex',
+            alignItems: 'center',
           }}
         >
           <Tabs
@@ -141,16 +142,27 @@ export function ProfileCover({
             onChange={onChangeTab}
             textColor="primary"
             indicatorColor="primary"
-            variant="scrollable"
-            scrollButtons="auto"
             sx={{
-              minHeight: 44,
+              minHeight: 40,
+              '& .MuiTabs-indicator': {
+                height: 3,
+                borderRadius: '3px 3px 0 0',
+              },
               '& .MuiTab-root': {
-                minHeight: 44,
-                fontWeight: 700,
-                fontSize: '0.82rem',
-                textTransform: 'none',
-                px: 2,
+                minHeight: 40,
+                minWidth: 44,
+                width: 44,
+                p: 0,
+                borderRadius: 1.5,
+                transition: 'all 0.2s ease-in-out',
+                color: 'text.secondary',
+                '&.Mui-selected': {
+                  color: 'primary.main',
+                  bgcolor: theme.palette.action.selected,
+                },
+                '&:hover': {
+                  bgcolor: theme.palette.action.hover,
+                },
               },
             }}
           >
@@ -158,9 +170,14 @@ export function ProfileCover({
               <Tab
                 key={tab.value}
                 value={tab.value}
-                label={tab.label}
-                icon={<Iconify icon={tab.icon} width={18} />}
-                iconPosition="start"
+                icon={
+                  <Tooltip title={tab.label} arrow placement="top">
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 1, height: 1 }}>
+                      <Iconify icon={tab.icon} width={22} />
+                    </Box>
+                  </Tooltip>
+                }
+                aria-label={tab.label}
               />
             ))}
           </Tabs>
