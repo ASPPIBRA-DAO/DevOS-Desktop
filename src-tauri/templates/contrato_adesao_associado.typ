@@ -134,40 +134,83 @@
 
 #v(4pt)
 
-// Preâmbulo e Qualificação
+// Preâmbulo e Qualificação das Partes em 2 Cards Independentes
+#par(justify: true)[
+  Pelo presente instrumento particular de Adesão Associativa e Termo de Compromisso Institucional, celebram o presente contrato as partes a seguir qualificadas:
+]
+
+#v(6pt)
+
+// Card 1: Associação (ASPPIBRA)
 #block(
   width: 100%,
   stroke: 0.6pt + color_border,
-  inset: 9pt,
+  inset: 10pt,
   radius: 4pt,
   fill: color_bg_box,
 )[
-  #set par(first-line-indent: 0pt, leading: 6pt)
-  #text(weight: "bold", size: 8.5pt, fill: color_primary)[PREÂMBULO E QUALIFICAÇÃO DAS PARTES] \ \
+  #set par(first-line-indent: 0pt, leading: 5.5pt)
+  #grid(
+    columns: (1fr, auto),
+    [
+      #text(weight: "bold", size: 8.5pt, fill: color_primary)[1. QUALIFICAÇÃO DA ASSOCIAÇÃO (ASPPIBRA)]
+    ],
+    [
+      #text(size: 7.5pt, weight: "bold", fill: color_secondary_text)[PRIMEIRA PARTE]
+    ],
+  )
+  #v(3pt)
+  #line(length: 100%, stroke: 0.4pt + color_border_light)
+  #v(4pt)
   #text(size: 8pt)[
-    Pelo presente instrumento particular de Adesão Associativa e Termo de Compromisso Institucional, de um lado:
-  ] \ \
+    *Razão Social:* #text(weight: "bold")[ASSOCIAÇÃO DOS PROPRIETÁRIOS E POSSUIDORES DE IMÓVEIS NO BRASIL – ASPPIBRA] \
+    *Natureza Jurídica:* Pessoa jurídica de direito privado, constituída sob a forma de associação civil sem fins lucrativos \
+    *CNPJ:* #get_plain("asppibra_cnpj", "59.416.732/0001-20") \
+    *Sede e Foro:* Comarca de Maricá, Estado do Rio de Janeiro \
+    *Representante Legal:* Sr.(a) #get_val("rep_legal_nome", "Sandro de Souza") \
+    *Qualificação:* CPF nº #get_plain("rep_legal_cpf", "000.000.000-00"), na qualidade de #get_val("rep_legal_cargo", "Presidente Executivo") \
+    #v(3pt)
+    #text(size: 7.5pt, style: "italic", fill: color_secondary_text)[Doravante denominada simplesmente *ASSOCIAÇÃO* ou *ASPPIBRA*.]
+  ]
+]
+
+#v(6pt)
+
+// Card 2: Associado(a)
+#block(
+  width: 100%,
+  stroke: 0.6pt + color_border,
+  inset: 10pt,
+  radius: 4pt,
+  fill: color_bg_box,
+)[
+  #set par(first-line-indent: 0pt, leading: 5.5pt)
+  #grid(
+    columns: (1fr, auto),
+    [
+      #text(weight: "bold", size: 8.5pt, fill: color_primary)[2. QUALIFICAÇÃO DO(A) ASSOCIADO(A)]
+    ],
+    [
+      #text(size: 7.5pt, weight: "bold", fill: color_secondary_text)[SEGUNDA PARTE]
+    ],
+  )
+  #v(3pt)
+  #line(length: 100%, stroke: 0.4pt + color_border_light)
+  #v(4pt)
   #text(size: 8pt)[
-    *ASSOCIAÇÃO:* #text(weight: "bold")[ASSOCIAÇÃO DOS PROPRIETÁRIOS E POSSUIDORES DE IMÓVEIS NO BRASIL – ASPPIBRA], pessoa jurídica de direito privado, constituída sob a forma de associação civil sem fins lucrativos, inscrita no CNPJ sob nº #get_plain("asppibra_cnpj", "59.416.732/0001-20"), com sede e foro na Comarca de Maricá, Estado do Rio de Janeiro, neste ato representada por seu representante legal, Sr.(a) #get_val("rep_legal_nome", "Sandro de Souza"), inscrito(a) no CPF sob nº #get_plain("rep_legal_cpf", "000.000.000-00"), na qualidade de #get_val("rep_legal_cargo", "Presidente Executivo"), doravante denominada simplesmente *ASSOCIAÇÃO* ou *ASPPIBRA*;
-  ] \ \
-  #text(size: 8pt)[
-    E, de outro lado:
-  ] \ \
-  #text(size: 8pt)[
-    *ASSOCIADO(A):* \
     • *Nome completo / Razão Social:* #get_val("associado_nome", "NÃO INFORMADO") \
     • *CPF / CNPJ:* #get_plain("associado_cpf_cnpj", get_plain_raw("associado_cpf", "000.000.000-00")) \
     • *RG / Documento de identificação:* #get_plain("associado_rg", "00000000-0") \
     • *Data de nascimento / constituição:* #get_plain("associado_nascimento", "DD/MM/AAAA") \
-    • *Nacionalidade:* #get_val("associado_nacionalidade", "Brasileira") \
-    • *Estado civil:* #get_val("associado_estado_civil", "Solteiro(a)") \
+    • *Nacionalidade:* #get_val("associado_nacionalidade", "Brasileira") • *Estado civil:* #get_val("associado_estado_civil", "Solteiro(a)") \
     • *Profissão / Atividade econômica:* #get_val("associado_profissao", "Autônomo(a)") \
     • *Endereço completo:* #get_val("associado_endereco", "Logradouro, nº, Bairro") \
     • *Município / UF / CEP:* #get_val("associado_municipio", "Maricá") / #get_plain("associado_uf", "RJ") — CEP: #get_plain("associado_cep", "24900-000") \
     • *Telefone / WhatsApp:* #get_plain("associado_telefone", "(00) 00000-0000") \
     • *E-mail:* #get_plain("associado_email", "contato@exemplo.com") \
     • *Representante legal (quando pessoa jurídica):* #get_val("associado_rep_legal", "—") (CPF: #get_plain("associado_rep_cpf", "—")) \
-    doravante denominado(a) simplesmente *ASSOCIADO(A)*.
+    #v(3pt)
+    #text(size: 7.5pt, style: "italic", fill: color_secondary_text)[Doravante denominado(a) simplesmente *ASSOCIADO(A)*.]
   ]
 ]
 
