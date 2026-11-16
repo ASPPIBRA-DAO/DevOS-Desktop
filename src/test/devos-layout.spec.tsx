@@ -36,6 +36,8 @@ describe('DevOSLayout & Navigation Adapter', () => {
       expect(navData[1].subheader).toBe('USUÁRIO');
       expect(navData[1].items[0].title).toBe('Perfil');
       expect(navData[1].items[0].path).toBe('/user/profile');
+      expect(navData[1].items[1].title).toBe('Conta');
+      expect(navData[1].items[1].path).toBe('/user/account');
       expect(navData[2].subheader).toBe('INFRAESTRUTURA');
       expect(navData[2].items).toHaveLength(2);
     });

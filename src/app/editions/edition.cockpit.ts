@@ -6,10 +6,15 @@ import { LedgerView } from '../../modules/ledger';
 import { WalletsLandingView } from '../../modules/wallets';
 import { RealEstateView } from '../../modules/real-estate';
 import { UserProfilePage } from '../../pages/user/profile';
+import { AccountTwoFAPage } from '../../pages/user/account/2fa';
 import { CessaoPosseView } from '../../sections/cessao-de-posse';
+import { AccountGeneralPage } from '../../pages/user/account/general';
+import { AccountSocialsPage } from '../../pages/user/account/socials';
 import { DocumentTemplatesGalleryView } from '../../modules/documents';
 import { CockpitDashboardPage } from './cockpit/cockpit-dashboard-page';
 import { InfrastructurePage } from '../../pages/devos/infrastructure-page';
+import { AccountNotificationsPage } from '../../pages/user/account/notifications';
+import { AccountChangePasswordPage } from '../../pages/user/account/change-password';
 
 export const currentEdition: EditionConfig = {
   editionId: 'cockpit',
@@ -36,6 +41,11 @@ export const currentEdition: EditionConfig = {
           title: 'Perfil',
           path: paths.dashboard.user.profile,
           icon: 'solar:user-id-bold',
+        },
+        {
+          title: 'Conta',
+          path: paths.dashboard.user.account,
+          icon: 'solar:settings-bold',
         },
       ],
     },
@@ -178,6 +188,36 @@ export const currentEdition: EditionConfig = {
       label: 'Perfil do Usuário',
       icon: 'solar:user-id-bold',
       component: UserProfilePage,
+    },
+    {
+      path: paths.dashboard.user.account,
+      label: 'Identidade Digital',
+      icon: 'solar:settings-bold',
+      component: AccountGeneralPage,
+    },
+    {
+      path: `${paths.dashboard.user.account}/notifications`,
+      label: 'Notificações',
+      icon: 'solar:bell-bing-bold',
+      component: AccountNotificationsPage,
+    },
+    {
+      path: `${paths.dashboard.user.account}/socials`,
+      label: 'Redes Sociais',
+      icon: 'solar:share-bold',
+      component: AccountSocialsPage,
+    },
+    {
+      path: `${paths.dashboard.user.account}/change-password`,
+      label: 'Segurança',
+      icon: 'ic:round-vpn-key',
+      component: AccountChangePasswordPage,
+    },
+    {
+      path: `${paths.dashboard.user.account}/2fa`,
+      label: 'Autenticador 2FA',
+      icon: 'solar:shield-keyhole-bold',
+      component: AccountTwoFAPage,
     },
   ],
 };
