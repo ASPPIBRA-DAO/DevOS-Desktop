@@ -23,8 +23,7 @@ describe('Editions Navigation & Architecture Validation', () => {
     expect(nodePaths).toContain('/devos/ipfs');
     expect(nodePaths).toContain('/devos/infrastructure');
     expect(nodePaths).toContain('/user/profile');
-    expect(nodePaths).toContain('/user/account');
-    expect(nodePaths).toHaveLength(5);
+    expect(nodePaths).toHaveLength(4);
 
     // Itens que NÃO devem estar no menu do Node
     expect(nodePaths).not.toContain('/devos/cadastre');
@@ -54,8 +53,7 @@ describe('Editions Navigation & Architecture Validation', () => {
     expect(cockpitPaths).toContain('/devos/ipfs');
     expect(cockpitPaths).toContain('/devos/infrastructure');
     expect(cockpitPaths).toContain('/user/profile');
-    expect(cockpitPaths).toContain('/user/account');
-    expect(cockpitPaths).toHaveLength(9);
+    expect(cockpitPaths).toHaveLength(8);
 
     // O menu do Cockpit NÃO deve ter duplicação de /devos/dao (está unificado em /devos/ledger)
     expect(cockpitPaths).not.toContain('/devos/dao');

@@ -42,11 +42,6 @@ export const currentEdition: EditionConfig = {
           path: paths.dashboard.user.profile,
           icon: 'solar:user-id-bold',
         },
-        {
-          title: 'Conta',
-          path: paths.dashboard.user.account,
-          icon: 'solar:settings-bold',
-        },
       ],
     },
     {

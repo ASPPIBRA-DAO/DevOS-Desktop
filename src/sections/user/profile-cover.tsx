@@ -23,10 +23,12 @@ type Props = {
 };
 
 export const TABS = [
-  { value: 'profile', label: 'Profile', icon: 'solar:user-id-bold' },
-  { value: 'followers', label: 'Followers', icon: 'solar:heart-bold' },
-  { value: 'friends', label: 'Friends', icon: 'solar:users-group-rounded-bold' },
-  { value: 'gallery', label: 'Gallery', icon: 'solar:gallery-wide-bold' },
+  { value: 'profile', label: 'Visão Geral', icon: 'solar:user-id-bold' },
+  { value: 'identity', label: 'Identidade Civil', icon: 'solar:document-text-bold' },
+  { value: 'notifications', label: 'Notificações', icon: 'solar:bell-bing-bold' },
+  { value: 'socials', label: 'Redes Sociais', icon: 'solar:share-bold' },
+  { value: 'security', label: 'Segurança', icon: 'ic:round-vpn-key' },
+  { value: '2fa', label: 'Autenticador 2FA', icon: 'solar:shield-keyhole-bold' },
 ];
 
 export function ProfileCover({
@@ -138,6 +140,8 @@ export function ProfileCover({
             onChange={onChangeTab}
             textColor="primary"
             indicatorColor="primary"
+            variant="scrollable"
+            scrollButtons="auto"
             sx={{
               minHeight: 44,
               '& .MuiTab-root': {
