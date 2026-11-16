@@ -58,6 +58,7 @@ export const paths = {
       root: '/user',
       new: '/user/new',
       account: '/user/account',
+      profile: '/user/profile',
     },
 
     general: {

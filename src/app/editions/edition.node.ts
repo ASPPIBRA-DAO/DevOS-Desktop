@@ -2,6 +2,7 @@ import type { EditionConfig } from './types';
 
 import { paths } from '../router/paths';
 import { IpfsView } from '../../modules/ipfs';
+import { UserProfilePage } from '../../pages/user/profile';
 import { NodeDashboardPage } from './node/node-dashboard-page';
 import { InfrastructurePage } from '../../pages/devos/infrastructure-page';
 
@@ -57,6 +58,18 @@ export const currentEdition: EditionConfig = {
       label: 'Infraestrutura',
       icon: 'solar:server-square-bold',
       component: InfrastructurePage,
+    },
+    {
+      path: '/user',
+      label: 'Perfil do Usuário',
+      icon: 'solar:user-id-bold',
+      component: UserProfilePage,
+    },
+    {
+      path: paths.dashboard.user.profile,
+      label: 'Perfil do Usuário',
+      icon: 'solar:user-id-bold',
+      component: UserProfilePage,
     },
   ],
 };

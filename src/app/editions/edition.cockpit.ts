@@ -5,6 +5,7 @@ import { IpfsView } from '../../modules/ipfs';
 import { LedgerView } from '../../modules/ledger';
 import { WalletsLandingView } from '../../modules/wallets';
 import { RealEstateView } from '../../modules/real-estate';
+import { UserProfilePage } from '../../pages/user/profile';
 import { CessaoPosseView } from '../../sections/cessao-de-posse';
 import { DocumentTemplatesGalleryView } from '../../modules/documents';
 import { CockpitDashboardPage } from './cockpit/cockpit-dashboard-page';
@@ -154,6 +155,18 @@ export const currentEdition: EditionConfig = {
       label: 'Infraestrutura',
       icon: 'solar:server-square-bold',
       component: InfrastructurePage,
+    },
+    {
+      path: '/user',
+      label: 'Perfil do Usuário',
+      icon: 'solar:user-id-bold',
+      component: UserProfilePage,
+    },
+    {
+      path: paths.dashboard.user.profile,
+      label: 'Perfil do Usuário',
+      icon: 'solar:user-id-bold',
+      component: UserProfilePage,
     },
   ],
 };
