@@ -37,13 +37,19 @@ export const UpdateUserSchema = z.object({
   coverURL: z.any().optional(),
   phoneNumber: z.string().optional(),
   cpf: z.string().optional(),
+  birthDate: z.string().optional(),
+  nationality: z.string().optional(),
+  maritalStatus: z.string().optional(),
   rg: z.string().optional(),
+  rgIssuer: z.string().optional(),
   cnh: z.string().optional(),
   cnhCategory: z.string().optional(),
   motherName: z.string().optional(),
   fatherName: z.string().optional(),
   country: z.string().min(1, { message: 'País obrigatório!' }),
   address: z.string().min(1, { message: 'Endereço obrigatório!' }),
+  addressNumber: z.string().optional(),
+  complement: z.string().optional(),
   neighborhood: z.string().optional(),
   state: z.string().min(1, { message: 'Estado obrigatório!' }),
   city: z.string().min(1, { message: 'Cidade obrigatória!' }),
@@ -69,13 +75,19 @@ export function AccountGeneral() {
     coverURL: user.coverURL,
     phoneNumber: user.phoneNumber || '',
     cpf: user.cpf || '',
+    birthDate: user.birthDate || '',
+    nationality: user.nationality || 'Brasileira',
+    maritalStatus: user.maritalStatus || 'Casado(a)',
     rg: user.rg || '',
+    rgIssuer: user.rgIssuer || '',
     cnh: user.cnh || '',
     cnhCategory: user.cnhCategory || '',
     motherName: user.motherName || '',
     fatherName: user.fatherName || '',
     country: user.country || 'Brasil',
     address: user.address || '',
+    addressNumber: user.addressNumber || '',
+    complement: user.complement || '',
     neighborhood: user.neighborhood || '',
     state: user.state || '',
     city: user.city || '',
@@ -115,9 +127,9 @@ export function AccountGeneral() {
     if (values.phoneNumber) score += 10;
     if (values.address && values.zipCode) score += 10;
     if (values.cpf) score += 15;
-    if (values.about) score += 5;
+    if (values.birthDate) score += 10;
     if (values.occupation) score += 10;
-    if (values.rg) score += 10;
+    if (values.about) score += 5;
     return Math.min(score, 100);
   };
 
@@ -145,13 +157,19 @@ export function AccountGeneral() {
         coverURL: user.coverURL,
         phoneNumber: user.phoneNumber || '',
         cpf: user.cpf || '',
+        birthDate: user.birthDate || '',
+        nationality: user.nationality || 'Brasileira',
+        maritalStatus: user.maritalStatus || 'Casado(a)',
         rg: user.rg || '',
+        rgIssuer: user.rgIssuer || '',
         cnh: user.cnh || '',
         cnhCategory: user.cnhCategory || '',
         motherName: user.motherName || '',
         fatherName: user.fatherName || '',
         country: user.country || 'Brasil',
         address: user.address || '',
+        addressNumber: user.addressNumber || '',
+        complement: user.complement || '',
         neighborhood: user.neighborhood || '',
         state: user.state || '',
         city: user.city || '',
@@ -321,13 +339,21 @@ export function AccountGeneral() {
                   <Field.Text name="email" label="Email de Acesso" />
                 </Box>
                 <Field.Text name="username" label="@username (Identificador Único)" />
-                <Field.Text name="phoneNumber" label="Telefone" />
-                <Field.Text name="cpf" label="CPF" />
-                <Field.Text name="rg" label="RG" />
-                <Field.Text name="cnh" label="Nº Registro CNH" />
-                <Field.Select name="cnhCategory" label="Categoria da CNH">
-                  {['A', 'B', 'AB', 'C', 'D', 'E'].map((cat) => (
-                    <MenuItem key={cat} value={cat}>{cat}</MenuItem>
+                <Field.Text name="phoneNumber" label="Telefone / WhatsApp" />
+                <Field.Text name="cpf" label="CPF (Identificador Civil)" />
+                <Field.Text name="birthDate" label="Data de Nascimento (DD/MM/AAAA)" />
+                <Field.Text name="nationality" label="Nacionalidade" placeholder="Brasileira" />
+                <Field.Select name="maritalStatus" label="Estado Civil">
+                  {['Solteiro(a)', 'Casado(a)', 'União Estável', 'Divorciado(a)', 'Viúvo(a)'].map((status) => (
+                    <MenuItem key={status} value={status}>{status}</MenuItem>
+                  ))}
+                </Field.Select>
+                <Field.Text name="rg" label="RG (Opcional - Padrão Antigo)" />
+                <Field.Text name="rgIssuer" label="Órgão Emissor / UF (Opcional)" placeholder="Ex: SSP/RJ" />
+                <Field.Text name="cnh" label="Nº Registro CNH (Opcional)" />
+                <Field.Select name="cnhCategory" label="Categoria da CNH (Opcional)">
+                  {['', 'A', 'B', 'AB', 'C', 'D', 'E'].map((cat) => (
+                    <MenuItem key={cat} value={cat}>{cat || 'Nenhuma'}</MenuItem>
                   ))}
                 </Field.Select>
                 <Field.Text name="motherName" label="Nome da Mãe" />
@@ -345,11 +371,15 @@ export function AccountGeneral() {
               <Box sx={{ rowGap: 2.5, columnGap: 2, display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
                 <Field.Text name="country" label="País" />
                 <Field.Text name="zipCode" label="CEP" />
-                <Field.Text name="state" label="Estado" />
+                <Field.Text name="state" label="Estado (UF)" />
                 <Field.Text name="city" label="Cidade" />
                 <Field.Text name="neighborhood" label="Bairro" />
+                <Field.Text name="addressNumber" label="Número / Km" placeholder="Ex: 120 ou Km 4" />
                 <Box sx={{ gridColumn: '1 / -1' }}>
-                  <Field.Text name="address" label="Endereço Completo" />
+                  <Field.Text name="address" label="Logradouro / Rua / Estrada" />
+                </Box>
+                <Box sx={{ gridColumn: '1 / -1' }}>
+                  <Field.Text name="complement" label="Complemento (Opcional - Lote, Quadra, Apto)" />
                 </Box>
               </Box>
             </Card>
