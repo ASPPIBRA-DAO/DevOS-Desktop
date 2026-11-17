@@ -136,7 +136,16 @@ export function readLegacyProfile(): LegacyReadResult {
     return { status: 'unavailable', reason: 'localStorage indisponível no ambiente de execução.' };
   }
 
-  const raw = storage.getItem(LEGACY_STORAGE_KEY);
+  let raw: string | null = null;
+  try {
+    raw = storage.getItem(LEGACY_STORAGE_KEY);
+  } catch (err: any) {
+    return {
+      status: 'unavailable',
+      reason: err?.message || 'Acesso ao localStorage bloqueado ou indisponível.',
+    };
+  }
+
   if (!raw || raw.trim().length <= 2) {
     return { status: 'missing' };
   }
@@ -180,7 +189,17 @@ export function readLegacyProfile(): LegacyReadResult {
     }
   }
 
-  safe.personType = parsed.personType === 'PJ' ? 'PJ' : 'PF';
+  if (parsed.personType === 'PJ') {
+    safe.personType = 'PJ';
+  } else if (parsed.personType === 'PF' || parsed.personType === undefined) {
+    safe.personType = 'PF';
+  } else {
+    return {
+      status: 'invalid',
+      reason: `personType inválido no documento legado: "${String(parsed.personType)}". Esperado 'PF' ou 'PJ'.`,
+    };
+  }
+
   safe.isPublic = false; // Requer confirmação explícita do usuário
   safe.username = canonicalizeUsername(
     typeof parsed.username === 'string'
@@ -419,6 +438,13 @@ let storeState: AccountStoreState = {
 let currentSessionGeneration = 0;
 const listeners = new Set<() => void>();
 
+type InFlightFetch = {
+  generation: number;
+  promise: Promise<void>;
+};
+
+let inFlightFetch: InFlightFetch | null = null;
+
 function notify() {
   listeners.forEach((listener) => listener());
 }
@@ -440,6 +466,7 @@ function subscribe(listener: () => void) {
  */
 export function resetAccountStore(): void {
   currentSessionGeneration += 1;
+  inFlightFetch = null;
   storeState = {
     user: createEmptyUserAccount(),
     loadStatus: 'idle',
@@ -503,8 +530,75 @@ export function mergeMissingLegacyFields(
     }
   }
 
-  merged.isPublic = false;
+  // Se o username do cofre estiver vazio e o legado tiver username válido, incorporar
+  if (!merged.username && legacy.username) {
+    const canonical = canonicalizeUsername(legacy.username);
+    if (canonical) {
+      merged.username = canonical;
+      changedFields.push('username');
+    }
+  }
+
+  // Preservar isPublic do cofre (não rebaixar para false se já estiver true no cofre)
+  merged.isPublic = vault.isPublic ?? false;
   return { merged, changedFields };
+}
+
+/**
+ * Verifica a integridade da persistência pós-migração comparando os campos
+ * preenchidos no documento legado contra os campos retornados pelo cofre.
+ * Retorna uma lista de nomes de campos divergentes (ou vazia se íntegro).
+ */
+export function verifyMigrationIntegrity(
+  legacy: Partial<UserAccountData>,
+  persisted: UserAccountData
+): string[] {
+  const mismatched: string[] = [];
+  const persistedRecord = persisted as unknown as Record<string, unknown>;
+
+  for (const field of LEGACY_STRING_FIELDS) {
+    const rawLegacyVal = legacy[field];
+    if (typeof rawLegacyVal !== 'string') continue;
+    const legacyVal = rawLegacyVal.trim();
+    if (!legacyVal) continue;
+
+    const persistedVal =
+      typeof persistedRecord[field] === 'string'
+        ? (persistedRecord[field] as string).trim()
+        : '';
+
+    if (field === 'cpf') {
+      const cleanLegacy = legacyVal.replace(/\D/g, '');
+      const cleanPersisted = persistedVal.replace(/\D/g, '');
+      if (cleanLegacy !== cleanPersisted) {
+        mismatched.push(field);
+      }
+    } else if (field === 'cnpj') {
+      const cleanLegacy = legacyVal.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+      const cleanPersisted = persistedVal.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+      if (cleanLegacy !== cleanPersisted) {
+        mismatched.push(field);
+      }
+    } else if (field === 'email') {
+      if (legacyVal.toLowerCase() !== persistedVal.toLowerCase()) {
+        mismatched.push(field);
+      }
+    } else if (field === 'username') {
+      const canonicalLegacy = canonicalizeUsername(legacyVal);
+      const canonicalPersisted = canonicalizeUsername(persistedVal);
+      if (canonicalLegacy && canonicalPersisted && canonicalLegacy !== canonicalPersisted) {
+        mismatched.push(field);
+      }
+    } else if (legacyVal !== persistedVal) {
+      mismatched.push(field);
+    }
+  }
+
+  if (legacy.personType && legacy.personType !== persisted.personType) {
+    mismatched.push('personType');
+  }
+
+  return mismatched;
 }
 
 async function reconcileAndMigrate(
@@ -526,7 +620,15 @@ async function reconcileAndMigrate(
     };
   }
 
-  if (legacyResult.status === 'unavailable' || legacyResult.status === 'missing') {
+  if (legacyResult.status === 'unavailable') {
+    return {
+      profile: rawProfile,
+      status: 'error',
+      errorMessage: `Armazenamento local inacessível: ${legacyResult.reason}. O acesso aos dados legados está temporariamente indisponível.`,
+    };
+  }
+
+  if (legacyResult.status === 'missing') {
     return { profile: rawProfile, status: 'idle' };
   }
 
@@ -619,15 +721,19 @@ async function reconcileAndMigrate(
     }
 
     if (verified && verified.revision >= 1) {
-      const verifiedFirst = (verified.firstName || '').trim();
-      const legacyFirst = (legacyObj.firstName || '').trim();
-      const verifiedEmail = (verified.email || '').trim().toLowerCase();
-      const legacyEmail = (legacyObj.email || '').trim().toLowerCase();
+      const verifiedData = userProfileToAccountData(verified);
+      const mismatches = verifyMigrationIntegrity(legacyObj, verifiedData);
 
-      if (!legacyFirst || verifiedFirst === legacyFirst || verifiedEmail === legacyEmail) {
+      if (mismatches.length === 0) {
         getSafeStorage()?.removeItem(LEGACY_STORAGE_KEY);
         return { profile: verified, status: 'migrated' };
       }
+
+      return {
+        profile: verified,
+        status: 'error',
+        errorMessage: `A leitura pós-migração identificou divergência nos campos: ${mismatches.join(', ')}. Os dados legados foram preservados.`,
+      };
     }
 
     return {
@@ -653,11 +759,9 @@ async function reconcileAndMigrate(
   }
 }
 
-let inFlightFetch: Promise<void> | null = null;
-
 async function fetchAndSyncProfile(): Promise<void> {
-  if (inFlightFetch) {
-    return inFlightFetch;
+  if (inFlightFetch && inFlightFetch.generation === currentSessionGeneration) {
+    return inFlightFetch.promise;
   }
 
   const sessionGenAtStart = currentSessionGeneration;
@@ -670,7 +774,7 @@ async function fetchAndSyncProfile(): Promise<void> {
   };
   notify();
 
-  inFlightFetch = (async () => {
+  const currentPromise: Promise<void> = (async () => {
     try {
       const rawProfile = await IdentityBridge.getUserProfile();
 
@@ -744,11 +848,18 @@ async function fetchAndSyncProfile(): Promise<void> {
         };
         notify();
       }
-      inFlightFetch = null;
+      if (inFlightFetch && inFlightFetch.generation === sessionGenAtStart) {
+        inFlightFetch = null;
+      }
     }
   })();
 
-  return inFlightFetch;
+  inFlightFetch = {
+    generation: sessionGenAtStart,
+    promise: currentPromise,
+  };
+
+  return currentPromise;
 }
 
 export function useAccountFacade() {
@@ -797,19 +908,23 @@ export function useAccountFacade() {
 
       return finalUser;
     } catch (err: any) {
-      const errorMsg = err?.message || 'Falha ao salvar dados no cofre seguro.';
-      storeState = {
-        ...storeState,
-        error: errorMsg,
-      };
-      notify();
+      if (sessionGenAtStart === currentSessionGeneration) {
+        const errorMsg = err?.message || 'Falha ao salvar dados no cofre seguro.';
+        storeState = {
+          ...storeState,
+          error: errorMsg,
+        };
+        notify();
+      }
       throw err;
     } finally {
-      storeState = {
-        ...storeState,
-        isSaving: false,
-      };
-      notify();
+      if (sessionGenAtStart === currentSessionGeneration) {
+        storeState = {
+          ...storeState,
+          isSaving: false,
+        };
+        notify();
+      }
     }
   };
 
@@ -828,12 +943,23 @@ export function useAccountFacade() {
    * ausentes, grava com a revisão atual e confirma leitura independente antes da exclusão.
    */
   const resolveMigrationConflict = async (choice: 'keep_vault' | 'merge_legacy'): Promise<void> => {
+    if (storeState.isSaving) {
+      throw new Error('Já existe uma operação de gravação ou migração em andamento.');
+    }
+
     const sessionGenAtStart = currentSessionGeneration;
     const assertCurrentSession = () => {
       if (sessionGenAtStart !== currentSessionGeneration) {
         throw new Error('A sessão foi alterada durante a resolução da migração.');
       }
     };
+
+    storeState = {
+      ...storeState,
+      isSaving: true,
+      error: null,
+    };
+    notify();
 
     try {
       if (choice === 'keep_vault') {
@@ -910,6 +1036,14 @@ export function useAccountFacade() {
           'Não foi possível concluir a reconciliação. Os dados legados foram mantidos para recuperação.',
       };
       notify();
+    } finally {
+      if (sessionGenAtStart === currentSessionGeneration) {
+        storeState = {
+          ...storeState,
+          isSaving: false,
+        };
+        notify();
+      }
     }
   };
 
