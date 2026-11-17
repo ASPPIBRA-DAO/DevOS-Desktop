@@ -1,5 +1,16 @@
 import { useState, useCallback } from 'react';
 
+export type LinkedProviders = {
+  walletAddress?: string;
+  walletNetwork?: string;
+  walletVerified?: boolean;
+  googleEmail?: string;
+  googleVerified?: boolean;
+  githubUsername?: string;
+  githubVerified?: boolean;
+  strictAuthEnabled?: boolean;
+};
+
 export type UserAccountData = {
   firstName: string;
   lastName: string;
@@ -35,6 +46,7 @@ export type UserAccountData = {
   personType?: 'PF' | 'PJ';
   legalRepresentative?: string;
   legalRepresentativeCpf?: string;
+  linkedProviders?: LinkedProviders;
 };
 
 const STORAGE_KEY = 'devos_user_account_profile';
@@ -74,6 +86,16 @@ const INITIAL_DATA: UserAccountData = {
   personType: 'PF',
   legalRepresentative: '',
   legalRepresentativeCpf: '',
+  linkedProviders: {
+    walletAddress: '0x71C8366420A0926793113693a740f11ee2273948',
+    walletNetwork: 'Polygon (POS) / Rede ASPPIBRA',
+    walletVerified: true,
+    googleEmail: 'sandro_ceo@asppibra.com.br',
+    googleVerified: true,
+    githubUsername: 'sandro-asppibra',
+    githubVerified: true,
+    strictAuthEnabled: true,
+  },
 };
 
 export function useAccountFacade() {
