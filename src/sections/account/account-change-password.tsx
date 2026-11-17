@@ -110,6 +110,51 @@ export function AccountChangePassword() {
         </Card>
       </Form>
 
+      {/* FACE ID & BIOMETRIA NATIVA */}
+      <Card sx={{ p: 4, borderRadius: 2 }}>
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          sx={{ alignItems: { sm: 'center' }, justifyContent: 'space-between', gap: 2.5 }}
+        >
+          <Stack direction="row" spacing={2.5} sx={{ alignItems: 'center' }}>
+            <Box
+              sx={{
+                width: 52,
+                height: 52,
+                borderRadius: 1.5,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                bgcolor: 'rgba(0, 167, 111, 0.12)',
+                color: 'primary.main',
+                flexShrink: 0,
+              }}
+            >
+              <Iconify icon="solar:scanner-bold" width={30} />
+            </Box>
+
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                Face ID & Biometria
+              </Typography>
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                Valide sua prova de vida e habilite autenticação biométrica nativa para assinaturas digitais.
+              </Typography>
+            </Box>
+          </Stack>
+
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<Iconify icon="solar:shield-check-bold" />}
+            onClick={() => toast.info('Módulo biométrico nativo pronto para pareamento de câmera.')}
+            sx={{ fontWeight: 800, px: 3, flexShrink: 0 }}
+          >
+            Configurar Biometria
+          </Button>
+        </Stack>
+      </Card>
+
       {/* DISPOSITIVOS CONECTADOS */}
       <Card sx={{ p: 4, borderRadius: 2 }}>
         <Typography variant="h6" sx={{ mb: 1, fontWeight: 800 }}>

@@ -215,9 +215,9 @@ export function AccountGeneral() {
         <Stack direction="row" spacing={3} sx={{ flexWrap: 'wrap', gap: 1 }}>
           <Typography variant="caption" sx={{ color: 'text.disabled' }}>• Foto (+15)</Typography>
           <Typography variant="caption" sx={{ color: 'text.disabled' }}>• CPF (+15)</Typography>
+          <Typography variant="caption" sx={{ color: 'text.disabled' }}>• Nascimento (+10)</Typography>
           <Typography variant="caption" sx={{ color: 'text.disabled' }}>• Endereço (+10)</Typography>
           <Typography variant="caption" sx={{ color: 'text.disabled' }}>• Biografia (+5)</Typography>
-          <Typography variant="caption" sx={{ color: 'text.disabled' }}>• Biometria (+15)</Typography>
         </Stack>
       </Card>
 
@@ -283,41 +283,6 @@ export function AccountGeneral() {
                 label="Perfil Público"
                 sx={{ mt: 2.5, justifyContent: 'center' }}
               />
-            </Card>
-
-            {/* CARD: FACE ID & BIOMETRIA */}
-            <Card sx={{ p: 3, textAlign: 'center', borderRadius: 2 }}>
-              <Box
-                sx={{
-                  width: 56,
-                  height: 56,
-                  mx: 'auto',
-                  mb: 1.5,
-                  borderRadius: 1.5,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  bgcolor: 'rgba(0, 167, 111, 0.12)',
-                  color: 'primary.main',
-                }}
-              >
-                <Iconify icon="solar:scanner-bold" width={32} />
-              </Box>
-              <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
-                Face ID & Biometria
-              </Typography>
-              <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5, mb: 2 }}>
-                Valide sua prova de vida e identidade biométrica no sistema.
-              </Typography>
-              <Button
-                variant="outlined"
-                color="inherit"
-                fullWidth
-                startIcon={<Iconify icon="solar:shield-check-bold" />}
-                onClick={() => toast.info('Módulo biométrico nativo pronto para pareamento de câmera.')}
-              >
-                Configurar Biometria
-              </Button>
             </Card>
           </Stack>
         </Grid>
