@@ -36,7 +36,6 @@ export type UserAccountData = {
   fatherName?: string;
   birthDate?: string | null;
   nationality?: string;
-  gender?: string;
   maritalStatus?: string;
   country: string;
   address: string;
@@ -104,6 +103,12 @@ export type LegacyField = (typeof LEGACY_STRING_FIELDS)[number];
 export type MigrationStatus = 'idle' | 'migrated' | 'conflict' | 'error';
 export type LoadStatus = 'idle' | 'loading' | 'ready' | 'error';
 
+export type LegacyReadResult =
+  | { status: 'missing' }
+  | { status: 'valid'; data: Partial<UserAccountData>; raw: string }
+  | { status: 'invalid'; reason: string }
+  | { status: 'unavailable'; reason: string };
+
 // ----------------------------------------------------------------------
 // Funções Auxiliares de Sanitização e Validação
 // ----------------------------------------------------------------------
@@ -122,36 +127,55 @@ function getSafeStorage(): Storage | null {
 }
 
 /**
- * Lê e higieniza os dados legados com checagem de tamanho, remoção de chaves arbitrárias
- * e aplicação do princípio Privacy-by-Default (isPublic sempre false na importação).
+ * Lê e higieniza os dados legados distinguindo missing, valid, invalid e unavailable.
+ * Aplica limites de tamanho por campo e princípio Privacy-by-Default (isPublic: false).
  */
-export function readLegacyProfile(): { raw: string; data: Partial<UserAccountData> } | null {
+export function readLegacyProfile(): LegacyReadResult {
   const storage = getSafeStorage();
-  if (!storage) return null;
+  if (!storage) {
+    return { status: 'unavailable', reason: 'localStorage indisponível no ambiente de execução.' };
+  }
 
   const raw = storage.getItem(LEGACY_STORAGE_KEY);
-  if (!raw || raw.trim().length <= 2) return null;
+  if (!raw || raw.trim().length <= 2) {
+    return { status: 'missing' };
+  }
 
   if (raw.length > MAX_LEGACY_LENGTH) {
-    throw new Error('O documento legado ultrapassa o tamanho máximo permitido de 64 KB.');
+    return {
+      status: 'invalid',
+      reason: 'O documento legado ultrapassa o tamanho máximo permitido de 64 KB.',
+    };
   }
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
-    throw new Error('Documento legado em formato JSON corrompido ou inválido.');
+    return {
+      status: 'invalid',
+      reason: 'Documento legado em formato JSON corrompido ou inválido.',
+    };
   }
 
   if (!isRecord(parsed)) {
-    throw new Error('Estrutura do documento legado inválida.');
+    return {
+      status: 'invalid',
+      reason: 'Estrutura do documento legado inválida (não é um objeto JSON).',
+    };
   }
 
   const safe: Record<string, unknown> = {};
   for (const field of LEGACY_STRING_FIELDS) {
     const value = parsed[field];
     const maxLength = field === 'about' ? 2000 : field === 'website' ? 200 : field === 'email' ? 254 : 150;
-    if (typeof value === 'string' && value.length <= maxLength) {
+    if (typeof value === 'string') {
+      if (value.length > maxLength) {
+        return {
+          status: 'invalid',
+          reason: `O campo ${field} ultrapassa o tamanho máximo permitido de ${maxLength} caracteres.`,
+        };
+      }
       safe[field] = value.trim();
     }
   }
@@ -167,6 +191,7 @@ export function readLegacyProfile(): { raw: string; data: Partial<UserAccountDat
   );
 
   return {
+    status: 'valid',
     raw: JSON.stringify(safe),
     data: safe as Partial<UserAccountData>,
   };
@@ -174,7 +199,7 @@ export function readLegacyProfile(): { raw: string; data: Partial<UserAccountDat
 
 /**
  * Normaliza um username para conformidade canônica com a regra `^[a-z0-9_]+$`.
- * Substitui pontos, traços e espaços por sublinhados e limita a 30 caracteres.
+ * Substitui pontos, traços e espaços por sublinhados e limita rigorosamente a 30 caracteres.
  */
 export function canonicalizeUsername(raw: string | undefined | null): string {
   if (!raw) return '';
@@ -191,7 +216,7 @@ export function canonicalizeUsername(raw: string | undefined | null): string {
 
 /**
  * Cria uma estrutura limpa e segura de dados do usuário por padrão.
- * Princípio Privacy-by-Default (isPublic = false, sem dados pessoais predefinidos).
+ * Princípio Privacy-by-Default (isPublic = false, sem presunções de estado civil).
  */
 export function createEmptyUserAccount(): UserAccountData {
   return {
@@ -211,7 +236,6 @@ export function createEmptyUserAccount(): UserAccountData {
     fatherName: '',
     birthDate: '',
     nationality: 'Brasileira',
-    gender: '',
     maritalStatus: '',
     country: 'Brasil',
     address: '',
@@ -235,14 +259,14 @@ export function createEmptyUserAccount(): UserAccountData {
     revision: 0,
     updatedAt: '',
     linkedProviders: {
-      walletAddress: '',
-      walletNetwork: '',
+      walletAddress: undefined,
+      walletNetwork: undefined,
       walletVerified: false,
-      googleEmail: '',
+      googleEmail: undefined,
       googleVerified: false,
-      githubUsername: '',
+      githubUsername: undefined,
       githubVerified: false,
-      strictAuthEnabled: false,
+      strictAuthEnabled: true,
     },
   };
 }
@@ -272,7 +296,6 @@ export function userProfileToAccountData(profile: UserProfile, current?: UserAcc
     fatherName: profile.fatherName || '',
     birthDate: profile.birthDate || '',
     nationality: profile.nationality || 'Brasileira',
-    gender: current?.gender || '',
     maritalStatus: profile.maritalStatus || '',
     country: profile.country || 'Brasil',
     address: profile.address || '',
@@ -308,55 +331,62 @@ export function userProfileToAccountData(profile: UserProfile, current?: UserAcc
   };
 }
 
+function normalizeText(value?: string | null): string {
+  return value?.trim() ?? '';
+}
+
 export function accountDataToSavePayload(
   data: Partial<UserAccountData>,
-  currentRevision?: number
+  currentRevision = data.revision
 ): SaveUserProfilePayload {
   const isPj = data.personType === 'PJ';
+  const firstName = normalizeText(data.firstName);
+  const lastName = normalizeText(data.lastName);
+  const companyName = normalizeText(data.companyName);
+
   const resolvedDisplayName = isPj
-    ? data.companyName?.trim() || undefined
-    : data.firstName && data.lastName
-      ? `${data.firstName} ${data.lastName}`.trim()
-      : data.firstName?.trim() || undefined;
+    ? companyName || 'Pessoa Jurídica'
+    : [firstName, lastName].filter(Boolean).join(' ') || normalizeText(data.username);
 
   return {
     personType: isPj ? 'PJ' : 'PF',
     username: canonicalizeUsername(data.username),
-    firstName: data.firstName,
-    lastName: data.lastName,
     displayName: resolvedDisplayName,
-    cpf: data.cpf,
-    rg: data.rg,
-    rgIssuer: data.rgIssuer,
-    cnh: data.cnh,
-    cnhCategory: data.cnhCategory,
-    motherName: data.motherName,
-    fatherName: data.fatherName,
-    birthDate: data.birthDate || '',
-    nationality: data.nationality,
-    maritalStatus: data.maritalStatus,
-    companyName: data.companyName,
-    cnpj: data.cnpj,
-    legalRepresentative: data.legalRepresentative,
-    legalRepresentativeCpf: data.legalRepresentativeCpf,
-    email: data.email,
-    phoneNumber: data.phoneNumber,
-    country: data.country,
-    zipCode: data.zipCode,
-    state: data.state,
-    city: data.city,
-    neighborhood: data.neighborhood,
-    address: data.address,
-    addressNumber: data.addressNumber,
-    complement: data.complement,
-    occupation: data.occupation,
-    company: data.company,
-    website: data.website,
-    about: data.about,
+    // Preservação estrita de todos os campos cadastrais PF e PJ (sem exclusão de dados inativos)
+    firstName,
+    lastName,
+    companyName,
+    cpf: normalizeText(data.cpf),
+    cnpj: normalizeText(data.cnpj),
+    rg: normalizeText(data.rg),
+    rgIssuer: normalizeText(data.rgIssuer),
+    cnh: normalizeText(data.cnh),
+    cnhCategory: normalizeText(data.cnhCategory),
+    motherName: normalizeText(data.motherName),
+    fatherName: normalizeText(data.fatherName),
+    birthDate: normalizeText(data.birthDate),
+    nationality: normalizeText(data.nationality) || 'Brasileira',
+    maritalStatus: normalizeText(data.maritalStatus),
+    legalRepresentative: normalizeText(data.legalRepresentative),
+    legalRepresentativeCpf: normalizeText(data.legalRepresentativeCpf),
+    email: normalizeText(data.email),
+    phoneNumber: normalizeText(data.phoneNumber),
+    country: normalizeText(data.country) || 'Brasil',
+    zipCode: normalizeText(data.zipCode),
+    state: normalizeText(data.state),
+    city: normalizeText(data.city),
+    neighborhood: normalizeText(data.neighborhood),
+    address: normalizeText(data.address),
+    addressNumber: normalizeText(data.addressNumber),
+    complement: normalizeText(data.complement),
+    occupation: normalizeText(data.occupation),
+    company: normalizeText(data.company),
+    website: normalizeText(data.website),
+    about: normalizeText(data.about),
     isPublic: data.isPublic ?? false,
-    photoUrl: data.photoURL,
-    coverUrl: data.coverURL,
-    expectedRevision: currentRevision,
+    photoUrl: data.photoURL ?? null,
+    coverUrl: data.coverURL ?? null,
+    expectedRevision: currentRevision !== undefined && currentRevision > 0 ? currentRevision : undefined,
   };
 }
 
@@ -477,28 +507,30 @@ export function mergeMissingLegacyFields(
   return { merged, changedFields };
 }
 
-async function reconcileAndMigrate(rawProfile: UserProfile | null): Promise<{
+async function reconcileAndMigrate(
+  rawProfile: UserProfile | null,
+  generation: number
+): Promise<{
   profile: UserProfile | null;
   fallbackUser?: UserAccountData;
   status: MigrationStatus;
   errorMessage?: string;
 }> {
-  let legacy: { raw: string; data: Partial<UserAccountData> } | null = null;
-  try {
-    legacy = readLegacyProfile();
-  } catch (err: any) {
+  const legacyResult = readLegacyProfile();
+
+  if (legacyResult.status === 'invalid') {
     return {
       profile: rawProfile,
       status: 'error',
-      errorMessage: err?.message || 'Falha ao ler o armazenamento legado.',
+      errorMessage: `Armazenamento legado inconsistente: ${legacyResult.reason}. Os dados anteriores foram preservados para investigação.`,
     };
   }
 
-  if (!legacy) {
+  if (legacyResult.status === 'unavailable' || legacyResult.status === 'missing') {
     return { profile: rawProfile, status: 'idle' };
   }
 
-  const legacyObj = legacy.data;
+  const legacyObj = legacyResult.data;
 
   // CENÁRIO 1: Perfil já existente no cofre seguro SQLite
   if (rawProfile) {
@@ -509,7 +541,7 @@ async function reconcileAndMigrate(rawProfile: UserProfile | null): Promise<{
     const legacyEmail = (legacyObj.email || '').trim().toLowerCase();
     const currentEmail = (rawProfile.email || '').trim().toLowerCase();
 
-    // Conflito direto: dados essenciais preenchidos com valores incompatíveis
+    // Conflito estrito de identidade: identificadores principais preenchidos com valores incompatíveis
     const hasCpfConflict = legacyCpf && currentCpf && legacyCpf !== currentCpf;
     const hasCnpjConflict = legacyCnpj && currentCnpj && legacyCnpj !== currentCnpj;
     const hasEmailConflict = legacyEmail && currentEmail && legacyEmail !== currentEmail;
@@ -519,25 +551,45 @@ async function reconcileAndMigrate(rawProfile: UserProfile | null): Promise<{
         profile: rawProfile,
         status: 'conflict',
         errorMessage:
-          'Divergência detectada entre os dados do cofre e do armazenamento legado. Os dados anteriores foram preservados para decisão explícita.',
+          'Divergência detectada entre os identificadores do cofre e do armazenamento legado. Os dados anteriores foram preservados para decisão explícita.',
       };
     }
 
-    // Reconciliação automática para campos não-conflitantes ausentes no cofre
+    // Reconciliação automática para campos complementares ausentes no cofre
     const currentUser = userProfileToAccountData(rawProfile);
     const { merged, changedFields } = mergeMissingLegacyFields(currentUser, legacyObj);
 
     if (changedFields.length > 0) {
+      if (generation !== currentSessionGeneration) {
+        return { profile: rawProfile, status: 'idle' };
+      }
       try {
         const payload = accountDataToSavePayload(merged, rawProfile.revision);
         const saved = await IdentityBridge.saveUserProfile(payload);
+        if (generation !== currentSessionGeneration) {
+          return { profile: rawProfile, status: 'idle' };
+        }
         const verified = await IdentityBridge.getUserProfile();
+        if (generation !== currentSessionGeneration) {
+          return { profile: rawProfile, status: 'idle' };
+        }
 
         if (verified && verified.revision > rawProfile.revision) {
-          getSafeStorage()?.removeItem(LEGACY_STORAGE_KEY);
-          return { profile: verified, status: 'migrated' };
+          const verifiedData = userProfileToAccountData(verified);
+          const target = merged as unknown as Record<string, unknown>;
+          const persisted = verifiedData as unknown as Record<string, unknown>;
+          const allVerified = changedFields.every((f) => persisted[f] === target[f]);
+
+          if (allVerified) {
+            getSafeStorage()?.removeItem(LEGACY_STORAGE_KEY);
+            return { profile: verified, status: 'migrated' };
+          }
         }
-        return { profile: saved, status: 'migrated' };
+        return {
+          profile: saved,
+          status: 'error',
+          errorMessage: 'A verificação pós-gravação de migração não confirmou a integridade dos campos.',
+        };
       } catch {
         return {
           profile: rawProfile,
@@ -553,9 +605,18 @@ async function reconcileAndMigrate(rawProfile: UserProfile | null): Promise<{
   }
 
   // CENÁRIO 2: Cofre vazio, importação inicial dos dados legados
+  if (generation !== currentSessionGeneration) {
+    return { profile: null, status: 'idle' };
+  }
   try {
-    const imported = await IdentityBridge.importLegacyProfile(legacy.raw);
+    const imported = await IdentityBridge.importLegacyProfile(legacyResult.raw);
+    if (generation !== currentSessionGeneration) {
+      return { profile: null, status: 'idle' };
+    }
     const verified = await IdentityBridge.getUserProfile();
+    if (generation !== currentSessionGeneration) {
+      return { profile: null, status: 'idle' };
+    }
 
     if (verified && verified.revision >= 1) {
       const verifiedFirst = (verified.firstName || '').trim();
@@ -618,7 +679,7 @@ async function fetchAndSyncProfile(): Promise<void> {
         return;
       }
 
-      const reconciliation = await reconcileAndMigrate(rawProfile);
+      const reconciliation = await reconcileAndMigrate(rawProfile, sessionGenAtStart);
 
       if (sessionGenAtStart !== currentSessionGeneration) {
         return;
@@ -702,6 +763,7 @@ export function useAccountFacade() {
   const updateProfile = async (data: Partial<UserAccountData>): Promise<UserAccountData> => {
     assertAccountCanBeSaved();
 
+    const sessionGenAtStart = currentSessionGeneration;
     storeState = {
       ...storeState,
       isSaving: true,
@@ -717,6 +779,10 @@ export function useAccountFacade() {
 
       const payload = accountDataToSavePayload(merged, storeState.user.revision);
       const saved = await IdentityBridge.saveUserProfile(payload);
+
+      if (sessionGenAtStart !== currentSessionGeneration) {
+        throw new Error('A sessão do cofre foi alterada durante a gravação.');
+      }
 
       const finalUser = userProfileToAccountData(saved, merged);
 
@@ -759,11 +825,19 @@ export function useAccountFacade() {
    * Resolução definitiva de conflitos de migração com precedência determinística:
    * 'keep_vault': Descarta o legado mantendo a integridade já existente no cofre.
    * 'merge_legacy': Preserva os identificadores do cofre, mescla os campos complementares
-   * vazios, grava com a revisão atual e confirma antes da exclusão.
+   * ausentes, grava com a revisão atual e confirma leitura independente antes da exclusão.
    */
   const resolveMigrationConflict = async (choice: 'keep_vault' | 'merge_legacy'): Promise<void> => {
+    const sessionGenAtStart = currentSessionGeneration;
+    const assertCurrentSession = () => {
+      if (sessionGenAtStart !== currentSessionGeneration) {
+        throw new Error('A sessão foi alterada durante a resolução da migração.');
+      }
+    };
+
     try {
       if (choice === 'keep_vault') {
+        assertCurrentSession();
         getSafeStorage()?.removeItem(LEGACY_STORAGE_KEY);
         storeState = {
           ...storeState,
@@ -774,51 +848,60 @@ export function useAccountFacade() {
         return;
       }
 
-      const legacy = readLegacyProfile();
-      if (!legacy) {
-        throw new Error('Os dados legados não foram encontrados no armazenamento.');
+      const legacyResult = readLegacyProfile();
+      if (legacyResult.status !== 'valid') {
+        throw new Error('Os dados legados não foram encontrados ou estão em formato inválido.');
       }
 
+      assertCurrentSession();
       const latestProfile = await IdentityBridge.getUserProfile();
+      assertCurrentSession();
       if (!latestProfile) {
         throw new Error('Perfil do cofre seguro indisponível.');
       }
 
       const currentUser = userProfileToAccountData(latestProfile);
-      const { merged, changedFields } = mergeMissingLegacyFields(currentUser, legacy.data);
+      const { merged, changedFields } = mergeMissingLegacyFields(currentUser, legacyResult.data);
 
-      let verifiedProfile = latestProfile;
-      if (changedFields.length > 0) {
-        const payload = accountDataToSavePayload(merged, latestProfile.revision);
-        await IdentityBridge.saveUserProfile(payload);
+      if (changedFields.length === 0) {
+        throw new Error(
+          'Não existem campos complementares ausentes para incorporar. As divergências de identidade foram mantidas no cofre.'
+        );
+      }
 
-        const verified = await IdentityBridge.getUserProfile();
-        if (!verified) {
-          throw new Error('Falha na leitura independente pós-reconciliação.');
-        }
+      assertCurrentSession();
+      const payload = accountDataToSavePayload(merged, latestProfile.revision);
+      await IdentityBridge.saveUserProfile(payload);
 
-        const verifiedData = userProfileToAccountData(verified);
-        const target = merged as unknown as Record<string, unknown>;
-        const persisted = verifiedData as unknown as Record<string, unknown>;
+      assertCurrentSession();
+      const verified = await IdentityBridge.getUserProfile();
+      assertCurrentSession();
 
-        const allFieldsVerified = changedFields.every((field) => persisted[field] === target[field]);
-        if (!allFieldsVerified) {
-          throw new Error('A reconciliação não passou na verificação estrita de integridade.');
-        }
+      if (!verified || verified.revision <= latestProfile.revision) {
+        throw new Error('Falha na leitura independente pós-reconciliação do cofre.');
+      }
 
-        verifiedProfile = verified;
+      const verifiedData = userProfileToAccountData(verified);
+      const target = merged as unknown as Record<string, unknown>;
+      const persisted = verifiedData as unknown as Record<string, unknown>;
+
+      const allFieldsVerified = changedFields.every((field) => persisted[field] === target[field]);
+      if (!allFieldsVerified) {
+        throw new Error('A reconciliação não passou na verificação estrita de integridade.');
       }
 
       // Exclusão definitiva somente após leitura de volta confirmada
+      assertCurrentSession();
       getSafeStorage()?.removeItem(LEGACY_STORAGE_KEY);
       storeState = {
         ...storeState,
-        user: userProfileToAccountData(verifiedProfile),
+        user: verifiedData,
         migrationStatus: 'migrated',
         error: null,
       };
       notify();
     } catch (err: any) {
+      if (sessionGenAtStart !== currentSessionGeneration) return;
       storeState = {
         ...storeState,
         migrationStatus: 'error',
@@ -845,3 +928,5 @@ export function useAccountFacade() {
     resolveMigrationConflict,
   };
 }
+
+export const useAccount = useAccountFacade;
