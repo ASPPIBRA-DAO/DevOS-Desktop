@@ -97,7 +97,7 @@ export function AccountGeneral() {
   };
 
   const methods = useForm<UpdateUserSchemaType>({
-    mode: 'all',
+    mode: 'onTouched',
     resolver: zodResolver(UpdateUserSchema),
     defaultValues,
   });

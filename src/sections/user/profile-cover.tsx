@@ -240,18 +240,13 @@ export function ProfileCover({
             }}
           >
             {TABS.map((tab) => (
-              <Tab
-                key={tab.value}
-                value={tab.value}
-                icon={
-                  <Tooltip title={tab.label} arrow placement="top">
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 1, height: 1 }}>
-                      <Iconify icon={tab.icon} width={22} />
-                    </Box>
-                  </Tooltip>
-                }
-                aria-label={tab.label}
-              />
+              <Tooltip key={tab.value} title={tab.label} arrow placement="top" enterDelay={300}>
+                <Tab
+                  value={tab.value}
+                  icon={<Iconify icon={tab.icon} width={22} />}
+                  aria-label={tab.label}
+                />
+              </Tooltip>
             ))}
           </Tabs>
         </Box>

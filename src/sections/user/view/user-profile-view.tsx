@@ -26,17 +26,20 @@ export function UserProfileView() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabFromUrl = searchParams.get('tab') || 'profile';
   const [currentTab, setCurrentTab] = useState(tabFromUrl);
+  const [visitedTabs, setVisitedTabs] = useState<Record<string, boolean>>({ [tabFromUrl]: true });
 
   useEffect(() => {
     const tab = searchParams.get('tab');
     if (tab && tab !== currentTab) {
       setCurrentTab(tab);
+      setVisitedTabs((prev) => (prev[tab] ? prev : { ...prev, [tab]: true }));
     }
   }, [searchParams, currentTab]);
 
   const handleChangeTab = (_event: React.SyntheticEvent, newValue: string) => {
     setCurrentTab(newValue);
-    setSearchParams({ tab: newValue });
+    setVisitedTabs((prev) => (prev[newValue] ? prev : { ...prev, [newValue]: true }));
+    setSearchParams({ tab: newValue }, { replace: true });
   };
 
   const handleUpdateAvatar = (photoURL: string) => {
@@ -72,13 +75,30 @@ export function UserProfileView() {
         onUpdateCover={handleUpdateCover}
       />
 
-      {/* Conteúdo Dinâmico por Ferramenta Selecionada */}
-      {currentTab === 'profile' && <ProfileHome />}
-      {currentTab === 'identity' && <AccountGeneral />}
-      {currentTab === 'notifications' && <AccountNotifications />}
-      {currentTab === 'socials' && <AccountSocials />}
-      {currentTab === 'security' && <AccountChangePassword />}
-      {currentTab === '2fa' && <AccountTwoFA />}
+      {/* Conteúdo Dinâmico por Ferramenta Selecionada (Mantido em Cache de Renderização) */}
+      <Box sx={{ display: currentTab === 'profile' ? 'block' : 'none' }}>
+        {visitedTabs.profile && <ProfileHome />}
+      </Box>
+
+      <Box sx={{ display: currentTab === 'identity' ? 'block' : 'none' }}>
+        {visitedTabs.identity && <AccountGeneral />}
+      </Box>
+
+      <Box sx={{ display: currentTab === 'notifications' ? 'block' : 'none' }}>
+        {visitedTabs.notifications && <AccountNotifications />}
+      </Box>
+
+      <Box sx={{ display: currentTab === 'socials' ? 'block' : 'none' }}>
+        {visitedTabs.socials && <AccountSocials />}
+      </Box>
+
+      <Box sx={{ display: currentTab === 'security' ? 'block' : 'none' }}>
+        {visitedTabs.security && <AccountChangePassword />}
+      </Box>
+
+      <Box sx={{ display: currentTab === '2fa' ? 'block' : 'none' }}>
+        {visitedTabs['2fa'] && <AccountTwoFA />}
+      </Box>
     </Box>
   );
 }
