@@ -11,6 +11,10 @@ const TAURI_APP_COMMANDS: &[&str] = &[
     "init_master_password",
     "unlock_vault",
     "lock_vault",
+    // Identidade Civil e Perfil do Usuário
+    "get_user_profile",
+    "save_user_profile",
+    "import_legacy_profile",
     // Geração, gerenciamento e custódia de carteiras
     "generate_seed_and_preview",
     "reveal_pending_mnemonic",
