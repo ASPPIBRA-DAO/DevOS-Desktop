@@ -118,9 +118,21 @@ impl IdentityService {
                 .unwrap_or_default(),
         };
 
-        let first_name = req.first_name.trim().to_string();
-        let last_name = req.last_name.trim().to_string();
-        let company_name = req.company_name.trim().to_string();
+        let first_name = if !req.first_name.trim().is_empty() {
+            req.first_name.trim().to_string()
+        } else {
+            existing_profile.as_ref().map(|p| p.first_name.clone()).unwrap_or_default()
+        };
+        let last_name = if !req.last_name.trim().is_empty() {
+            req.last_name.trim().to_string()
+        } else {
+            existing_profile.as_ref().map(|p| p.last_name.clone()).unwrap_or_default()
+        };
+        let company_name = if !req.company_name.trim().is_empty() {
+            req.company_name.trim().to_string()
+        } else {
+            existing_profile.as_ref().map(|p| p.company_name.clone()).unwrap_or_default()
+        };
 
         let display_name = match &req.display_name {
             Some(d) if !d.trim().is_empty() => d.trim().to_string(),
@@ -158,49 +170,135 @@ impl IdentityService {
             legal_representative_cpf,
         ) = if person_type == PERSON_TYPE_PJ {
             // Regras Pessoa Jurídica
-            let validated_cnpj = validate_cnpj(&req.cnpj)
+            let raw_cnpj = if !req.cnpj.trim().is_empty() {
+                &req.cnpj
+            } else if let Some(p) = existing_profile {
+                &p.cnpj
+            } else {
+                &req.cnpj
+            };
+            let validated_cnpj = validate_cnpj(raw_cnpj)
                 .map_err(|e| IdentityError::Validation(format!("CNPJ inválido: {}", e)))?;
 
-            let validated_rep_cpf = validate_cpf(&req.legal_representative_cpf)
-                .map_err(|e| IdentityError::Validation(format!("CPF do representante inválido: {}", e)))?;
+            let raw_rep_cpf = if !req.legal_representative_cpf.trim().is_empty() {
+                &req.legal_representative_cpf
+            } else if let Some(p) = existing_profile {
+                &p.legal_representative_cpf
+            } else {
+                &req.legal_representative_cpf
+            };
+            let validated_rep_cpf = if !raw_rep_cpf.trim().is_empty() {
+                validate_cpf(raw_rep_cpf)
+                    .map_err(|e| IdentityError::Validation(format!("CPF do representante inválido: {}", e)))?
+            } else {
+                String::new()
+            };
+
+            let legal_rep = if !req.legal_representative.trim().is_empty() {
+                req.legal_representative.trim().to_string()
+            } else {
+                existing_profile.as_ref().map(|p| p.legal_representative.clone()).unwrap_or_default()
+            };
+
+            // Preservação ou atualização de dados de PF em modo PJ
+            let pf_cpf = if !req.cpf.trim().is_empty() {
+                validate_cpf(&req.cpf).unwrap_or_else(|_| existing_profile.as_ref().map(|p| p.cpf.clone()).unwrap_or_default())
+            } else {
+                existing_profile.as_ref().map(|p| p.cpf.clone()).unwrap_or_default()
+            };
+            let pf_rg = if !req.rg.trim().is_empty() { req.rg.trim().to_string() } else { existing_profile.as_ref().map(|p| p.rg.clone()).unwrap_or_default() };
+            let pf_rg_issuer = if !req.rg_issuer.trim().is_empty() { req.rg_issuer.trim().to_string() } else { existing_profile.as_ref().map(|p| p.rg_issuer.clone()).unwrap_or_default() };
+            let pf_cnh = if !req.cnh.trim().is_empty() { req.cnh.trim().to_string() } else { existing_profile.as_ref().map(|p| p.cnh.clone()).unwrap_or_default() };
+            let pf_cnh_cat = if !req.cnh_category.trim().is_empty() { req.cnh_category.trim().to_string() } else { existing_profile.as_ref().map(|p| p.cnh_category.clone()).unwrap_or_default() };
+            let pf_mother = if !req.mother_name.trim().is_empty() { req.mother_name.trim().to_string() } else { existing_profile.as_ref().map(|p| p.mother_name.clone()).unwrap_or_default() };
+            let pf_father = if !req.father_name.trim().is_empty() { req.father_name.trim().to_string() } else { existing_profile.as_ref().map(|p| p.father_name.clone()).unwrap_or_default() };
+            let pf_birth = if !req.birth_date.trim().is_empty() {
+                validate_and_normalize_date(&req.birth_date).unwrap_or_else(|_| existing_profile.as_ref().map(|p| p.birth_date.clone()).unwrap_or_default())
+            } else {
+                existing_profile.as_ref().map(|p| p.birth_date.clone()).unwrap_or_default()
+            };
+            let pf_marital = if !req.marital_status.trim().is_empty() { req.marital_status.trim().to_string() } else { existing_profile.as_ref().map(|p| p.marital_status.clone()).unwrap_or_default() };
 
             (
-                existing_profile.as_ref().map(|p| p.cpf.clone()).unwrap_or_default(),
-                existing_profile.as_ref().map(|p| p.rg.clone()).unwrap_or_default(),
-                existing_profile.as_ref().map(|p| p.rg_issuer.clone()).unwrap_or_default(),
-                existing_profile.as_ref().map(|p| p.cnh.clone()).unwrap_or_default(),
-                existing_profile.as_ref().map(|p| p.cnh_category.clone()).unwrap_or_default(),
-                existing_profile.as_ref().map(|p| p.mother_name.clone()).unwrap_or_default(),
-                existing_profile.as_ref().map(|p| p.father_name.clone()).unwrap_or_default(),
-                existing_profile.as_ref().map(|p| p.birth_date.clone()).unwrap_or_default(),
-                existing_profile.as_ref().map(|p| p.marital_status.clone()).unwrap_or_default(),
+                pf_cpf,
+                pf_rg,
+                pf_rg_issuer,
+                pf_cnh,
+                pf_cnh_cat,
+                pf_mother,
+                pf_father,
+                pf_birth,
+                pf_marital,
                 company_name,
                 validated_cnpj,
-                req.legal_representative.trim().to_string(),
+                legal_rep,
                 validated_rep_cpf,
             )
         } else {
             // Regras Pessoa Física
-            let validated_cpf = validate_cpf(&req.cpf)
+            let raw_cpf = if !req.cpf.trim().is_empty() {
+                &req.cpf
+            } else if let Some(p) = existing_profile {
+                &p.cpf
+            } else {
+                &req.cpf
+            };
+            let validated_cpf = validate_cpf(raw_cpf)
                 .map_err(|e| IdentityError::Validation(format!("CPF inválido: {}", e)))?;
 
-            let validated_birth = validate_and_normalize_date(&req.birth_date)
-                .map_err(|e| IdentityError::Validation(format!("Data de nascimento inválida: {}", e)))?;
+            let raw_birth = if !req.birth_date.trim().is_empty() {
+                &req.birth_date
+            } else if let Some(p) = existing_profile {
+                &p.birth_date
+            } else {
+                &req.birth_date
+            };
+            let validated_birth = if !raw_birth.trim().is_empty() {
+                validate_and_normalize_date(raw_birth)
+                    .map_err(|e| IdentityError::Validation(format!("Data de nascimento inválida: {}", e)))?
+            } else {
+                String::new()
+            };
+
+            let pf_rg = if !req.rg.trim().is_empty() { req.rg.trim().to_string() } else { existing_profile.as_ref().map(|p| p.rg.clone()).unwrap_or_default() };
+            let pf_rg_issuer = if !req.rg_issuer.trim().is_empty() { req.rg_issuer.trim().to_string() } else { existing_profile.as_ref().map(|p| p.rg_issuer.clone()).unwrap_or_default() };
+            let pf_cnh = if !req.cnh.trim().is_empty() { req.cnh.trim().to_string() } else { existing_profile.as_ref().map(|p| p.cnh.clone()).unwrap_or_default() };
+            let pf_cnh_cat = if !req.cnh_category.trim().is_empty() { req.cnh_category.trim().to_string() } else { existing_profile.as_ref().map(|p| p.cnh_category.clone()).unwrap_or_default() };
+            let pf_mother = if !req.mother_name.trim().is_empty() { req.mother_name.trim().to_string() } else { existing_profile.as_ref().map(|p| p.mother_name.clone()).unwrap_or_default() };
+            let pf_father = if !req.father_name.trim().is_empty() { req.father_name.trim().to_string() } else { existing_profile.as_ref().map(|p| p.father_name.clone()).unwrap_or_default() };
+            let pf_marital = if !req.marital_status.trim().is_empty() { req.marital_status.trim().to_string() } else { existing_profile.as_ref().map(|p| p.marital_status.clone()).unwrap_or_default() };
+
+            // Preservação ou atualização de dados PJ em modo PF
+            let pj_cnpj = if !req.cnpj.trim().is_empty() {
+                validate_cnpj(&req.cnpj).unwrap_or_else(|_| existing_profile.as_ref().map(|p| p.cnpj.clone()).unwrap_or_default())
+            } else {
+                existing_profile.as_ref().map(|p| p.cnpj.clone()).unwrap_or_default()
+            };
+            let pj_legal_rep = if !req.legal_representative.trim().is_empty() {
+                req.legal_representative.trim().to_string()
+            } else {
+                existing_profile.as_ref().map(|p| p.legal_representative.clone()).unwrap_or_default()
+            };
+            let pj_legal_rep_cpf = if !req.legal_representative_cpf.trim().is_empty() {
+                validate_cpf(&req.legal_representative_cpf).unwrap_or_else(|_| existing_profile.as_ref().map(|p| p.legal_representative_cpf.clone()).unwrap_or_default())
+            } else {
+                existing_profile.as_ref().map(|p| p.legal_representative_cpf.clone()).unwrap_or_default()
+            };
 
             (
                 validated_cpf,
-                req.rg.trim().to_string(),
-                req.rg_issuer.trim().to_string(),
-                req.cnh.trim().to_string(),
-                req.cnh_category.trim().to_string(),
-                req.mother_name.trim().to_string(),
-                req.father_name.trim().to_string(),
+                pf_rg,
+                pf_rg_issuer,
+                pf_cnh,
+                pf_cnh_cat,
+                pf_mother,
+                pf_father,
                 validated_birth,
-                req.marital_status.trim().to_string(),
-                existing_profile.as_ref().map(|p| p.company_name.clone()).unwrap_or_default(),
-                existing_profile.as_ref().map(|p| p.cnpj.clone()).unwrap_or_default(),
-                existing_profile.as_ref().map(|p| p.legal_representative.clone()).unwrap_or_default(),
-                existing_profile.as_ref().map(|p| p.legal_representative_cpf.clone()).unwrap_or_default(),
+                pf_marital,
+                company_name,
+                pj_cnpj,
+                pj_legal_rep,
+                pj_legal_rep_cpf,
             )
         };
 
@@ -708,5 +806,58 @@ mod tests {
         assert_eq!(saved_pj.cpf, "529.982.247-25");
         assert_eq!(saved_pj.rg, "123456");
         assert_eq!(saved_pj.mother_name, "Maria Silva");
+
+        // 3. Transiciona de volta para PF (PF -> PJ -> PF) comprovando preservação mútua
+        let req_pf_again = SaveUserProfileRequest {
+            person_type: "PF".to_string(),
+            username: Some("joao_silva".to_string()),
+            first_name: "".to_string(), // Deve preservar "João"
+            last_name: "".to_string(),  // Deve preservar "Silva"
+            display_name: None,
+            cpf: "".to_string(),        // Deve preservar "529.982.247-25"
+            rg: "".to_string(),
+            rg_issuer: "".to_string(),
+            cnh: "".to_string(),
+            cnh_category: "".to_string(),
+            mother_name: "".to_string(),
+            father_name: "".to_string(),
+            birth_date: "".to_string(),
+            nationality: "Brasileira".to_string(),
+            marital_status: "".to_string(),
+            company_name: "".to_string(), // Deve preservar "Minha Empresa Ltda"
+            cnpj: "".to_string(),         // Deve preservar "12.ABC.345/01DE-35"
+            legal_representative: "".to_string(),
+            legal_representative_cpf: "".to_string(),
+            email: "joao@email.com".to_string(),
+            phone_number: "11988888888".to_string(),
+            country: "Brasil".to_string(),
+            zip_code: "01310-100".to_string(),
+            state: "SP".to_string(),
+            city: "São Paulo".to_string(),
+            neighborhood: "Bela Vista".to_string(),
+            address: "Av Paulista".to_string(),
+            address_number: "1000".to_string(),
+            complement: "".to_string(),
+            occupation: "Engenheiro".to_string(),
+            company: "".to_string(),
+            website: "".to_string(),
+            about: "".to_string(),
+            is_public: false,
+            photo_url: None,
+            cover_url: None,
+            linked_providers: Vec::new(),
+            expected_revision: Some(saved_pj.revision),
+        };
+
+        let saved_pf_again = IdentityService::save_profile(&db, &session, req_pf_again).unwrap();
+        assert_eq!(saved_pf_again.person_type, "PF");
+        assert_eq!(saved_pf_again.first_name, "João");
+        assert_eq!(saved_pf_again.last_name, "Silva");
+        assert_eq!(saved_pf_again.cpf, "529.982.247-25");
+        assert_eq!(saved_pf_again.mother_name, "Maria Silva");
+        // Comprova que os dados PJ anteriores NÃO foram destruídos
+        assert_eq!(saved_pf_again.company_name, "Minha Empresa Ltda");
+        assert_eq!(saved_pf_again.cnpj, "12.ABC.345/01DE-35");
+        assert_eq!(saved_pf_again.legal_representative, "João Silva");
     }
 }
