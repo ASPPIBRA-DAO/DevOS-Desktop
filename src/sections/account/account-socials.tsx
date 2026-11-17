@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 
 import Card from '@mui/material/Card';
+import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
@@ -13,34 +14,190 @@ import { Form, Field } from 'src/shared/components/hook-form';
 
 // ----------------------------------------------------------------------
 
-export type SocialLinks = {
-  facebook?: string;
-  instagram?: string;
-  linkedin?: string;
-  twitter?: string;
-};
+export type SocialField = 'facebook' | 'instagram' | 'linkedin' | 'twitter';
+
+export type SocialLinks = Partial<Record<SocialField, string>>;
+
+export type SaveSocialLinks = (links: SocialLinks) => Promise<void> | void;
 
 type Props = {
   socialLinks?: SocialLinks;
+  onSave?: SaveSocialLinks;
 };
 
-export function AccountSocials({ socialLinks }: Props) {
+type SocialFieldConfig = {
+  name: SocialField;
+  label: string;
+  icon: string;
+  color: string;
+};
+
+// ----------------------------------------------------------------------
+
+export const SOCIAL_FIELDS: SocialFieldConfig[] = [
+  {
+    name: 'linkedin',
+    label: 'LinkedIn',
+    icon: 'eva:linkedin-fill',
+    color: '#0A66C2',
+  },
+  {
+    name: 'twitter',
+    label: 'X / Twitter',
+    icon: 'ri:twitter-x-fill',
+    color: 'text.primary',
+  },
+  {
+    name: 'instagram',
+    label: 'Instagram',
+    icon: 'ant-design:instagram-filled',
+    color: '#DF3E30',
+  },
+  {
+    name: 'facebook',
+    label: 'Facebook',
+    icon: 'eva:facebook-fill',
+    color: '#1877F2',
+  },
+];
+
+export const ALLOWED_HOSTS: Record<SocialField, readonly string[]> = {
+  facebook: ['facebook.com', 'www.facebook.com', 'm.facebook.com', 'fb.com', 'www.fb.com'],
+  instagram: ['instagram.com', 'www.instagram.com'],
+  linkedin: ['linkedin.com', 'www.linkedin.com'],
+  twitter: ['x.com', 'www.x.com', 'twitter.com', 'www.twitter.com'],
+};
+
+export const MAX_URL_LENGTH = 2048;
+
+// ----------------------------------------------------------------------
+
+export function createDefaultValues(socialLinks?: SocialLinks): SocialLinks {
+  return {
+    facebook: socialLinks?.facebook ?? '',
+    instagram: socialLinks?.instagram ?? '',
+    linkedin: socialLinks?.linkedin ?? '',
+    twitter: socialLinks?.twitter ?? '',
+  };
+}
+
+// ----------------------------------------------------------------------
+
+export function normalizeSocialLinks(
+  input: SocialLinks
+): {
+  values: SocialLinks;
+  errors: Partial<Record<SocialField, string>>;
+} {
+  const values: SocialLinks = {};
+  const errors: Partial<Record<SocialField, string>> = {};
+
+  for (const field of SOCIAL_FIELDS) {
+    const { name } = field;
+    const rawValue = input[name]?.trim() ?? '';
+
+    // Campos opcionais podem permanecer vazios
+    if (!rawValue) {
+      values[name] = '';
+      continue;
+    }
+
+    if (rawValue.length > MAX_URL_LENGTH) {
+      errors[name] = 'A URL ultrapassa o tamanho permitido de 2.048 caracteres.';
+      continue;
+    }
+
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(rawValue);
+    } catch {
+      errors[name] = 'Informe uma URL válida, incluindo https://.';
+      continue;
+    }
+
+    const validProtocol = parsedUrl.protocol === 'https:';
+    const validHost = ALLOWED_HOSTS[name].includes(parsedUrl.hostname.toLowerCase());
+    const hasCredentials = Boolean(parsedUrl.username) || Boolean(parsedUrl.password);
+    const hasCustomPort = Boolean(parsedUrl.port);
+
+    if (!validProtocol || !validHost || hasCredentials || hasCustomPort) {
+      errors[name] = 'Informe uma URL HTTPS válida da plataforma correspondente.';
+      continue;
+    }
+
+    values[name] = parsedUrl.toString();
+  }
+
+  return { values, errors };
+}
+
+// ----------------------------------------------------------------------
+
+export function AccountSocials({ socialLinks, onSave }: Props) {
   const methods = useForm<SocialLinks>({
-    defaultValues: {
-      facebook: socialLinks?.facebook || 'https://www.facebook.com/asppibra',
-      instagram: socialLinks?.instagram || 'https://www.instagram.com/asppibra',
-      linkedin: socialLinks?.linkedin || 'https://www.linkedin.com/company/asppibra',
-      twitter: socialLinks?.twitter || 'https://www.twitter.com/asppibra',
-    },
+    defaultValues: createDefaultValues(socialLinks),
+    mode: 'onBlur',
   });
 
   const {
     handleSubmit,
+    reset,
+    clearErrors,
+    setError,
     formState: { isSubmitting },
   } = methods;
 
-  const onSubmit = handleSubmit(() => {
-    toast.success('Redes sociais sincronizadas com sucesso!');
+  const facebook = socialLinks?.facebook;
+  const instagram = socialLinks?.instagram;
+  const linkedin = socialLinks?.linkedin;
+  const twitter = socialLinks?.twitter;
+
+  // Sincroniza os valores quando as propriedades externas mudarem
+  useEffect(() => {
+    reset(
+      createDefaultValues({
+        facebook,
+        instagram,
+        linkedin,
+        twitter,
+      })
+    );
+  }, [reset, facebook, instagram, linkedin, twitter]);
+
+  const onSubmit = handleSubmit(async (submittedValues) => {
+    clearErrors();
+
+    const { values, errors } = normalizeSocialLinks(submittedValues);
+    const invalidFields = Object.keys(errors) as SocialField[];
+
+    if (invalidFields.length > 0) {
+      invalidFields.forEach((field) => {
+        const message = errors[field];
+        if (message) {
+          setError(field, {
+            type: 'validate',
+            message,
+          });
+        }
+      });
+      toast.error('Verifique as URLs informadas antes de continuar.');
+      return;
+    }
+
+    // Não simula uma operação de persistência inexistente
+    if (!onSave) {
+      toast.error('O serviço de salvamento ainda não foi configurado.');
+      return;
+    }
+
+    try {
+      await onSave(values);
+      // Atualiza a referência inicial do formulário após o sucesso
+      reset(values);
+      toast.success('Redes sociais salvas com sucesso!');
+    } catch {
+      toast.error('Não foi possível salvar suas redes sociais. Tente novamente.');
+    }
   });
 
   return (
@@ -53,73 +210,42 @@ export function AccountSocials({ socialLinks }: Props) {
           Conecte seus perfis profissionais para exibição no diretório institucional.
         </Typography>
 
+        {!onSave && (
+          <Alert severity="warning" sx={{ mb: 3 }}>
+            O serviço de salvamento ainda não está conectado. Os dados não poderão ser persistidos até
+            que a integração com a API seja configurada.
+          </Alert>
+        )}
+
         <Stack spacing={3}>
-          <Field.Text
-            name="linkedin"
-            label="LinkedIn"
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Iconify width={22} icon="eva:linkedin-fill" sx={{ color: '#0A66C2' }} />
-                  </InputAdornment>
-                ),
-              },
-            }}
-          />
-
-          <Field.Text
-            name="twitter"
-            label="X / Twitter"
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Iconify width={22} icon="ri:twitter-x-fill" sx={{ color: 'text.primary' }} />
-                  </InputAdornment>
-                ),
-              },
-            }}
-          />
-
-          <Field.Text
-            name="instagram"
-            label="Instagram"
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Iconify width={22} icon="ant-design:instagram-filled" sx={{ color: '#DF3E30' }} />
-                  </InputAdornment>
-                ),
-              },
-            }}
-          />
-
-          <Field.Text
-            name="facebook"
-            label="Facebook"
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Iconify width={22} icon="eva:facebook-fill" sx={{ color: '#1877F2' }} />
-                  </InputAdornment>
-                ),
-              },
-            }}
-          />
+          {SOCIAL_FIELDS.map((field) => (
+            <Field.Text
+              key={field.name}
+              name={field.name}
+              label={field.label}
+              type="url"
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Iconify width={22} icon={field.icon} sx={{ color: field.color }} />
+                    </InputAdornment>
+                  ),
+                },
+              }}
+            />
+          ))}
         </Stack>
 
         <Stack direction="row" sx={{ justifyContent: 'flex-end', mt: 4 }}>
           <Button
             type="submit"
             variant="contained"
-            disabled={isSubmitting}
+            disabled={isSubmitting || !onSave}
             size="large"
             sx={{ px: 4, fontWeight: 800 }}
           >
-            Salvar Redes
+            {isSubmitting ? 'Salvando...' : 'Salvar Redes'}
           </Button>
         </Stack>
       </Card>
