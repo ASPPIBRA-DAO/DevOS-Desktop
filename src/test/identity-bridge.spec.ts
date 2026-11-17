@@ -18,10 +18,11 @@ import {
   readLegacyProfile,
   resetAccountStore,
   LEGACY_STORAGE_KEY,
+  removeLegacyProfile,
   canonicalizeUsername,
   createEmptyUserAccount,
-  mergeMissingLegacyFields,
   accountDataToSavePayload,
+  mergeMissingLegacyFields,
   userProfileToAccountData,
   verifyMigrationIntegrity,
 } from 'src/sections/account/use-account';
@@ -237,8 +238,10 @@ describe('IdentityBridge — Tauri Native Identity & Vault IPC', () => {
       // Rejeita DV errado
       expect(isStrictValidCpf('52998224726')).toBe(false);
 
-      // Rejeita caracteres indevidos
+      // Rejeita caracteres indevidos e formatos corrompidos com letras adicionais
       expect(isStrictValidCpf('529.982.247-2A')).toBe(false);
+      expect(isStrictValidCpf('abc52998224725xyz')).toBe(false);
+      expect(isStrictValidCpf('529.982.247-25-EXTRA')).toBe(false);
     });
 
     it('isStrictValidCnpj deve validar formato numérico e alfanumérico RFB 2026', () => {
@@ -258,6 +261,8 @@ describe('IdentityBridge — Tauri Native Identity & Vault IPC', () => {
       expect(isStrictValidCnpj('12.ABC.345-01DE/35')).toBe(false);
       expect(isStrictValidCnpj('12/ABC/345/01DE-35')).toBe(false);
       expect(isStrictValidCnpj('00.000.000/0001-9')).toBe(false);
+      expect(isStrictValidCnpj('12..ABC--345//01DE==35')).toBe(false);
+      expect(isStrictValidCnpj('12.ABC.345/01DE-35-EXTRA')).toBe(false);
 
       // Rejeita DV errado
       expect(isStrictValidCnpj('12.ABC.345/01DE-36')).toBe(false);
@@ -453,6 +458,7 @@ describe('IdentityBridge — Tauri Native Identity & Vault IPC', () => {
         state: 'SP', // Campo preenchido no cofre
         isPublic: true, // Já aprovado como público pelo usuário no cofre
         username: '', // Cofre sem username explícito
+        email: '',    // Cofre sem e-mail preenchido
       };
 
       const legacy: Partial<typeof sampleUserAccount> = {
@@ -461,6 +467,7 @@ describe('IdentityBridge — Tauri Native Identity & Vault IPC', () => {
         city: 'Campinas',
         isPublic: false,
         username: 'maria_legacy',
+        email: 'maria.legacy@asppibra.org.br',
       };
 
       const { merged, changedFields } = mergeMissingLegacyFields(vault, legacy);
@@ -468,8 +475,9 @@ describe('IdentityBridge — Tauri Native Identity & Vault IPC', () => {
       expect(merged.state).toBe('SP'); // Manteve o cofre
       expect(merged.city).toBe('Campinas'); // Preencheu vazio
       expect(merged.username).toBe('maria_legacy'); // Incorporou username canônico ausente
+      expect(merged.email).toBe('maria.legacy@asppibra.org.br'); // Incorporou e-mail ausente com segurança
       expect(merged.isPublic).toBe(true); // Preservou configuração do cofre
-      expect(changedFields).toEqual(['address', 'city', 'username']);
+      expect(changedFields).toEqual(['address', 'city', 'username', 'email']);
     });
 
     it('verifyMigrationIntegrity deve validar correspondência estrita de todos os campos legados', () => {
@@ -501,6 +509,22 @@ describe('IdentityBridge — Tauri Native Identity & Vault IPC', () => {
         personType: 'PJ' as const,
       };
       expect(verifyMigrationIntegrity(divergentType, persisted)).toContain('personType');
+
+      // 4. Caso com username legado presente mas cofre sem username
+      const persistedWithoutUsername = {
+        ...persisted,
+        username: '',
+      };
+      const legacyWithUsername = {
+        username: 'maria_santos',
+      };
+      expect(verifyMigrationIntegrity(legacyWithUsername, persistedWithoutUsername)).toContain('username');
+
+      // 5. Caso com username legado inválido (< 3 caracteres)
+      const legacyWithInvalidUsername = {
+        username: 'ab',
+      };
+      expect(verifyMigrationIntegrity(legacyWithInvalidUsername, persisted)).toContain('username');
     });
 
     it('readLegacyProfile deve detectar storage inacessível e personType corrompido', () => {
@@ -546,7 +570,23 @@ describe('IdentityBridge — Tauri Native Identity & Vault IPC', () => {
         expect(invalidTypeResult.reason).toContain('personType inválido');
       }
 
-      validStorage.removeItem(LEGACY_STORAGE_KEY);
+      // Inferência inteligente quando personType for omitido mas houver CNPJ e Razão Social
+      validStorage.setItem(
+        LEGACY_STORAGE_KEY,
+        JSON.stringify({
+          companyName: 'ASPPIBRA Soluções Ltda',
+          cnpj: '12.ABC.345/01DE-35',
+        })
+      );
+      const inferredPj = readLegacyProfile();
+      expect(inferredPj.status).toBe('valid');
+      if (inferredPj.status === 'valid') {
+        expect(inferredPj.data.personType).toBe('PJ');
+      }
+
+      // Teste de removeLegacyProfile com confirmação
+      expect(removeLegacyProfile()).toBe(true);
+      expect(validStorage.getItem(LEGACY_STORAGE_KEY)).toBeNull();
     });
 
     it('resetAccountStore deve resetar o estado da store para idle e limpar erros', () => {
