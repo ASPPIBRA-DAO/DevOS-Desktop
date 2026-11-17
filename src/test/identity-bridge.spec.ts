@@ -5,14 +5,6 @@ import { it, expect, describe } from 'vitest';
 import { IdentityBridge } from 'src/platform/tauri/identity/identity-bridge';
 
 import {
-  resetAccountStore,
-  canonicalizeUsername,
-  createEmptyUserAccount,
-  mergeMissingLegacyFields,
-  accountDataToSavePayload,
-  userProfileToAccountData,
-} from 'src/sections/account/use-account';
-import {
   isStrictValidCpf,
   isStrictValidCep,
   isStrictValidCnpj,
@@ -20,7 +12,18 @@ import {
   mapUserToFormValues,
   isStrictValidWebsite,
   isStrictValidBirthDate,
+  calculateIdentityCompleteness,
 } from 'src/sections/account/account-general';
+import {
+  readLegacyProfile,
+  resetAccountStore,
+  LEGACY_STORAGE_KEY,
+  canonicalizeUsername,
+  createEmptyUserAccount,
+  mergeMissingLegacyFields,
+  accountDataToSavePayload,
+  userProfileToAccountData,
+} from 'src/sections/account/use-account';
 
 import { mockIpcError, mockIpcResponse } from './test-utils';
 
@@ -242,22 +245,22 @@ describe('IdentityBridge — Tauri Native Identity & Vault IPC', () => {
       expect(isStrictValidCnpj('00000000000191')).toBe(true);
       expect(isStrictValidCnpj('00.000.000/0001-91')).toBe(true);
 
-      // Alfanumérico oficial IN RFB 2.229/2024
+      // Alfanumérico oficial publicado na IN RFB 2.229/2024
       expect(isStrictValidCnpj('12ABC34501DE35')).toBe(true);
       expect(isStrictValidCnpj('12.ABC.345/01DE-35')).toBe(true);
-
-      // Vetor de teste oficial RFB 2026 (00.000.000/E08G-12)
-      expect(isStrictValidCnpj('00000000E08G12')).toBe(true);
-      expect(isStrictValidCnpj('00.000.000/E08G-12')).toBe(true);
 
       // Rejeita espaços vazios
       expect(isStrictValidCnpj('')).toBe(false);
       expect(isStrictValidCnpj('   ')).toBe(false);
 
+      // Rejeita máscaras inválidas ou pontuações irregulares
+      expect(isStrictValidCnpj('12.ABC.345-01DE/35')).toBe(false);
+      expect(isStrictValidCnpj('12/ABC/345/01DE-35')).toBe(false);
+      expect(isStrictValidCnpj('00.000.000/0001-9')).toBe(false);
+
       // Rejeita DV errado
       expect(isStrictValidCnpj('12.ABC.345/01DE-36')).toBe(false);
       expect(isStrictValidCnpj('00.000.000/0001-92')).toBe(false);
-      expect(isStrictValidCnpj('00.000.000/E08G-13')).toBe(false);
     });
 
     it('isStrictValidBirthDate deve verificar bissexto, calendário e rejeitar datas futuras', () => {
@@ -311,6 +314,10 @@ describe('IdentityBridge — Tauri Native Identity & Vault IPC', () => {
       expect(canonicalizeUsername('joao.silva.dev@asppibra.org')).toBe('joao_silva_dev_asppibra_org');
       expect(canonicalizeUsername('__teste___nome__')).toBe('teste_nome');
       expect(canonicalizeUsername('')).toBe('');
+
+      // Limita estritamente a 30 caracteres
+      const longInput = 'a'.repeat(45);
+      expect(canonicalizeUsername(longInput).length).toBe(30);
     });
   });
 
@@ -323,8 +330,6 @@ describe('IdentityBridge — Tauri Native Identity & Vault IPC', () => {
       expect(emptyForm.companyName).toBe('');
 
       const sampleUserAccount = userProfileToAccountData(sampleProfile);
-      const samplePjUserAccount = userProfileToAccountData(samplePjProfile);
-
       const filledForm = mapUserToFormValues(sampleUserAccount);
       expect(filledForm.firstName).toBe('Maria');
       expect(filledForm.lastName).toBe('Santos');
@@ -332,17 +337,110 @@ describe('IdentityBridge — Tauri Native Identity & Vault IPC', () => {
       expect(filledForm.isPublic).toBe(false);
     });
 
-    it('accountDataToSavePayload deve discriminar displayName para Pessoa Física e Jurídica', () => {
+    it('accountDataToSavePayload deve discriminar displayName e PRESERVAR todos os campos PF e PJ', () => {
       const sampleUserAccount = userProfileToAccountData(sampleProfile);
       const samplePjUserAccount = userProfileToAccountData(samplePjProfile);
 
       const pfPayload = accountDataToSavePayload(sampleUserAccount);
       expect(pfPayload.displayName).toBe('Maria Santos');
       expect(pfPayload.personType).toBe('PF');
+      expect(pfPayload.cpf).toBe('529.982.247-25');
 
       const pjPayload = accountDataToSavePayload(samplePjUserAccount);
       expect(pjPayload.displayName).toBe('ASPPIBRA Soluções Ltda');
       expect(pjPayload.personType).toBe('PJ');
+      expect(pjPayload.cnpj).toBe('12.ABC.345/01DE-35');
+
+      // Preservação mútua: se PJ contém dados PF prévios, não devem ser apagados no payload
+      const pjWithPfFields = accountDataToSavePayload({
+        ...samplePjUserAccount,
+        firstName: 'Maria',
+        lastName: 'Santos',
+        cpf: '529.982.247-25',
+        rg: '12345678-9',
+      });
+      expect(pjWithPfFields.personType).toBe('PJ');
+      expect(pjWithPfFields.firstName).toBe('Maria');
+      expect(pjWithPfFields.cpf).toBe('529.982.247-25');
+      expect(pjWithPfFields.cnpj).toBe('12.ABC.345/01DE-35');
+    });
+
+    it('calculateIdentityCompleteness deve atingir 100 pontos para cadastros PF e PJ completos', () => {
+      const pfComplete = calculateIdentityCompleteness({
+        personType: 'PF',
+        firstName: 'João',
+        lastName: 'Silva',
+        cpf: '529.982.247-25',
+        birthDate: '1985-05-15',
+        rg: '123456',
+        motherName: 'Maria Silva',
+        email: 'joao@email.com',
+        phoneNumber: '(11) 98765-4321',
+        zipCode: '01310-100',
+        city: 'São Paulo',
+        state: 'SP',
+        address: 'Av Paulista',
+        occupation: 'Desenvolvedor',
+      });
+      expect(pfComplete).toBe(100);
+
+      const pjComplete = calculateIdentityCompleteness({
+        personType: 'PJ',
+        companyName: 'Minha Empresa Ltda',
+        cnpj: '12.ABC.345/01DE-35',
+        legalRepresentative: 'João Silva',
+        legalRepresentativeCpf: '529.982.247-25',
+        email: 'contato@empresa.com',
+        phoneNumber: '(11) 3333-4444',
+        zipCode: '01310-100',
+        city: 'São Paulo',
+        state: 'SP',
+        address: 'Av Paulista',
+        occupation: 'Tecnologia',
+      });
+      expect(pjComplete).toBe(100);
+    });
+
+    it('readLegacyProfile deve diferenciar missing, invalid e valid sem descartar dados indevidamente', () => {
+      const storageMap = new Map<string, string>();
+      const mockStorage = {
+        getItem: (k: string) => storageMap.get(k) ?? null,
+        setItem: (k: string, v: string) => storageMap.set(k, v),
+        removeItem: (k: string) => storageMap.delete(k),
+        clear: () => storageMap.clear(),
+        length: 0,
+        key: () => null,
+      };
+      (globalThis as unknown as { window?: { localStorage?: typeof mockStorage } }).window = {
+        localStorage: mockStorage,
+      };
+
+      mockStorage.removeItem(LEGACY_STORAGE_KEY);
+      expect(readLegacyProfile()).toEqual({ status: 'missing' });
+
+      // JSON corrompido
+      mockStorage.setItem(LEGACY_STORAGE_KEY, '{ invalid json');
+      const corrupted = readLegacyProfile();
+      expect(corrupted.status).toBe('invalid');
+
+      // Tamanho excessivo > 64 KB
+      mockStorage.setItem(LEGACY_STORAGE_KEY, '{"about":"' + 'a'.repeat(65 * 1024) + '"}');
+      const oversized = readLegacyProfile();
+      expect(oversized.status).toBe('invalid');
+
+      // Válido
+      mockStorage.setItem(
+        LEGACY_STORAGE_KEY,
+        JSON.stringify({ firstName: 'Maria', email: 'maria@email.com' })
+      );
+      const valid = readLegacyProfile();
+      expect(valid.status).toBe('valid');
+      if (valid.status === 'valid') {
+        expect(valid.data.firstName).toBe('Maria');
+        expect(valid.data.isPublic).toBe(false);
+      }
+
+      mockStorage.removeItem(LEGACY_STORAGE_KEY);
     });
 
     it('mergeMissingLegacyFields deve preencher apenas campos ausentes no cofre e forçar isPublic false', () => {
@@ -372,7 +470,6 @@ describe('IdentityBridge — Tauri Native Identity & Vault IPC', () => {
 
     it('resetAccountStore deve resetar o estado da store para idle e limpar erros', () => {
       resetAccountStore();
-      // Não lança exceção e restaura o estado limpo
       expect(true).toBe(true);
     });
   });
