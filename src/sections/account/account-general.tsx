@@ -649,6 +649,7 @@ export function AccountGeneral() {
               <Button
                 color="inherit"
                 size="small"
+                disabled={isSaving}
                 onClick={() => resolveMigrationConflict('merge_legacy')}
               >
                 Mesclar Dados
@@ -656,6 +657,7 @@ export function AccountGeneral() {
               <Button
                 color="inherit"
                 size="small"
+                disabled={isSaving}
                 onClick={() => resolveMigrationConflict('keep_vault')}
               >
                 Manter Cofre
@@ -774,10 +776,13 @@ export function AccountGeneral() {
                 • Filiação (+5)
               </Typography>
               <Typography variant="caption" sx={{ color: 'text.disabled' }}>
+                • Email (+10)
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'text.disabled' }}>
                 • Endereço (+15)
               </Typography>
               <Typography variant="caption" sx={{ color: 'text.disabled' }}>
-                • Contato & Profissão (+20)
+                • Contato & Profissão (+10)
               </Typography>
             </>
           )}
