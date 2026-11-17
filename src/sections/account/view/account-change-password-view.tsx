@@ -1,12 +1,25 @@
 import React from 'react';
 
 import { AccountLayout } from '../account-layout';
-import { AccountChangePassword } from '../account-change-password';
+import {
+  type SecuritySession,
+  AccountChangePassword,
+  type ChangePasswordHandler,
+} from '../account-change-password';
 
-export function AccountChangePasswordView() {
+// ----------------------------------------------------------------------
+
+type Props = {
+  onChangePassword?: ChangePasswordHandler;
+  sessions?: SecuritySession[];
+  onRevokeSession?: (sessionId: string) => Promise<void>;
+  onConfigureBiometrics?: () => Promise<void>;
+};
+
+export function AccountChangePasswordView(props: Props) {
   return (
     <AccountLayout>
-      <AccountChangePassword />
+      <AccountChangePassword {...props} />
     </AccountLayout>
   );
 }
