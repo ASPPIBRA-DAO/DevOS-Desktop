@@ -23,6 +23,7 @@ import {
   mergeMissingLegacyFields,
   accountDataToSavePayload,
   userProfileToAccountData,
+  verifyMigrationIntegrity,
 } from 'src/sections/account/use-account';
 
 import { mockIpcError, mockIpcResponse } from './test-utils';
@@ -443,29 +444,109 @@ describe('IdentityBridge — Tauri Native Identity & Vault IPC', () => {
       mockStorage.removeItem(LEGACY_STORAGE_KEY);
     });
 
-    it('mergeMissingLegacyFields deve preencher apenas campos ausentes no cofre e forçar isPublic false', () => {
+    it('mergeMissingLegacyFields deve preencher apenas campos ausentes no cofre e preservar isPublic do cofre', () => {
       const sampleUserAccount = userProfileToAccountData(sampleProfile);
       const vault: typeof sampleUserAccount = {
         ...sampleUserAccount,
         address: '', // Campo vazio no cofre
         city: '',    // Campo vazio no cofre
         state: 'SP', // Campo preenchido no cofre
-        isPublic: true, // Mesmo se legado fosse público, privacidade por padrão
+        isPublic: true, // Já aprovado como público pelo usuário no cofre
+        username: '', // Cofre sem username explícito
       };
 
       const legacy: Partial<typeof sampleUserAccount> = {
         address: 'Rua das Flores, 100',
         state: 'RJ', // Conflito: não deve sobrescrever o cofre
         city: 'Campinas',
-        isPublic: true,
+        isPublic: false,
+        username: 'maria_legacy',
       };
 
       const { merged, changedFields } = mergeMissingLegacyFields(vault, legacy);
       expect(merged.address).toBe('Rua das Flores, 100'); // Preencheu vazio
       expect(merged.state).toBe('SP'); // Manteve o cofre
       expect(merged.city).toBe('Campinas'); // Preencheu vazio
-      expect(merged.isPublic).toBe(false); // Estritamente forçado como false
-      expect(changedFields).toEqual(['address', 'city']);
+      expect(merged.username).toBe('maria_legacy'); // Incorporou username canônico ausente
+      expect(merged.isPublic).toBe(true); // Preservou configuração do cofre
+      expect(changedFields).toEqual(['address', 'city', 'username']);
+    });
+
+    it('verifyMigrationIntegrity deve validar correspondência estrita de todos os campos legados', () => {
+      const persisted = userProfileToAccountData(sampleProfile);
+
+      // 1. Caso idêntico: sem divergências
+      const identicalLegacy = {
+        firstName: 'Maria',
+        lastName: 'Santos',
+        cpf: '52998224725', // Formato desmascarado deve equivaler ao mascarado
+        email: 'MARIA@asppibra.org.br', // Case-insensitive
+        state: 'SP',
+      };
+      expect(verifyMigrationIntegrity(identicalLegacy, persisted)).toEqual([]);
+
+      // 2. Caso com divergência de campo
+      const divergentLegacy = {
+        firstName: 'Maria',
+        lastName: 'Santos',
+        cpf: '11122233344', // CPF incompatível
+        rg: '99999999-9',   // RG não coincidente
+      };
+      const mismatches = verifyMigrationIntegrity(divergentLegacy, persisted);
+      expect(mismatches).toContain('cpf');
+      expect(mismatches).toContain('rg');
+
+      // 3. Caso com personType incompatível
+      const divergentType = {
+        personType: 'PJ' as const,
+      };
+      expect(verifyMigrationIntegrity(divergentType, persisted)).toContain('personType');
+    });
+
+    it('readLegacyProfile deve detectar storage inacessível e personType corrompido', () => {
+      // Mock que lança erro ao tentar ler (ex: restrição de segurança no WebView)
+      const throwingStorage = {
+        getItem: () => {
+          throw new Error('Access denied by browser security policy');
+        },
+        setItem: () => {},
+        removeItem: () => {},
+        clear: () => {},
+        length: 0,
+        key: () => null,
+      };
+      (globalThis as unknown as { window?: { localStorage?: typeof throwingStorage } }).window = {
+        localStorage: throwingStorage,
+      };
+
+      const unavail = readLegacyProfile();
+      expect(unavail.status).toBe('unavailable');
+
+      // Mock com personType inválido
+      const storageMap = new Map<string, string>();
+      const validStorage = {
+        getItem: (k: string) => storageMap.get(k) ?? null,
+        setItem: (k: string, v: string) => storageMap.set(k, v),
+        removeItem: (k: string) => storageMap.delete(k),
+        clear: () => storageMap.clear(),
+        length: 0,
+        key: () => null,
+      };
+      (globalThis as unknown as { window?: { localStorage?: typeof validStorage } }).window = {
+        localStorage: validStorage,
+      };
+
+      validStorage.setItem(
+        LEGACY_STORAGE_KEY,
+        JSON.stringify({ firstName: 'Maria', personType: 'ALIEN' })
+      );
+      const invalidTypeResult = readLegacyProfile();
+      expect(invalidTypeResult.status).toBe('invalid');
+      if (invalidTypeResult.status === 'invalid') {
+        expect(invalidTypeResult.reason).toContain('personType inválido');
+      }
+
+      validStorage.removeItem(LEGACY_STORAGE_KEY);
     });
 
     it('resetAccountStore deve resetar o estado da store para idle e limpar erros', () => {
