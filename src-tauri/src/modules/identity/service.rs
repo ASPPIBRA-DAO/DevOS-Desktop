@@ -46,11 +46,43 @@ impl From<StorageError> for IdentityError {
     }
 }
 
+pub fn normalize_username(raw: &str) -> String {
+    let lower = raw.trim().to_lowercase();
+    let sanitized: String = lower
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() || c == '_' { c } else { '_' })
+        .collect();
+    let mut result = String::new();
+    let mut last_was_underscore = false;
+    for c in sanitized.chars() {
+        if c == '_' {
+            if !last_was_underscore && !result.is_empty() {
+                result.push(c);
+                last_was_underscore = true;
+            }
+        } else {
+            result.push(c);
+            last_was_underscore = false;
+        }
+    }
+    if result.ends_with('_') {
+        result.pop();
+    }
+    if result.len() > 30 {
+        result.truncate(30);
+    }
+    result
+}
+
 pub struct IdentityService;
 
 impl IdentityService {
-    /// Higieniza e valida os dados recebidos para o perfil com separação estrita PF / PJ.
-    fn sanitize_and_validate(req: &SaveUserProfileRequest) -> Result<UserProfileDto, IdentityError> {
+    /// Higieniza e valida os dados recebidos para o perfil com separação estrita PF / PJ
+    /// e preservação segura de dados inativos entre transições de titularidade.
+    fn sanitize_and_validate(
+        req: &SaveUserProfileRequest,
+        existing_profile: Option<&UserProfileDto>,
+    ) -> Result<UserProfileDto, IdentityError> {
         let person_type = if req.person_type.trim() == PERSON_TYPE_PJ {
             PERSON_TYPE_PJ.to_string()
         } else {
@@ -70,12 +102,21 @@ impl IdentityService {
             ));
         }
 
-        let username = req.username.as_deref().unwrap_or("").trim().to_string();
-        if !username.is_empty() && (username.len() < 3 || username.len() > 30) {
-            return Err(IdentityError::Validation(
-                "O username deve ter entre 3 e 30 caracteres.".to_string(),
-            ));
-        }
+        let username = match &req.username {
+            Some(u) if !u.trim().is_empty() => {
+                let norm = normalize_username(u);
+                if norm.len() < 3 || norm.len() > 30 {
+                    return Err(IdentityError::Validation(
+                        "O username deve ter entre 3 e 30 caracteres alfanuméricos ou sublinhados.".to_string(),
+                    ));
+                }
+                norm
+            }
+            _ => existing_profile
+                .as_ref()
+                .map(|p| p.username.clone())
+                .unwrap_or_default(),
+        };
 
         let first_name = req.first_name.trim().to_string();
         let last_name = req.last_name.trim().to_string();
@@ -100,7 +141,7 @@ impl IdentityService {
         let zip_code = validate_cep(&req.zip_code)
             .map_err(|e| IdentityError::Validation(format!("CEP inválido: {}", e)))?;
 
-        // Validações específicas e isolamento estrito de dados PF vs PJ
+        // Validações específicas e preservação segura de dados entre transições PF e PJ
         let (
             cpf,
             rg,
@@ -124,15 +165,15 @@ impl IdentityService {
                 .map_err(|e| IdentityError::Validation(format!("CPF do representante inválido: {}", e)))?;
 
             (
-                String::new(), // PF fields limpos para evitar inconsistência de payload
-                String::new(),
-                String::new(),
-                String::new(),
-                String::new(),
-                String::new(),
-                String::new(),
-                String::new(),
-                String::new(),
+                existing_profile.as_ref().map(|p| p.cpf.clone()).unwrap_or_default(),
+                existing_profile.as_ref().map(|p| p.rg.clone()).unwrap_or_default(),
+                existing_profile.as_ref().map(|p| p.rg_issuer.clone()).unwrap_or_default(),
+                existing_profile.as_ref().map(|p| p.cnh.clone()).unwrap_or_default(),
+                existing_profile.as_ref().map(|p| p.cnh_category.clone()).unwrap_or_default(),
+                existing_profile.as_ref().map(|p| p.mother_name.clone()).unwrap_or_default(),
+                existing_profile.as_ref().map(|p| p.father_name.clone()).unwrap_or_default(),
+                existing_profile.as_ref().map(|p| p.birth_date.clone()).unwrap_or_default(),
+                existing_profile.as_ref().map(|p| p.marital_status.clone()).unwrap_or_default(),
                 company_name,
                 validated_cnpj,
                 req.legal_representative.trim().to_string(),
@@ -156,10 +197,10 @@ impl IdentityService {
                 req.father_name.trim().to_string(),
                 validated_birth,
                 req.marital_status.trim().to_string(),
-                String::new(), // PJ fields limpos no cadastro de PF
-                String::new(),
-                String::new(),
-                String::new(),
+                existing_profile.as_ref().map(|p| p.company_name.clone()).unwrap_or_default(),
+                existing_profile.as_ref().map(|p| p.cnpj.clone()).unwrap_or_default(),
+                existing_profile.as_ref().map(|p| p.legal_representative.clone()).unwrap_or_default(),
+                existing_profile.as_ref().map(|p| p.legal_representative_cpf.clone()).unwrap_or_default(),
             )
         };
 
@@ -257,8 +298,9 @@ impl IdentityService {
             return Err(IdentityError::VaultLocked);
         }
 
+        let existing = Self::get_profile(db, session)?;
         let expected_revision = req.expected_revision;
-        let mut profile = Self::sanitize_and_validate(&req)?;
+        let mut profile = Self::sanitize_and_validate(&req, existing.as_ref())?;
 
         let payload_json = serde_json::to_vec(&profile)
             .map_err(|_| IdentityError::Serialization)?;
@@ -557,5 +599,114 @@ mod tests {
         let err = IdentityService::save_profile(&db, &session, req2);
         assert!(err.is_err());
         assert!(matches!(err.unwrap_err(), IdentityError::ConcurrencyConflict(_)));
+    }
+
+    #[test]
+    fn test_normalize_username_canonical() {
+        assert_eq!(normalize_username("usuario.teste"), "usuario_teste");
+        assert_eq!(normalize_username("Usuario.De.Teste@123"), "usuario_de_teste_123");
+        assert_eq!(normalize_username("__sandro___souza__"), "sandro_souza");
+        assert_eq!(normalize_username(""), "");
+    }
+
+    #[test]
+    fn test_preserve_inactive_fields_on_person_type_switch() {
+        let (db, session, _guard) = setup_test_vault();
+
+        // 1. Salva inicialmente como PF com CPF
+        let req_pf = SaveUserProfileRequest {
+            person_type: "PF".to_string(),
+            username: Some("joao_silva".to_string()),
+            first_name: "João".to_string(),
+            last_name: "Silva".to_string(),
+            display_name: None,
+            cpf: "52998224725".to_string(),
+            rg: "123456".to_string(),
+            rg_issuer: "SSP/SP".to_string(),
+            cnh: "".to_string(),
+            cnh_category: "".to_string(),
+            mother_name: "Maria Silva".to_string(),
+            father_name: "".to_string(),
+            birth_date: "1990-01-01".to_string(),
+            nationality: "Brasileira".to_string(),
+            marital_status: "Solteiro(a)".to_string(),
+            company_name: "".to_string(),
+            cnpj: "".to_string(),
+            legal_representative: "".to_string(),
+            legal_representative_cpf: "".to_string(),
+            email: "joao@empresa.com".to_string(),
+            phone_number: "11999999999".to_string(),
+            country: "Brasil".to_string(),
+            zip_code: "01310-100".to_string(),
+            state: "SP".to_string(),
+            city: "São Paulo".to_string(),
+            neighborhood: "Bela Vista".to_string(),
+            address: "Av Paulista".to_string(),
+            address_number: "1000".to_string(),
+            complement: "".to_string(),
+            occupation: "Desenvolvedor".to_string(),
+            company: "".to_string(),
+            website: "".to_string(),
+            about: "".to_string(),
+            is_public: false,
+            photo_url: None,
+            cover_url: None,
+            linked_providers: Vec::new(),
+            expected_revision: None,
+        };
+
+        let saved_pf = IdentityService::save_profile(&db, &session, req_pf).unwrap();
+        assert_eq!(saved_pf.person_type, "PF");
+        assert_eq!(saved_pf.cpf, "529.982.247-25");
+
+        // 2. Transiciona para PJ, fornecendo CNPJ e Razão Social
+        let req_pj = SaveUserProfileRequest {
+            person_type: "PJ".to_string(),
+            username: Some("joao_silva".to_string()),
+            first_name: "".to_string(),
+            last_name: "".to_string(),
+            display_name: None,
+            cpf: "".to_string(),
+            rg: "".to_string(),
+            rg_issuer: "".to_string(),
+            cnh: "".to_string(),
+            cnh_category: "".to_string(),
+            mother_name: "".to_string(),
+            father_name: "".to_string(),
+            birth_date: "".to_string(),
+            nationality: "Brasileira".to_string(),
+            marital_status: "".to_string(),
+            company_name: "Minha Empresa Ltda".to_string(),
+            cnpj: "12ABC34501DE35".to_string(),
+            legal_representative: "João Silva".to_string(),
+            legal_representative_cpf: "52998224725".to_string(),
+            email: "contato@empresa.com".to_string(),
+            phone_number: "11999999999".to_string(),
+            country: "Brasil".to_string(),
+            zip_code: "01310-100".to_string(),
+            state: "SP".to_string(),
+            city: "São Paulo".to_string(),
+            neighborhood: "Bela Vista".to_string(),
+            address: "Av Paulista".to_string(),
+            address_number: "1000".to_string(),
+            complement: "".to_string(),
+            occupation: "Tecnologia".to_string(),
+            company: "".to_string(),
+            website: "".to_string(),
+            about: "".to_string(),
+            is_public: false,
+            photo_url: None,
+            cover_url: None,
+            linked_providers: Vec::new(),
+            expected_revision: Some(saved_pf.revision),
+        };
+
+        let saved_pj = IdentityService::save_profile(&db, &session, req_pj).unwrap();
+        assert_eq!(saved_pj.person_type, "PJ");
+        assert_eq!(saved_pj.cnpj, "12.ABC.345/01DE-35");
+        // Comprova que os dados civis PF anteriores NÃO foram destruídos
+        assert_eq!(saved_pj.cpf, "529.982.247-25");
+        assert_eq!(saved_pj.rg, "123456");
+        assert_eq!(saved_pj.mother_name, "Maria Silva");
     }
 }
