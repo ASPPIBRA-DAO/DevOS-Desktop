@@ -40,17 +40,24 @@ export const NAV_ITEMS = [
     icon: <Iconify width={20} icon="solar:shield-keyhole-bold" />,
     href: `${paths.dashboard.user.account}/2fa`,
   },
-];
+] as const;
 
 type Props = {
   children?: ReactNode;
 };
 
-export function AccountLayout({ children }: Props) {
-  const pathname = usePathname();
+function normalizePathname(pathname: string): string {
+  return pathname.replace(/\/+$/, '') || '/';
+}
 
-  // Remove trailing slash for exact tab matching
-  const currentTab = pathname.endsWith('/') && pathname.length > 1 ? pathname.slice(0, -1) : pathname;
+export function AccountLayout({ children }: Props) {
+  const pathname = normalizePathname(usePathname());
+
+  const hasMatchingTab = NAV_ITEMS.some(
+    (item) => normalizePathname(item.href) === pathname
+  );
+
+  const currentTab = hasMatchingTab ? pathname : false;
 
   return (
     <Box sx={{ width: '100%', maxWidth: 1400, mx: 'auto', p: { xs: 2, md: 3 } }}>
@@ -73,6 +80,7 @@ export function AccountLayout({ children }: Props) {
       >
         <Tabs
           value={currentTab}
+          aria-label="Navegação da conta"
           variant="scrollable"
           scrollButtons="auto"
           sx={{
@@ -106,7 +114,7 @@ export function AccountLayout({ children }: Props) {
               label={tab.label}
               icon={tab.icon}
               iconPosition="start"
-              value={tab.href}
+              value={normalizePathname(tab.href)}
               href={tab.href}
             />
           ))}
