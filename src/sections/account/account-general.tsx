@@ -341,7 +341,7 @@ export function mapUserToFormValues(user: UserAccountData): UpdateUserSchemaType
     cpf: user.cpf || '',
     birthDate: user.birthDate || '',
     nationality: user.nationality || 'Brasileira',
-    maritalStatus: user.maritalStatus || 'Solteiro(a)',
+    maritalStatus: user.maritalStatus || '',
     rg: user.rg || '',
     rgIssuer: user.rgIssuer || '',
     cnh: user.cnh || '',
@@ -362,6 +362,51 @@ export function mapUserToFormValues(user: UserAccountData): UpdateUserSchemaType
     about: user.about || '',
     isPublic: user.isPublic ?? false,
   };
+}
+
+/**
+ * Função pura para cálculo determinístico do escore de completude cadastral (0 a 100).
+ * Calibrada com pesos exatos para PF e PJ.
+ */
+export function calculateIdentityCompleteness(values: Partial<UpdateUserSchemaType>): number {
+  let score = 0;
+  if (values.personType === 'PJ') {
+    if (values.companyName && values.companyName.trim().length > 0) score += 20;
+    if (isStrictValidCnpj(values.cnpj)) score += 20;
+    if (values.legalRepresentative && values.legalRepresentative.trim().length > 0) score += 15;
+    if (isStrictValidCpf(values.legalRepresentativeCpf)) score += 10;
+    if (values.email && values.email.trim().includes('@')) score += 10;
+    if (isStrictValidPhone(values.phoneNumber)) score += 5;
+    if (isStrictValidCep(values.zipCode)) score += 5;
+    if (values.city && values.city.trim().length > 0 && values.state && values.state.trim().length > 0)
+      score += 5;
+    if (values.address && values.address.trim().length > 0) score += 5;
+    if (values.occupation && values.occupation.trim().length > 0) score += 5;
+  } else {
+    if (values.firstName && values.firstName.trim().length > 0) score += 10;
+    if (values.lastName && values.lastName.trim().length > 0) score += 10;
+    if (isStrictValidCpf(values.cpf)) score += 20;
+    if (isStrictValidBirthDate(values.birthDate)) score += 10;
+    if (
+      (values.rg && values.rg.trim().length > 0) ||
+      (values.cnh && values.cnh.trim().length > 0)
+    )
+      score += 10;
+    if (values.motherName && values.motherName.trim().length > 0) score += 5;
+    if (values.email && values.email.trim().includes('@')) score += 10;
+    if (isStrictValidPhone(values.phoneNumber)) score += 5;
+    if (isStrictValidCep(values.zipCode)) score += 5;
+    if (values.city && values.city.trim().length > 0 && values.state && values.state.trim().length > 0)
+      score += 5;
+    if (values.address && values.address.trim().length > 0) score += 5;
+    if (
+      (values.occupation && values.occupation.trim().length > 0) ||
+      (values.about && values.about.trim().length > 0)
+    )
+      score += 5;
+  }
+
+  return Math.min(score, 100);
 }
 
 export function AccountGeneral() {
@@ -451,67 +496,53 @@ export function AccountGeneral() {
   });
 
   // Cálculo rigoroso do Completeness Score totalizando exatamente 100 pontos para PF e PJ
-  const completenessScore = useMemo(() => {
-    let score = 0;
-    if (watchedPersonType === 'PJ') {
-      if (watchedCompanyName && watchedCompanyName.trim().length > 0) score += 20;
-      if (isStrictValidCnpj(watchedCnpj)) score += 20;
-      if (watchedLegalRep && watchedLegalRep.trim().length > 0) score += 15;
-      if (isStrictValidCpf(watchedLegalRepCpf)) score += 10;
-      if (watchedEmail && watchedEmail.trim().includes('@')) score += 10;
-      if (isStrictValidPhone(watchedPhone)) score += 5;
-      if (isStrictValidCep(watchedZip)) score += 5;
-      if (watchedCity && watchedCity.trim().length > 0 && watchedState && watchedState.trim().length > 0)
-        score += 5;
-      if (watchedAddress && watchedAddress.trim().length > 0) score += 5;
-      if (watchedOccupation && watchedOccupation.trim().length > 0) score += 5;
-    } else {
-      if (watchedFirstName && watchedFirstName.trim().length > 0) score += 10;
-      if (watchedLastName && watchedLastName.trim().length > 0) score += 10;
-      if (isStrictValidCpf(watchedCpf)) score += 20;
-      if (isStrictValidBirthDate(watchedBirthDate)) score += 10;
-      if (
-        (watchedRg && watchedRg.trim().length > 0) ||
-        (watchedCnh && watchedCnh.trim().length > 0)
-      )
-        score += 10;
-      if (watchedMother && watchedMother.trim().length > 0) score += 5;
-      if (watchedEmail && watchedEmail.trim().includes('@')) score += 10;
-      if (isStrictValidPhone(watchedPhone)) score += 5;
-      if (isStrictValidCep(watchedZip)) score += 5;
-      if (watchedCity && watchedCity.trim().length > 0 && watchedState && watchedState.trim().length > 0)
-        score += 5;
-      if (watchedAddress && watchedAddress.trim().length > 0) score += 5;
-      if (
-        (watchedOccupation && watchedOccupation.trim().length > 0) ||
-        (watchedAbout && watchedAbout.trim().length > 0)
-      )
-        score += 5;
-    }
-
-    return Math.min(score, 100);
-  }, [
-    watchedPersonType,
-    watchedFirstName,
-    watchedLastName,
-    watchedCompanyName,
-    watchedCpf,
-    watchedCnpj,
-    watchedLegalRep,
-    watchedLegalRepCpf,
-    watchedEmail,
-    watchedPhone,
-    watchedZip,
-    watchedCity,
-    watchedState,
-    watchedAddress,
-    watchedBirthDate,
-    watchedRg,
-    watchedCnh,
-    watchedMother,
-    watchedOccupation,
-    watchedAbout,
-  ]);
+  const completenessScore = useMemo(
+    () =>
+      calculateIdentityCompleteness({
+        personType: watchedPersonType,
+        firstName: watchedFirstName,
+        lastName: watchedLastName,
+        companyName: watchedCompanyName,
+        cpf: watchedCpf,
+        cnpj: watchedCnpj,
+        legalRepresentative: watchedLegalRep,
+        legalRepresentativeCpf: watchedLegalRepCpf,
+        email: watchedEmail,
+        phoneNumber: watchedPhone,
+        zipCode: watchedZip,
+        city: watchedCity,
+        state: watchedState,
+        address: watchedAddress,
+        birthDate: watchedBirthDate,
+        rg: watchedRg,
+        cnh: watchedCnh,
+        motherName: watchedMother,
+        occupation: watchedOccupation,
+        about: watchedAbout,
+      }),
+    [
+      watchedPersonType,
+      watchedFirstName,
+      watchedLastName,
+      watchedCompanyName,
+      watchedCpf,
+      watchedCnpj,
+      watchedLegalRep,
+      watchedLegalRepCpf,
+      watchedEmail,
+      watchedPhone,
+      watchedZip,
+      watchedCity,
+      watchedState,
+      watchedAddress,
+      watchedBirthDate,
+      watchedRg,
+      watchedCnh,
+      watchedMother,
+      watchedOccupation,
+      watchedAbout,
+    ]
+  );
 
   const canSave =
     loadStatus === 'ready' &&
@@ -548,7 +579,7 @@ export function AccountGeneral() {
           sx={{ color: 'text.secondary', mb: 3, maxWidth: 520, mx: 'auto' }}
         >
           Seus dados de identificação civil e qualificação documental são armazenados com
-          criptografia nativa AES-256-GCM / Argon2id. O cofre precisa estar desbloqueado pelo login
+          criptografia nativa. O cofre precisa estar desbloqueado pelo login
           mestre para que você possa visualizar e atualizar suas informações com segurança.
         </Typography>
         <Button
@@ -565,7 +596,7 @@ export function AccountGeneral() {
   }
 
   // Previne a liberação de formulário vazio editável caso o backend tenha falhado
-  if (loadStatus === 'error' && !hasLoadedInitially) {
+  if (loadStatus === 'error') {
     return (
       <Card sx={{ p: 4, textAlign: 'center', borderRadius: 2 }}>
         <Iconify
@@ -580,7 +611,8 @@ export function AccountGeneral() {
           variant="body2"
           sx={{ color: 'text.secondary', mb: 3, maxWidth: 520, mx: 'auto' }}
         >
-          {error || 'Não foi possível recuperar seus dados cadastrais. Para proteger seus registros de sobrescrita acidental, a edição está temporariamente travada.'}
+          {error ||
+            'Não foi possível recuperar seus dados cadastrais. Para proteger seus registros de sobrescrita acidental, a edição está temporariamente travada.'}
         </Typography>
         <Button
           variant="contained"
@@ -595,7 +627,7 @@ export function AccountGeneral() {
     );
   }
 
-  if (!hasLoadedInitially || isLoading || loadStatus === 'loading') {
+  if (!hasLoadedInitially || isLoading || loadStatus === 'loading' || loadStatus === 'idle') {
     return (
       <Stack spacing={3}>
         <Skeleton variant="rounded" height={140} sx={{ borderRadius: 2 }} />
@@ -822,13 +854,18 @@ export function AccountGeneral() {
                   placeholder="Ex: 1985-05-15"
                 />
                 <Field.Select name="maritalStatus" label="Estado Civil">
-                  {['Solteiro(a)', 'Casado(a)', 'União Estável', 'Divorciado(a)', 'Viúvo(a)'].map(
-                    (status) => (
-                      <MenuItem key={status} value={status}>
-                        {status}
-                      </MenuItem>
-                    )
-                  )}
+                  {[
+                    { value: '', label: 'Não informado' },
+                    { value: 'Solteiro(a)', label: 'Solteiro(a)' },
+                    { value: 'Casado(a)', label: 'Casado(a)' },
+                    { value: 'União Estável', label: 'União Estável' },
+                    { value: 'Divorciado(a)', label: 'Divorciado(a)' },
+                    { value: 'Viúvo(a)', label: 'Viúvo(a)' },
+                  ].map((opt) => (
+                    <MenuItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </MenuItem>
+                  ))}
                 </Field.Select>
                 <Field.Text name="nationality" label="Nacionalidade" placeholder="Brasileira" />
                 <Field.Text name="rg" label="RG (Opcional)" placeholder="Número do RG" />
