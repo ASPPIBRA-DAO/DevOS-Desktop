@@ -64,6 +64,23 @@ impl MigrationManager {
             )?;
         }
 
+        // Migração 2: Tabela de perfil e identidade civil com envelope criptográfico
+        if current_version < 2 {
+            tx.execute_batch(
+                "CREATE TABLE IF NOT EXISTS user_profiles (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    encrypted_envelope TEXT NOT NULL,
+                    payload_version INTEGER NOT NULL DEFAULT 1,
+                    revision INTEGER NOT NULL DEFAULT 1,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+
+                INSERT INTO schema_migrations (version, applied_at)
+                VALUES (2, datetime('now'));",
+            )?;
+        }
+
         tx.commit()?;
 
         // Banco de dados inicializado limpo, pronto para carteiras reais
