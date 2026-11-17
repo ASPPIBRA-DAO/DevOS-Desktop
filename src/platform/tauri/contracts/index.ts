@@ -1,4 +1,5 @@
 export * from './ipc-errors';
+export * from './identity-contracts';
 export * from './ipfs-contracts';
 export * from './vault-contracts';
 export * from './system-contracts';
