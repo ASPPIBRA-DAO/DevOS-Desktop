@@ -177,7 +177,16 @@ export function readLegacyProfile(): LegacyReadResult {
   const safe: Record<string, unknown> = {};
   for (const field of LEGACY_STRING_FIELDS) {
     const value = parsed[field];
-    const maxLength = field === 'about' ? 2000 : field === 'website' ? 200 : field === 'email' ? 254 : 150;
+    const maxLength =
+      field === 'about'
+        ? 2000
+        : field === 'website'
+          ? 200
+          : field === 'email'
+            ? 254
+            : field === 'companyName'
+              ? 150
+              : 100;
     if (typeof value === 'string') {
       if (value.length > maxLength) {
         return {
@@ -191,8 +200,18 @@ export function readLegacyProfile(): LegacyReadResult {
 
   if (parsed.personType === 'PJ') {
     safe.personType = 'PJ';
-  } else if (parsed.personType === 'PF' || parsed.personType === undefined) {
+  } else if (parsed.personType === 'PF') {
     safe.personType = 'PF';
+  } else if (parsed.personType === undefined) {
+    // Inferência inteligente para documentos legados sem a flag explícita
+    const hasPjEvidence =
+      (typeof parsed.companyName === 'string' && parsed.companyName.trim().length > 0) ||
+      (typeof parsed.cnpj === 'string' && parsed.cnpj.trim().length > 0);
+    const hasPfEvidence =
+      (typeof parsed.firstName === 'string' && parsed.firstName.trim().length > 0) ||
+      (typeof parsed.cpf === 'string' && parsed.cpf.trim().length > 0);
+
+    safe.personType = hasPjEvidence && !hasPfEvidence ? 'PJ' : 'PF';
   } else {
     return {
       status: 'invalid',
@@ -214,6 +233,21 @@ export function readLegacyProfile(): LegacyReadResult {
     raw: JSON.stringify(safe),
     data: safe as Partial<UserAccountData>,
   };
+}
+
+/**
+ * Remove com segurança o registro legado do localStorage e confirma a exclusão.
+ * Retorna true se e somente se o valor não existir mais após a tentativa.
+ */
+export function removeLegacyProfile(): boolean {
+  const storage = getSafeStorage();
+  if (!storage) return false;
+  try {
+    storage.removeItem(LEGACY_STORAGE_KEY);
+    return storage.getItem(LEGACY_STORAGE_KEY) === null;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -533,10 +567,16 @@ export function mergeMissingLegacyFields(
   // Se o username do cofre estiver vazio e o legado tiver username válido, incorporar
   if (!merged.username && legacy.username) {
     const canonical = canonicalizeUsername(legacy.username);
-    if (canonical) {
+    if (canonical && /^[a-z0-9_]{3,30}$/.test(canonical)) {
       merged.username = canonical;
       changedFields.push('username');
     }
+  }
+
+  // Se o e-mail do cofre estiver vazio e o legado tiver e-mail válido, incorporar com segurança
+  if (!merged.email && legacy.email && legacy.email.includes('@')) {
+    merged.email = legacy.email.trim();
+    changedFields.push('email');
   }
 
   // Preservar isPublic do cofre (não rebaixar para false se já estiver true no cofre)
@@ -586,7 +626,9 @@ export function verifyMigrationIntegrity(
     } else if (field === 'username') {
       const canonicalLegacy = canonicalizeUsername(legacyVal);
       const canonicalPersisted = canonicalizeUsername(persistedVal);
-      if (canonicalLegacy && canonicalPersisted && canonicalLegacy !== canonicalPersisted) {
+      const isValidUsername = /^[a-z0-9_]{3,30}$/.test(canonicalLegacy);
+
+      if (!isValidUsername || !canonicalPersisted || canonicalLegacy !== canonicalPersisted) {
         mismatched.push(field);
       }
     } else if (legacyVal !== persistedVal) {
@@ -683,7 +725,7 @@ async function reconcileAndMigrate(
           const allVerified = changedFields.every((f) => persisted[f] === target[f]);
 
           if (allVerified) {
-            getSafeStorage()?.removeItem(LEGACY_STORAGE_KEY);
+            removeLegacyProfile();
             return { profile: verified, status: 'migrated' };
           }
         }
@@ -701,7 +743,7 @@ async function reconcileAndMigrate(
       }
     } else {
       // Coincidência total: cofre já contém todas as informações
-      getSafeStorage()?.removeItem(LEGACY_STORAGE_KEY);
+      removeLegacyProfile();
       return { profile: rawProfile, status: 'migrated' };
     }
   }
@@ -725,7 +767,7 @@ async function reconcileAndMigrate(
       const mismatches = verifyMigrationIntegrity(legacyObj, verifiedData);
 
       if (mismatches.length === 0) {
-        getSafeStorage()?.removeItem(LEGACY_STORAGE_KEY);
+        removeLegacyProfile();
         return { profile: verified, status: 'migrated' };
       }
 
@@ -741,7 +783,8 @@ async function reconcileAndMigrate(
       status: 'error',
       errorMessage: 'A leitura pós-migração não pôde comprovar a integridade dos dados.',
     };
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
     const fallbackUser: UserAccountData = {
       ...createEmptyUserAccount(),
       ...legacyObj,
@@ -753,7 +796,7 @@ async function reconcileAndMigrate(
       fallbackUser,
       status: 'error',
       errorMessage:
-        err?.message ||
+        errorMsg ||
         'Falha ao importar o perfil legado para o cofre seguro. Seus dados anteriores foram preservados.',
     };
   }
@@ -820,12 +863,12 @@ async function fetchAndSyncProfile(): Promise<void> {
           error: reconciliation.errorMessage || null,
         };
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (sessionGenAtStart !== currentSessionGeneration) {
         return;
       }
 
-      const errorMsg = err?.message || String(err);
+      const errorMsg = err instanceof Error ? err.message : String(err);
       const isLocked =
         errorMsg.includes('VAULT_LOCKED') ||
         errorMsg.includes('bloqueado') ||
@@ -907,9 +950,9 @@ export function useAccountFacade() {
       notify();
 
       return finalUser;
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (sessionGenAtStart === currentSessionGeneration) {
-        const errorMsg = err?.message || 'Falha ao salvar dados no cofre seguro.';
+        const errorMsg = err instanceof Error ? err.message : 'Falha ao salvar dados no cofre seguro.';
         storeState = {
           ...storeState,
           error: errorMsg,
@@ -964,7 +1007,7 @@ export function useAccountFacade() {
     try {
       if (choice === 'keep_vault') {
         assertCurrentSession();
-        getSafeStorage()?.removeItem(LEGACY_STORAGE_KEY);
+        removeLegacyProfile();
         storeState = {
           ...storeState,
           migrationStatus: 'migrated',
@@ -1018,7 +1061,7 @@ export function useAccountFacade() {
 
       // Exclusão definitiva somente após leitura de volta confirmada
       assertCurrentSession();
-      getSafeStorage()?.removeItem(LEGACY_STORAGE_KEY);
+      removeLegacyProfile();
       storeState = {
         ...storeState,
         user: verifiedData,
@@ -1026,13 +1069,14 @@ export function useAccountFacade() {
         error: null,
       };
       notify();
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (sessionGenAtStart !== currentSessionGeneration) return;
+      const errorMsg = err instanceof Error ? err.message : String(err);
       storeState = {
         ...storeState,
         migrationStatus: 'error',
         error:
-          err?.message ||
+          errorMsg ||
           'Não foi possível concluir a reconciliação. Os dados legados foram mantidos para recuperação.',
       };
       notify();
