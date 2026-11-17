@@ -1,3 +1,5 @@
+import type { UserAccountData } from './use-account';
+
 import * as z from 'zod';
 import React, { useMemo, useEffect } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
@@ -20,18 +22,55 @@ import { Form, Field } from 'src/shared/components/hook-form';
 import { useAccountFacade } from './use-account';
 
 // ----------------------------------------------------------------------
-// Funções de Validação Documental Oficial
+// Funções de Validação Documental Oficial e Estrita
 // ----------------------------------------------------------------------
 
-/**
- * Validação algorítmica de CPF com rejeição prévia de caracteres inválidos.
- */
-function isValidCpf(cpf: string): boolean {
-  const trimmed = cpf.trim();
-  if (!trimmed) return true;
+const CNPJ_WEIGHTS_1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+const CNPJ_WEIGHTS_2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
 
-  // Rejeita qualquer caractere fora de dígitos, pontos e traços
-  if (/[^0-9.-]/.test(trimmed)) {
+function calculateCnpjDigit(values: number[], weights: number[]): number {
+  const sum = values.reduce((total, value, index) => total + value * weights[index], 0);
+  const remainder = sum % 11;
+  return remainder < 2 ? 0 : 11 - remainder;
+}
+
+/**
+ * Validação rigorosa de CNPJ (numérico clássico ou alfanumérico RFB IN 2.229/2024).
+ * Retorna true exclusivamente para CNPJs válidos com conteúdo preenchido.
+ */
+export function isStrictValidCnpj(input: string | undefined | null): boolean {
+  if (!input || typeof input !== 'string') return false;
+  const value = input.trim().toUpperCase();
+
+  const isPlain = /^[A-Z0-9]{12}\d{2}$/.test(value);
+  const isMasked = /^[A-Z0-9]{2}\.[A-Z0-9]{3}\.[A-Z0-9]{3}\/[A-Z0-9]{4}-\d{2}$/.test(value);
+
+  if (!isPlain && !isMasked) return false;
+
+  const normalized = value.replace(/[./-]/g, '');
+  if (!/^[A-Z0-9]{12}\d{2}$/.test(normalized)) return false;
+  if (/^(\d)\1{13}$/.test(normalized)) return false;
+
+  // Conversão oficial: código ASCII menos 48
+  const baseValues = Array.from(normalized.slice(0, 12), (character) => character.charCodeAt(0) - 48);
+  const firstDigit = calculateCnpjDigit(baseValues, CNPJ_WEIGHTS_1);
+  const secondDigit = calculateCnpjDigit([...baseValues, firstDigit], CNPJ_WEIGHTS_2);
+  const calculated = `${firstDigit}${secondDigit}`;
+
+  return normalized.slice(12) === calculated;
+}
+
+/**
+ * Validação rigorosa de CPF com checagem de dígitos verificadores e rejeição de sequências.
+ * Retorna true exclusivamente para CPFs válidos com conteúdo preenchido.
+ */
+export function isStrictValidCpf(cpf: string | undefined | null): boolean {
+  if (!cpf) return false;
+  const trimmed = cpf.trim();
+  if (!trimmed) return false;
+
+  // Aceita exclusivamente 11 dígitos ou formato 000.000.000-00
+  if (!/^\d{11}$/.test(trimmed) && !/^\d{3}\.\d{3}\.\d{3}-\d{2}$/.test(trimmed)) {
     return false;
   }
 
@@ -53,62 +92,13 @@ function isValidCpf(cpf: string): boolean {
 }
 
 /**
- * Validação algorítmica de CNPJ com suporte ao formato numérico legado
- * e ao formato alfanumérico oficial (IN RFB nº 2.229/2024).
+ * Validação rigorosa de data (ISO YYYY-MM-DD ou DD/MM/AAAA) no calendário gregoriano.
+ * Rejeita dias inexistentes (ex: 29/02 em não-bissextos) e datas futuras.
  */
-function isValidCnpj(cnpj: string): boolean {
-  const trimmed = cnpj.trim();
-  if (!trimmed) return true;
-
-  // Rejeita caracteres fora do conjunto permitido
-  if (/[^a-zA-Z0-9./-]/.test(trimmed)) {
-    return false;
-  }
-
-  const normalized = trimmed.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-  if (normalized.length !== 14) return false;
-
-  // Os dois últimos devem ser dígitos decimais
-  if (!/^\d{2}$/.test(normalized.slice(12))) {
-    return false;
-  }
-
-  // Rejeita sequências de 14 caracteres idênticos
-  if (/^(.)\1{13}$/.test(normalized)) {
-    return false;
-  }
-
-  // Conversão de cada caractere das 12 primeiras posições por ASCII - 48
-  const values: number[] = [];
-  for (let i = 0; i < 12; i += 1) {
-    values.push(normalized.charCodeAt(i) - 48);
-  }
-
-  // 1º Dígito Verificador (pesos: 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2)
-  const w1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
-  let sum1 = 0;
-  for (let i = 0; i < 12; i += 1) sum1 += values[i] * w1[i];
-  const rem1 = sum1 % 11;
-  const d1 = rem1 < 2 ? 0 : 11 - rem1;
-  if (d1 !== parseInt(normalized[12], 10)) return false;
-
-  // 2º Dígito Verificador (pesos: 6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3) + d1*2
-  const w2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3];
-  let sum2 = 0;
-  for (let i = 0; i < 12; i += 1) sum2 += values[i] * w2[i];
-  sum2 += d1 * 2;
-  const rem2 = sum2 % 11;
-  const d2 = rem2 < 2 ? 0 : 11 - rem2;
-  return d2 === parseInt(normalized[13], 10);
-}
-
-/**
- * Validação rigorosa de data (ISO YYYY-MM-DD ou legível DD/MM/AAAA)
- * com verificação de calendário, ano bissexto e impedimento de datas futuras.
- */
-function isValidBirthDate(dateStr: string): boolean {
+export function isStrictValidBirthDate(dateStr: string | undefined | null): boolean {
+  if (!dateStr) return false;
   const trimmed = dateStr.trim();
-  if (!trimmed) return true;
+  if (!trimmed) return false;
 
   let iso = trimmed;
   if (trimmed.includes('/')) {
@@ -138,7 +128,7 @@ function isValidBirthDate(dateStr: string): boolean {
     dateObj.getMonth() !== month - 1 ||
     dateObj.getDate() !== day
   ) {
-    return false; // Rejeita dias inexistentes (ex: 31/04, 29/02 em não-bissextos)
+    return false;
   }
 
   const today = new Date();
@@ -146,105 +136,168 @@ function isValidBirthDate(dateStr: string): boolean {
   return dateObj <= today;
 }
 
+/**
+ * Validação estrita de CEP (8 dígitos numéricos puros ou máscara 00000-000).
+ */
+export function isStrictValidCep(cep: string | undefined | null): boolean {
+  if (!cep) return false;
+  const trimmed = cep.trim();
+  if (!trimmed) return false;
+  return /^\d{5}-?\d{3}$/.test(trimmed);
+}
+
+/**
+ * Validação de telefone com DDD (10 a 13 dígitos numéricos).
+ */
+export function isStrictValidPhone(phone: string | undefined | null): boolean {
+  if (!phone) return false;
+  const trimmed = phone.trim();
+  if (!trimmed) return false;
+  const digits = trimmed.replace(/\D/g, '');
+  if (digits.length < 10 || digits.length > 13) return false;
+  return /^[+]?[0-9\s().-]{10,25}$/.test(trimmed) && !/[a-zA-Z]/.test(trimmed);
+}
+
+/**
+ * Validação de URL de website com construtor nativo URL.
+ * Exige HTTP/HTTPS e hostname válido com domínio (bloqueia credenciais embutidas).
+ */
+export function isStrictValidWebsite(url: string | undefined | null): boolean {
+  if (!url) return false;
+  const trimmed = url.trim();
+  if (!trimmed) return false;
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return false;
+    }
+    if (parsed.username || parsed.password) {
+      return false; // Rejeita credenciais embutidas na URL
+    }
+    if (!parsed.hostname || !parsed.hostname.includes('.') || parsed.hostname.endsWith('.')) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // ----------------------------------------------------------------------
-// Schema de Validação Zod com Validação Condicional PF / PJ
+// Schema de Validação Zod com Sanitização Trim
 // ----------------------------------------------------------------------
 
 export const UpdateUserSchema = z
   .object({
     personType: z.enum(['PF', 'PJ']),
-    firstName: z.string().max(100, 'Máximo de 100 caracteres'),
-    lastName: z.string().max(100, 'Máximo de 100 caracteres'),
-    companyName: z.string().max(150, 'Máximo de 150 caracteres'),
-    cnpj: z.string().max(20, 'Máximo de 20 caracteres'),
-    legalRepresentative: z.string().max(100, 'Máximo de 100 caracteres'),
-    legalRepresentativeCpf: z.string().max(20, 'Máximo de 20 caracteres'),
+    firstName: z.string().trim().max(100, 'Máximo de 100 caracteres'),
+    lastName: z.string().trim().max(100, 'Máximo de 100 caracteres'),
+    companyName: z.string().trim().max(150, 'Máximo de 150 caracteres'),
+    cnpj: z.string().trim().max(20, 'Máximo de 20 caracteres'),
+    legalRepresentative: z.string().trim().max(100, 'Máximo de 100 caracteres'),
+    legalRepresentativeCpf: z.string().trim().max(20, 'Máximo de 20 caracteres'),
     username: z
       .string()
+      .trim()
       .min(3, { message: 'Username deve ter pelo menos 3 caracteres' })
       .max(30, { message: 'Username deve ter no máximo 30 caracteres' })
       .regex(/^[a-z0-9_]+$/, {
         message: 'Apenas letras minúsculas, números e sublinhados são permitidos',
       }),
-    email: z.string().email({ message: 'E-mail inválido!' }),
+    email: z.string().trim().email({ message: 'E-mail inválido!' }),
     photoURL: z.string().nullable().optional(),
     coverURL: z.string().nullable().optional(),
-    phoneNumber: z.string().max(30, 'Telefone inválido'),
-    cpf: z.string().max(20, 'CPF inválido'),
-    birthDate: z.string(),
-    nationality: z.string().max(50),
-    maritalStatus: z.string(),
-    rg: z.string().max(30),
-    rgIssuer: z.string().max(30),
-    cnh: z.string().max(30),
-    cnhCategory: z.string().max(10),
-    motherName: z.string().max(100),
-    fatherName: z.string().max(100),
-    country: z.string().min(1, { message: 'País obrigatório!' }),
-    address: z.string().min(1, { message: 'Endereço obrigatório!' }),
-    addressNumber: z.string().max(30),
-    complement: z.string().max(100),
-    neighborhood: z.string().max(100),
-    state: z.string().min(1, { message: 'Estado obrigatório!' }),
-    city: z.string().min(1, { message: 'Cidade obrigatória!' }),
-    zipCode: z.string().min(1, { message: 'CEP obrigatório!' }),
-    occupation: z.string().max(100),
-    company: z.string().max(100),
-    website: z.string().max(200),
-    about: z.string().max(2000, 'Máximo de 2.000 caracteres'),
+    phoneNumber: z.string().trim().max(30, 'Telefone inválido'),
+    cpf: z.string().trim().max(20, 'CPF inválido'),
+    birthDate: z.string().trim(),
+    nationality: z.string().trim().max(50),
+    maritalStatus: z.string().trim(),
+    rg: z.string().trim().max(30),
+    rgIssuer: z.string().trim().max(30),
+    cnh: z.string().trim().max(30),
+    cnhCategory: z.string().trim().max(10),
+    motherName: z.string().trim().max(100),
+    fatherName: z.string().trim().max(100),
+    country: z.string().trim().min(1, { message: 'País obrigatório!' }),
+    address: z.string().trim().min(1, { message: 'Endereço obrigatório!' }),
+    addressNumber: z.string().trim().max(30),
+    complement: z.string().trim().max(100),
+    neighborhood: z.string().trim().max(100),
+    state: z.string().trim().min(1, { message: 'Estado obrigatório!' }),
+    city: z.string().trim().min(1, { message: 'Cidade obrigatória!' }),
+    zipCode: z.string().trim().min(1, { message: 'CEP obrigatório!' }),
+    occupation: z.string().trim().max(100),
+    company: z.string().trim().max(100),
+    website: z.string().trim().max(200),
+    about: z.string().trim().max(2000, 'Máximo de 2.000 caracteres'),
     isPublic: z.boolean(),
   })
   .superRefine((data, ctx) => {
-    // Validação de URL segura (bloqueia esquemas como javascript:, data:, file:)
-    if (data.website && data.website.trim().length > 0) {
-      const trimmedUrl = data.website.trim();
-      if (!/^https?:\/\//i.test(trimmedUrl)) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['website'],
-          message: 'Website deve ser uma URL absoluta segura iniciando com http:// ou https://',
-        });
-      }
+    // Website seguro
+    if (data.website && data.website.length > 0 && !isStrictValidWebsite(data.website)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['website'],
+        message: 'Website deve ser uma URL absoluta válida com http:// ou https:// e domínio completo',
+      });
+    }
+
+    // Telefone
+    if (data.phoneNumber && data.phoneNumber.length > 0 && !isStrictValidPhone(data.phoneNumber)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['phoneNumber'],
+        message: 'Telefone inválido. Informe o DDD e o número completo (10 ou 11 dígitos).',
+      });
+    }
+
+    // CEP
+    if (data.zipCode && data.zipCode.length > 0 && !isStrictValidCep(data.zipCode)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['zipCode'],
+        message: 'CEP deve conter exatamente 8 dígitos numéricos no formato 00000-000.',
+      });
     }
 
     if (data.personType === 'PF') {
-      if (!data.firstName || data.firstName.trim().length === 0) {
+      if (!data.firstName || data.firstName.length === 0) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['firstName'],
           message: 'Nome é obrigatório para Pessoa Física!',
         });
       }
-      if (!data.lastName || data.lastName.trim().length === 0) {
+      if (!data.lastName || data.lastName.length === 0) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['lastName'],
           message: 'Sobrenome é obrigatório para Pessoa Física!',
         });
       }
-      if (data.cpf && data.cpf.trim().length > 0 && !isValidCpf(data.cpf)) {
+      if (data.cpf && data.cpf.length > 0 && !isStrictValidCpf(data.cpf)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['cpf'],
-          message: 'CPF inválido. Verifique os dígitos numéricos.',
+          message: 'CPF inválido. Verifique os dígitos verificadores e o formato.',
         });
       }
-      if (data.birthDate && data.birthDate.trim().length > 0 && !isValidBirthDate(data.birthDate)) {
+      if (data.birthDate && data.birthDate.length > 0 && !isStrictValidBirthDate(data.birthDate)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['birthDate'],
-          message: 'Data de nascimento inválida, inexistente ou no futuro.',
+          message: 'Data de nascimento inválida, inexistente no calendário ou no futuro.',
         });
       }
     } else if (data.personType === 'PJ') {
-      if (!data.companyName || data.companyName.trim().length === 0) {
+      if (!data.companyName || data.companyName.length === 0) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['companyName'],
           message: 'Razão Social / Nome da Empresa é obrigatório para Pessoa Jurídica!',
         });
       }
-      if (data.cnpj && data.cnpj.trim().length > 0 && !isValidCnpj(data.cnpj)) {
+      if (data.cnpj && data.cnpj.length > 0 && !isStrictValidCnpj(data.cnpj)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['cnpj'],
@@ -253,8 +306,8 @@ export const UpdateUserSchema = z
       }
       if (
         data.legalRepresentativeCpf &&
-        data.legalRepresentativeCpf.trim().length > 0 &&
-        !isValidCpf(data.legalRepresentativeCpf)
+        data.legalRepresentativeCpf.length > 0 &&
+        !isStrictValidCpf(data.legalRepresentativeCpf)
       ) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -263,73 +316,71 @@ export const UpdateUserSchema = z
         });
       }
     }
-
-    if (data.zipCode && data.zipCode.trim().length > 0) {
-      const cleanCep = data.zipCode.replace(/\D/g, '');
-      if (cleanCep.length !== 8) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['zipCode'],
-          message: 'CEP deve conter exatamente 8 dígitos numéricos.',
-        });
-      }
-    }
   });
 
 export type UpdateUserSchemaType = z.infer<typeof UpdateUserSchema>;
 
+/**
+ * Mapeador canônico único entre entidade UserAccountData e valores do formulário.
+ * Elimina duplicidade de código entre defaultValues e reset pós-salvamento.
+ */
+export function mapUserToFormValues(user: UserAccountData): UpdateUserSchemaType {
+  return {
+    personType: user.personType === 'PJ' ? 'PJ' : 'PF',
+    firstName: user.firstName || '',
+    lastName: user.lastName || '',
+    companyName: user.companyName || '',
+    cnpj: user.cnpj || '',
+    legalRepresentative: user.legalRepresentative || '',
+    legalRepresentativeCpf: user.legalRepresentativeCpf || '',
+    username: user.username || '',
+    email: user.email || '',
+    photoURL: user.photoURL ?? null,
+    coverURL: user.coverURL ?? null,
+    phoneNumber: user.phoneNumber || '',
+    cpf: user.cpf || '',
+    birthDate: user.birthDate || '',
+    nationality: user.nationality || 'Brasileira',
+    maritalStatus: user.maritalStatus || 'Solteiro(a)',
+    rg: user.rg || '',
+    rgIssuer: user.rgIssuer || '',
+    cnh: user.cnh || '',
+    cnhCategory: user.cnhCategory || '',
+    motherName: user.motherName || '',
+    fatherName: user.fatherName || '',
+    country: user.country || 'Brasil',
+    address: user.address || '',
+    addressNumber: user.addressNumber || '',
+    complement: user.complement || '',
+    neighborhood: user.neighborhood || '',
+    state: user.state || '',
+    city: user.city || '',
+    zipCode: user.zipCode || '',
+    occupation: user.occupation || '',
+    company: user.company || '',
+    website: user.website || '',
+    about: user.about || '',
+    isPublic: user.isPublic ?? false,
+  };
+}
+
 export function AccountGeneral() {
   const {
     user,
+    loadStatus,
     updateProfile,
     isLoading,
     isSaving,
     isVaultLocked,
     error,
     hasLoadedInitially,
+    migrationStatus,
     refreshProfile,
+    retryMigration,
+    resolveMigrationConflict,
   } = useAccountFacade();
 
-  const defaultValues: UpdateUserSchemaType = useMemo(
-    () => ({
-      personType: user.personType || 'PF',
-      firstName: user.firstName || '',
-      lastName: user.lastName || '',
-      companyName: user.companyName || '',
-      cnpj: user.cnpj || '',
-      legalRepresentative: user.legalRepresentative || '',
-      legalRepresentativeCpf: user.legalRepresentativeCpf || '',
-      username: user.username || '',
-      email: user.email || '',
-      photoURL: user.photoURL ?? null,
-      coverURL: user.coverURL ?? null,
-      phoneNumber: user.phoneNumber || '',
-      cpf: user.cpf || '',
-      birthDate: user.birthDate || '',
-      nationality: user.nationality || 'Brasileira',
-      maritalStatus: user.maritalStatus || 'Solteiro(a)',
-      rg: user.rg || '',
-      rgIssuer: user.rgIssuer || '',
-      cnh: user.cnh || '',
-      cnhCategory: user.cnhCategory || '',
-      motherName: user.motherName || '',
-      fatherName: user.fatherName || '',
-      country: user.country || 'Brasil',
-      address: user.address || '',
-      addressNumber: user.addressNumber || '',
-      complement: user.complement || '',
-      neighborhood: user.neighborhood || '',
-      state: user.state || '',
-      city: user.city || '',
-      zipCode: user.zipCode || '',
-      occupation: user.occupation || '',
-      company: user.company || '',
-      website: user.website || '',
-      about: user.about || '',
-      isPublic: user.isPublic ?? false,
-    }),
-    [user]
-  );
+  const defaultValues: UpdateUserSchemaType = useMemo(() => mapUserToFormValues(user), [user]);
 
   const methods = useForm<UpdateUserSchemaType>({
     mode: 'onTouched',
@@ -344,64 +395,97 @@ export function AccountGeneral() {
     formState: { isSubmitting, isDirty },
   } = methods;
 
-  // Proteção contra perda de digitação: Não reseta o formulário se o usuário estiver editando (isDirty)
+  // Proteção contra perda de digitação: Só sincroniza os defaults externos se o formulário não estiver em edição
   useEffect(() => {
     if (!isDirty) {
       reset(defaultValues);
     }
   }, [defaultValues, reset, isDirty]);
 
-  // Monitora com useWatch apenas os campos que compõem o cálculo do Completeness Score
-  const watchedPersonType = useWatch({ control, name: 'personType' });
-  const watchedFirstName = useWatch({ control, name: 'firstName' });
-  const watchedLastName = useWatch({ control, name: 'lastName' });
-  const watchedCompanyName = useWatch({ control, name: 'companyName' });
-  const watchedCpf = useWatch({ control, name: 'cpf' });
-  const watchedCnpj = useWatch({ control, name: 'cnpj' });
-  const watchedLegalRep = useWatch({ control, name: 'legalRepresentative' });
-  const watchedLegalRepCpf = useWatch({ control, name: 'legalRepresentativeCpf' });
-  const watchedEmail = useWatch({ control, name: 'email' });
-  const watchedPhone = useWatch({ control, name: 'phoneNumber' });
-  const watchedZip = useWatch({ control, name: 'zipCode' });
-  const watchedCity = useWatch({ control, name: 'city' });
-  const watchedState = useWatch({ control, name: 'state' });
-  const watchedAddress = useWatch({ control, name: 'address' });
-  const watchedBirthDate = useWatch({ control, name: 'birthDate' });
-  const watchedRg = useWatch({ control, name: 'rg' });
-  const watchedCnh = useWatch({ control, name: 'cnh' });
-  const watchedMother = useWatch({ control, name: 'motherName' });
-  const watchedOccupation = useWatch({ control, name: 'occupation' });
-  const watchedAbout = useWatch({ control, name: 'about' });
+  // Monitoramento agrupado de campos para cálculo de completude de alta performance
+  const [
+    watchedPersonType,
+    watchedFirstName,
+    watchedLastName,
+    watchedCompanyName,
+    watchedCpf,
+    watchedCnpj,
+    watchedLegalRep,
+    watchedLegalRepCpf,
+    watchedEmail,
+    watchedPhone,
+    watchedZip,
+    watchedCity,
+    watchedState,
+    watchedAddress,
+    watchedBirthDate,
+    watchedRg,
+    watchedCnh,
+    watchedMother,
+    watchedOccupation,
+    watchedAbout,
+  ] = useWatch({
+    control,
+    name: [
+      'personType',
+      'firstName',
+      'lastName',
+      'companyName',
+      'cpf',
+      'cnpj',
+      'legalRepresentative',
+      'legalRepresentativeCpf',
+      'email',
+      'phoneNumber',
+      'zipCode',
+      'city',
+      'state',
+      'address',
+      'birthDate',
+      'rg',
+      'cnh',
+      'motherName',
+      'occupation',
+      'about',
+    ],
+  });
 
   // Cálculo rigoroso do Completeness Score totalizando exatamente 100 pontos para PF e PJ
   const completenessScore = useMemo(() => {
     let score = 0;
     if (watchedPersonType === 'PJ') {
-      // PJ: 20 + 20 + 15 + 10 + 10 + 5 + 5 + 5 + 5 + 5 = 100
-      if (watchedCompanyName && watchedCompanyName.trim()) score += 20;
-      if (watchedCnpj && isValidCnpj(watchedCnpj)) score += 20;
-      if (watchedLegalRep && watchedLegalRep.trim()) score += 15;
-      if (watchedLegalRepCpf && isValidCpf(watchedLegalRepCpf)) score += 10;
-      if (watchedEmail && watchedEmail.trim()) score += 10;
-      if (watchedPhone && watchedPhone.trim()) score += 5;
-      if (watchedZip && watchedZip.trim()) score += 5;
-      if (watchedCity && watchedCity.trim() && watchedState && watchedState.trim()) score += 5;
-      if (watchedAddress && watchedAddress.trim()) score += 5;
-      if (watchedOccupation && watchedOccupation.trim()) score += 5;
+      if (watchedCompanyName && watchedCompanyName.trim().length > 0) score += 20;
+      if (isStrictValidCnpj(watchedCnpj)) score += 20;
+      if (watchedLegalRep && watchedLegalRep.trim().length > 0) score += 15;
+      if (isStrictValidCpf(watchedLegalRepCpf)) score += 10;
+      if (watchedEmail && watchedEmail.trim().includes('@')) score += 10;
+      if (isStrictValidPhone(watchedPhone)) score += 5;
+      if (isStrictValidCep(watchedZip)) score += 5;
+      if (watchedCity && watchedCity.trim().length > 0 && watchedState && watchedState.trim().length > 0)
+        score += 5;
+      if (watchedAddress && watchedAddress.trim().length > 0) score += 5;
+      if (watchedOccupation && watchedOccupation.trim().length > 0) score += 5;
     } else {
-      // PF: 10 + 10 + 20 + 10 + 10 + 5 + 10 + 5 + 5 + 5 + 5 + 5 = 100
-      if (watchedFirstName && watchedFirstName.trim()) score += 10;
-      if (watchedLastName && watchedLastName.trim()) score += 10;
-      if (watchedCpf && isValidCpf(watchedCpf)) score += 20;
-      if (watchedBirthDate && isValidBirthDate(watchedBirthDate)) score += 10;
-      if ((watchedRg && watchedRg.trim()) || (watchedCnh && watchedCnh.trim())) score += 10;
-      if (watchedMother && watchedMother.trim()) score += 5;
-      if (watchedEmail && watchedEmail.trim()) score += 10;
-      if (watchedPhone && watchedPhone.trim()) score += 5;
-      if (watchedZip && watchedZip.trim()) score += 5;
-      if (watchedCity && watchedCity.trim() && watchedState && watchedState.trim()) score += 5;
-      if (watchedAddress && watchedAddress.trim()) score += 5;
-      if ((watchedOccupation && watchedOccupation.trim()) || (watchedAbout && watchedAbout.trim()))
+      if (watchedFirstName && watchedFirstName.trim().length > 0) score += 10;
+      if (watchedLastName && watchedLastName.trim().length > 0) score += 10;
+      if (isStrictValidCpf(watchedCpf)) score += 20;
+      if (isStrictValidBirthDate(watchedBirthDate)) score += 10;
+      if (
+        (watchedRg && watchedRg.trim().length > 0) ||
+        (watchedCnh && watchedCnh.trim().length > 0)
+      )
+        score += 10;
+      if (watchedMother && watchedMother.trim().length > 0) score += 5;
+      if (watchedEmail && watchedEmail.trim().includes('@')) score += 10;
+      if (isStrictValidPhone(watchedPhone)) score += 5;
+      if (isStrictValidCep(watchedZip)) score += 5;
+      if (watchedCity && watchedCity.trim().length > 0 && watchedState && watchedState.trim().length > 0)
+        score += 5;
+      if (watchedAddress && watchedAddress.trim().length > 0) score += 5;
+      if (
+        (watchedOccupation && watchedOccupation.trim().length > 0) ||
+        (watchedAbout && watchedAbout.trim().length > 0)
+      )
         score += 5;
     }
 
@@ -429,9 +513,19 @@ export function AccountGeneral() {
     watchedAbout,
   ]);
 
+  const canSave =
+    loadStatus === 'ready' &&
+    !isVaultLocked &&
+    !isSaving &&
+    migrationStatus !== 'conflict' &&
+    migrationStatus !== 'error' &&
+    isDirty;
+
   const onSubmit = handleSubmit(async (data) => {
     try {
-      await updateProfile(data);
+      const updatedUser = await updateProfile(data);
+      // Sincroniza formulário com a entidade persistida e zera isDirty de forma centralizada
+      reset(mapUserToFormValues(updatedUser));
       toast.success('Identidade civil sincronizada e protegida no cofre local!');
     } catch (err: any) {
       toast.error(err?.message || 'Falha ao salvar dados no cofre seguro.');
@@ -470,8 +564,38 @@ export function AccountGeneral() {
     );
   }
 
-  // Previne a exibição de formulário vazio enquanto a primeira resposta do backend não chega
-  if (!hasLoadedInitially || isLoading) {
+  // Previne a liberação de formulário vazio editável caso o backend tenha falhado
+  if (loadStatus === 'error' && !hasLoadedInitially) {
+    return (
+      <Card sx={{ p: 4, textAlign: 'center', borderRadius: 2 }}>
+        <Iconify
+          icon="solar:danger-triangle-bold"
+          width={64}
+          sx={{ color: 'error.main', mb: 2, mx: 'auto' }}
+        />
+        <Typography variant="h6" sx={{ mb: 1, fontWeight: 800 }}>
+          Falha na Comunicação com o Cofre Seguro
+        </Typography>
+        <Typography
+          variant="body2"
+          sx={{ color: 'text.secondary', mb: 3, maxWidth: 520, mx: 'auto' }}
+        >
+          {error || 'Não foi possível recuperar seus dados cadastrais. Para proteger seus registros de sobrescrita acidental, a edição está temporariamente travada.'}
+        </Typography>
+        <Button
+          variant="contained"
+          color="primary"
+          startIcon={<Iconify icon="solar:refresh-circle-bold" />}
+          onClick={refreshProfile}
+          sx={{ px: 3, py: 1, fontWeight: 700 }}
+        >
+          Tentar Novamente
+        </Button>
+      </Card>
+    );
+  }
+
+  if (!hasLoadedInitially || isLoading || loadStatus === 'loading') {
     return (
       <Stack spacing={3}>
         <Skeleton variant="rounded" height={140} sx={{ borderRadius: 2 }} />
@@ -483,7 +607,52 @@ export function AccountGeneral() {
 
   return (
     <Form methods={methods} onSubmit={onSubmit}>
-      {error && (
+      {/* Alerta de Divergência/Conflito de Migração */}
+      {migrationStatus === 'conflict' && (
+        <Alert
+          severity="warning"
+          sx={{ mb: 3, borderRadius: 1.5 }}
+          action={
+            <Stack direction="row" spacing={1}>
+              <Button
+                color="inherit"
+                size="small"
+                onClick={() => resolveMigrationConflict('merge_legacy')}
+              >
+                Mesclar Dados
+              </Button>
+              <Button
+                color="inherit"
+                size="small"
+                onClick={() => resolveMigrationConflict('keep_vault')}
+              >
+                Manter Cofre
+              </Button>
+            </Stack>
+          }
+        >
+          Existem dados cadastrais no armazenamento anterior divergentes do cofre local. Seus dados
+          antigos foram preservados em segurança.
+        </Alert>
+      )}
+
+      {/* Alerta de Falha de Migração */}
+      {migrationStatus === 'error' && (
+        <Alert
+          severity="error"
+          sx={{ mb: 3, borderRadius: 1.5 }}
+          action={
+            <Button color="inherit" size="small" onClick={retryMigration}>
+              Tentar Novamente
+            </Button>
+          }
+        >
+          {error ||
+            'Não foi possível migrar os dados antigos com segurança para o cofre. Seus dados anteriores estão preservados e o salvamento foi travado para evitar sobrescrita acidental.'}
+        </Alert>
+      )}
+
+      {error && migrationStatus !== 'error' && (
         <Alert severity="error" sx={{ mb: 3, borderRadius: 1.5 }}>
           {error}
         </Alert>
@@ -529,22 +698,57 @@ export function AccountGeneral() {
           sx={{ height: 8, borderRadius: 1, mb: 2 }}
         />
 
+        {/* Legenda Dinâmica e Calibrada com os Pesos Exatos */}
         <Stack direction="row" spacing={3} sx={{ flexWrap: 'wrap', gap: 1 }}>
-          <Typography variant="caption" sx={{ color: 'text.disabled' }}>
-            • Nome / Razão Social (+20)
-          </Typography>
-          <Typography variant="caption" sx={{ color: 'text.disabled' }}>
-            • CPF / CNPJ (+20)
-          </Typography>
-          <Typography variant="caption" sx={{ color: 'text.disabled' }}>
-            • Documento Civil (+10)
-          </Typography>
-          <Typography variant="caption" sx={{ color: 'text.disabled' }}>
-            • Endereço (+15)
-          </Typography>
-          <Typography variant="caption" sx={{ color: 'text.disabled' }}>
-            • Contato (+15)
-          </Typography>
+          {watchedPersonType === 'PJ' ? (
+            <>
+              <Typography variant="caption" sx={{ color: 'text.disabled' }}>
+                • Razão Social (+20)
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'text.disabled' }}>
+                • CNPJ (+20)
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'text.disabled' }}>
+                • Representante (+15)
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'text.disabled' }}>
+                • CPF Rep. (+10)
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'text.disabled' }}>
+                • Email (+10)
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'text.disabled' }}>
+                • Endereço (+15)
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'text.disabled' }}>
+                • Contato & Ramo (+10)
+              </Typography>
+            </>
+          ) : (
+            <>
+              <Typography variant="caption" sx={{ color: 'text.disabled' }}>
+                • Nome & Sobrenome (+20)
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'text.disabled' }}>
+                • CPF (+20)
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'text.disabled' }}>
+                • Documento Civil (+10)
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'text.disabled' }}>
+                • Nascimento (+10)
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'text.disabled' }}>
+                • Filiação (+5)
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'text.disabled' }}>
+                • Endereço (+15)
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'text.disabled' }}>
+                • Contato & Profissão (+20)
+              </Typography>
+            </>
+          )}
         </Stack>
       </Card>
 
@@ -607,7 +811,11 @@ export function AccountGeneral() {
               <>
                 <Field.Text name="firstName" label="Nome" placeholder="Nome" />
                 <Field.Text name="lastName" label="Sobrenome" placeholder="Sobrenome" />
-                <Field.Text name="cpf" label="CPF (Identificador Civil)" placeholder="000.000.000-00" />
+                <Field.Text
+                  name="cpf"
+                  label="CPF (Identificador Civil)"
+                  placeholder="000.000.000-00"
+                />
                 <Field.Text
                   name="birthDate"
                   label="Data de Nascimento (AAAA-MM-DD)"
@@ -651,7 +859,11 @@ export function AccountGeneral() {
               />
             </Box>
             <Field.Text name="username" label="@username (Identificador do Nó)" />
-            <Field.Text name="phoneNumber" label="Telefone / WhatsApp" placeholder="(00) 00000-0000" />
+            <Field.Text
+              name="phoneNumber"
+              label="Telefone / WhatsApp"
+              placeholder="(00) 00000-0000"
+            />
           </Box>
         </Card>
 
@@ -712,21 +924,33 @@ export function AccountGeneral() {
           >
             <Field.Text
               name="occupation"
-              label={watchedPersonType === 'PJ' ? 'Ramo de Atuação / CNAE' : 'Profissão / Especialidade'}
+              label={
+                watchedPersonType === 'PJ'
+                  ? 'Ramo de Atuação / CNAE'
+                  : 'Profissão / Especialidade'
+              }
             />
             <Field.Text
               name="company"
               label={watchedPersonType === 'PJ' ? 'Grupo Econômico / Filial' : 'Empresa Atual'}
             />
             <Box sx={{ gridColumn: '1 / -1' }}>
-              <Field.Text name="website" label="Website Institucional ou Portfólio" placeholder="https://exemplo.com.br" />
+              <Field.Text
+                name="website"
+                label="Website Institucional ou Portfólio"
+                placeholder="https://exemplo.com.br"
+              />
             </Box>
             <Box sx={{ gridColumn: '1 / -1' }}>
               <Field.Text
                 name="about"
                 multiline
                 rows={4}
-                label={watchedPersonType === 'PJ' ? 'Apresentação Institucional' : 'Biografia Resumida'}
+                label={
+                  watchedPersonType === 'PJ'
+                    ? 'Apresentação Institucional'
+                    : 'Biografia Resumida'
+                }
                 helperText="Máximo de 2.000 caracteres."
               />
             </Box>
@@ -739,7 +963,7 @@ export function AccountGeneral() {
             type="submit"
             variant="contained"
             color="primary"
-            disabled={isSubmitting || isSaving || !isDirty}
+            disabled={!canSave || isSubmitting}
             size="large"
             startIcon={
               isSubmitting || isSaving ? (
