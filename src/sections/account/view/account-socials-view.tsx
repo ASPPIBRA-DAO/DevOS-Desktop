@@ -1,12 +1,19 @@
+import type { SocialLinks, SaveSocialLinks } from '../account-socials';
+
 import React from 'react';
 
 import { AccountLayout } from '../account-layout';
 import { AccountSocials } from '../account-socials';
 
-export function AccountSocialsView() {
+type Props = {
+  socialLinks?: SocialLinks;
+  onSave?: SaveSocialLinks;
+};
+
+export function AccountSocialsView({ socialLinks, onSave }: Props) {
   return (
     <AccountLayout>
-      <AccountSocials />
+      <AccountSocials socialLinks={socialLinks} onSave={onSave} />
     </AccountLayout>
   );
 }
