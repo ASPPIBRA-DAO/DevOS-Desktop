@@ -8,8 +8,10 @@ import Stack from '@mui/material/Stack';
 import Avatar from '@mui/material/Avatar';
 import Tooltip from '@mui/material/Tooltip';
 import { useTheme } from '@mui/material/styles';
+import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 
+import { toast } from 'src/shared/components/snackbar';
 import { Iconify } from 'src/shared/components/iconify';
 
 // ----------------------------------------------------------------------
@@ -21,6 +23,8 @@ type Props = {
   coverUrl?: string;
   currentTab: string;
   onChangeTab: (event: React.SyntheticEvent, newValue: string) => void;
+  onUpdateAvatar?: (url: string) => void;
+  onUpdateCover?: (url: string) => void;
 };
 
 export const TABS = [
@@ -39,8 +43,28 @@ export function ProfileCover({
   coverUrl,
   currentTab,
   onChangeTab,
+  onUpdateAvatar,
+  onUpdateCover,
 }: Props) {
   const theme = useTheme();
+
+  const handleCoverChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const url = URL.createObjectURL(file);
+      onUpdateCover?.(url);
+      toast.success('Foto de capa atualizada!');
+    }
+  };
+
+  const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const url = URL.createObjectURL(file);
+      onUpdateAvatar?.(url);
+      toast.success('Foto de perfil atualizada!');
+    }
+  };
 
   return (
     <Card
@@ -77,6 +101,33 @@ export function ProfileCover({
         }}
       />
 
+      {/* Botão de Trocar Capa Diretamente no Banner */}
+      <IconButton
+        component="label"
+        size="small"
+        sx={{
+          position: 'absolute',
+          top: 14,
+          right: 14,
+          zIndex: 10,
+          bgcolor: 'rgba(0, 0, 0, 0.5)',
+          color: 'common.white',
+          backdropFilter: 'blur(8px)',
+          border: '1px solid rgba(255, 255, 255, 0.25)',
+          '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.8)' },
+          px: 1.5,
+          py: 0.6,
+          borderRadius: 1.5,
+          gap: 0.8,
+        }}
+      >
+        <Iconify icon="solar:camera-add-bold" width={18} />
+        <Typography variant="caption" sx={{ fontWeight: 700, color: 'common.white' }}>
+          Trocar Capa
+        </Typography>
+        <input type="file" hidden accept="image/*" onChange={handleCoverChange} />
+      </IconButton>
+
       {/* Conteúdo Sobreposto: Avatar + Nome + Tabs */}
       <Stack
         direction={{ xs: 'column', md: 'row' }}
@@ -92,24 +143,46 @@ export function ProfileCover({
           justifyContent: 'space-between',
         }}
       >
-        {/* Lado Esquerdo: Avatar Circular e Nome */}
+        {/* Lado Esquerdo: Avatar Circular com Botão de Câmera e Nome */}
         <Stack direction="row" spacing={2.5} sx={{ alignItems: 'flex-end', mb: { xs: 1.5, md: 0 }, flexShrink: 0 }}>
-          <Avatar
-            src={avatarUrl}
-            alt={name}
-            sx={{
-              width: { xs: 80, md: 108 },
-              height: { xs: 80, md: 108 },
-              border: `4px solid ${theme.palette.common.white}`,
-              bgcolor: 'rgba(255, 255, 255, 0.25)',
-              color: theme.palette.common.white,
-              boxShadow: theme.shadows[4],
-              fontSize: { xs: '2rem', md: '2.5rem' },
-              fontWeight: 800,
-            }}
-          >
-            {name.charAt(0).toUpperCase()}
-          </Avatar>
+          <Box sx={{ position: 'relative' }}>
+            <Avatar
+              src={avatarUrl}
+              alt={name}
+              sx={{
+                width: { xs: 80, md: 108 },
+                height: { xs: 80, md: 108 },
+                border: `4px solid ${theme.palette.common.white}`,
+                bgcolor: 'rgba(255, 255, 255, 0.25)',
+                color: theme.palette.common.white,
+                boxShadow: theme.shadows[4],
+                fontSize: { xs: '2rem', md: '2.5rem' },
+                fontWeight: 800,
+              }}
+            >
+              {name.charAt(0).toUpperCase()}
+            </Avatar>
+
+            <IconButton
+              component="label"
+              size="small"
+              sx={{
+                position: 'absolute',
+                bottom: 2,
+                right: 2,
+                bgcolor: 'primary.main',
+                color: 'primary.contrastText',
+                boxShadow: theme.shadows[3],
+                border: `2px solid ${theme.palette.common.white}`,
+                '&:hover': { bgcolor: 'primary.dark' },
+                width: 32,
+                height: 32,
+              }}
+            >
+              <Iconify icon="solar:camera-bold" width={17} />
+              <input type="file" hidden accept="image/*" onChange={handleAvatarChange} />
+            </IconButton>
+          </Box>
 
           <Box sx={{ color: 'common.white', mb: 1, minWidth: 0, flexShrink: 0 }}>
             <Typography variant="h5" sx={{ fontWeight: 800, textShadow: '0 2px 8px rgba(0,0,0,0.5)', whiteSpace: 'nowrap' }}>

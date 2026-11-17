@@ -1,22 +1,19 @@
 import * as z from 'zod';
-import { useForm, Controller } from 'react-hook-form';
+import React, { useEffect } from 'react';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import React, { useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
-import Grid from '@mui/material/Grid';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import MenuItem from '@mui/material/MenuItem';
-import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import LinearProgress from '@mui/material/LinearProgress';
 
 import { toast } from 'src/shared/components/snackbar';
 import { Iconify } from 'src/shared/components/iconify';
 import { Form, Field } from 'src/shared/components/hook-form';
-import { UploadAvatar } from 'src/shared/components/upload/avatar/upload-avatar';
 
 import { useAccountFacade } from './use-account';
 
@@ -108,15 +105,11 @@ export function AccountGeneral() {
   const {
     reset,
     watch,
-    control,
-    setValue,
     handleSubmit,
     formState: { isSubmitting, isDirty },
   } = methods;
 
   const values = watch();
-  const coverURL = values.coverURL;
-  const coverPreview = typeof coverURL === 'string' ? coverURL : null;
 
   // Lógica do Completeness Score
   const getScore = () => {
@@ -134,17 +127,6 @@ export function AccountGeneral() {
   };
 
   const completenessScore = getScore();
-
-  const handleCoverChange = useCallback(
-    (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      if (file) {
-        const fakeUrl = URL.createObjectURL(file);
-        setValue('coverURL', fakeUrl, { shouldDirty: true });
-      }
-    },
-    [setValue]
-  );
 
   useEffect(() => {
     if (user) {
@@ -194,16 +176,38 @@ export function AccountGeneral() {
 
   return (
     <Form methods={methods} onSubmit={onSubmit}>
-      {/* BARRA: PROGRESSO DA IDENTIDADE */}
+      {/* BARRA: PROGRESSO DA IDENTIDADE + VISIBILIDADE DO PERFIL */}
       <Card sx={{ p: 3, mb: 4, borderRadius: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
-          <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
-            Progresso da sua Identidade
-          </Typography>
-          <Typography variant="subtitle2" sx={{ color: 'text.secondary', fontWeight: 'bold' }}>
-            {completenessScore}%
-          </Typography>
-        </Box>
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          sx={{ alignItems: { sm: 'center' }, justifyContent: 'space-between', mb: 2, gap: 1.5 }}
+        >
+          <Box>
+            <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
+              Progresso da sua Identidade
+            </Typography>
+            <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: '0.85rem' }}>
+              Complete suas informações civis para habilitação de contratos e governança DAO.
+            </Typography>
+          </Box>
+
+          <Stack direction="row" spacing={2.5} sx={{ alignItems: 'center' }}>
+            <Field.Switch name="isPublic" label="Perfil Público" />
+            <Typography
+              variant="subtitle2"
+              sx={{
+                color: 'primary.main',
+                fontWeight: 800,
+                bgcolor: 'rgba(0, 167, 111, 0.12)',
+                px: 1.5,
+                py: 0.5,
+                borderRadius: 1,
+              }}
+            >
+              {completenessScore}% Completo
+            </Typography>
+          </Stack>
+        </Stack>
 
         <LinearProgress
           variant="determinate"
@@ -221,169 +225,100 @@ export function AccountGeneral() {
         </Stack>
       </Card>
 
-      <Grid container spacing={3}>
-        {/* COLUNA ESQUERDA: CAPA, AVATAR E BIOMETRIA */}
-        <Grid size={{ xs: 12, md: 4 }}>
-          <Stack spacing={3}>
-            <Card sx={{ p: 3, textAlign: 'center', borderRadius: 2 }}>
-              {/* Capa */}
-              <Box
-                sx={{
-                  height: 120,
-                  borderRadius: 1.5,
-                  mb: 2,
-                  position: 'relative',
-                  bgcolor: 'grey.300',
-                  backgroundImage: coverPreview ? `url(${coverPreview})` : 'linear-gradient(135deg, #072e21 0%, #007753 100%)',
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
-                }}
-              >
-                <IconButton
-                  component="label"
-                  size="small"
-                  sx={{
-                    position: 'absolute',
-                    top: 8,
-                    right: 8,
-                    bgcolor: 'rgba(0,0,0,0.6)',
-                    color: 'white',
-                    '&:hover': { bgcolor: 'rgba(0,0,0,0.8)' },
-                  }}
-                >
-                  <Iconify icon="solar:camera-add-bold" width={18} />
-                  <input type="file" hidden accept="image/*" onChange={handleCoverChange} />
-                </IconButton>
-              </Box>
+      {/* FORMULÁRIO DE IDENTIDADE CIVIL EM LARGURA TOTAL */}
+      <Stack spacing={3.5} sx={{ width: 1 }}>
+        {/* Bloco 1: Sua Identidade */}
+        <Card sx={{ p: 3.5, borderRadius: 2 }}>
+          <Typography variant="h6" sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1.5, fontWeight: 800 }}>
+            <Iconify icon="solar:user-id-bold" width={22} sx={{ color: 'primary.main' }} />
+            Sua Identidade
+          </Typography>
 
-              {/* Upload de Avatar */}
-              <Controller
-                name="photoURL"
-                control={control}
-                render={({ field }) => (
-                  <UploadAvatar
-                    value={field.value}
-                    onDrop={(acceptedFiles) => {
-                      const file = acceptedFiles[0];
-                      if (file) {
-                        field.onChange(URL.createObjectURL(file));
-                      }
-                    }}
-                    helperText={
-                      <Typography variant="caption" sx={{ mt: 1.5, display: 'block', color: 'text.disabled' }}>
-                        Avatar: *.jpeg, *.jpg, *.png
-                      </Typography>
-                    }
-                  />
-                )}
-              />
+          <Box sx={{ rowGap: 2.5, columnGap: 2, display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
+            <Field.Text name="firstName" label="Nome" />
+            <Field.Text name="lastName" label="Sobrenome" />
+            <Box sx={{ gridColumn: '1 / -1' }}>
+              <Field.Text name="email" label="Email de Acesso" />
+            </Box>
+            <Field.Text name="username" label="@username (Identificador Único)" />
+            <Field.Text name="phoneNumber" label="Telefone / WhatsApp" />
+            <Field.Text name="cpf" label="CPF (Identificador Civil)" />
+            <Field.Text name="birthDate" label="Data de Nascimento (DD/MM/AAAA)" />
+            <Field.Text name="nationality" label="Nacionalidade" placeholder="Brasileira" />
+            <Field.Select name="maritalStatus" label="Estado Civil">
+              {['Solteiro(a)', 'Casado(a)', 'União Estável', 'Divorciado(a)', 'Viúvo(a)'].map((status) => (
+                <MenuItem key={status} value={status}>{status}</MenuItem>
+              ))}
+            </Field.Select>
+            <Field.Text name="rg" label="RG (Opcional - Padrão Antigo)" />
+            <Field.Text name="rgIssuer" label="Órgão Emissor / UF (Opcional)" placeholder="Ex: SSP/RJ" />
+            <Field.Text name="cnh" label="Nº Registro CNH (Opcional)" />
+            <Field.Select name="cnhCategory" label="Categoria da CNH (Opcional)">
+              {['', 'A', 'B', 'AB', 'C', 'D', 'E'].map((cat) => (
+                <MenuItem key={cat} value={cat}>{cat || 'Nenhuma'}</MenuItem>
+              ))}
+            </Field.Select>
+            <Field.Text name="motherName" label="Nome da Mãe" />
+            <Field.Text name="fatherName" label="Nome do Pai" />
+          </Box>
+        </Card>
 
-              <Field.Switch
-                name="isPublic"
-                label="Perfil Público"
-                sx={{ mt: 2.5, justifyContent: 'center' }}
-              />
-            </Card>
-          </Stack>
-        </Grid>
+        {/* Bloco 2: Endereço Residencial */}
+        <Card sx={{ p: 3.5, borderRadius: 2 }}>
+          <Typography variant="h6" sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1.5, fontWeight: 800 }}>
+            <Iconify icon="solar:map-point-wave-bold" width={22} sx={{ color: 'primary.main' }} />
+            Endereço Residencial
+          </Typography>
 
-        {/* COLUNA DIREITA: FORMULÁRIO DE IDENTIDADE CIVIL */}
-        <Grid size={{ xs: 12, md: 8 }}>
-          <Stack spacing={3}>
-            {/* Bloco 1: Sua Identidade */}
-            <Card sx={{ p: 3.5, borderRadius: 2 }}>
-              <Typography variant="h6" sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1.5, fontWeight: 800 }}>
-                <Iconify icon="solar:user-id-bold" width={22} sx={{ color: 'primary.main' }} />
-                Sua Identidade
-              </Typography>
+          <Box sx={{ rowGap: 2.5, columnGap: 2, display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
+            <Field.Text name="country" label="País" />
+            <Field.Text name="zipCode" label="CEP" />
+            <Field.Text name="state" label="Estado (UF)" />
+            <Field.Text name="city" label="Cidade" />
+            <Field.Text name="neighborhood" label="Bairro" />
+            <Field.Text name="addressNumber" label="Número / Km" placeholder="Ex: 120 ou Km 4" />
+            <Box sx={{ gridColumn: '1 / -1' }}>
+              <Field.Text name="address" label="Logradouro / Rua / Estrada" />
+            </Box>
+            <Box sx={{ gridColumn: '1 / -1' }}>
+              <Field.Text name="complement" label="Complemento (Opcional - Lote, Quadra, Apto)" />
+            </Box>
+          </Box>
+        </Card>
 
-              <Box sx={{ rowGap: 2.5, columnGap: 2, display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
-                <Field.Text name="firstName" label="Nome" />
-                <Field.Text name="lastName" label="Sobrenome" />
-                <Box sx={{ gridColumn: '1 / -1' }}>
-                  <Field.Text name="email" label="Email de Acesso" />
-                </Box>
-                <Field.Text name="username" label="@username (Identificador Único)" />
-                <Field.Text name="phoneNumber" label="Telefone / WhatsApp" />
-                <Field.Text name="cpf" label="CPF (Identificador Civil)" />
-                <Field.Text name="birthDate" label="Data de Nascimento (DD/MM/AAAA)" />
-                <Field.Text name="nationality" label="Nacionalidade" placeholder="Brasileira" />
-                <Field.Select name="maritalStatus" label="Estado Civil">
-                  {['Solteiro(a)', 'Casado(a)', 'União Estável', 'Divorciado(a)', 'Viúvo(a)'].map((status) => (
-                    <MenuItem key={status} value={status}>{status}</MenuItem>
-                  ))}
-                </Field.Select>
-                <Field.Text name="rg" label="RG (Opcional - Padrão Antigo)" />
-                <Field.Text name="rgIssuer" label="Órgão Emissor / UF (Opcional)" placeholder="Ex: SSP/RJ" />
-                <Field.Text name="cnh" label="Nº Registro CNH (Opcional)" />
-                <Field.Select name="cnhCategory" label="Categoria da CNH (Opcional)">
-                  {['', 'A', 'B', 'AB', 'C', 'D', 'E'].map((cat) => (
-                    <MenuItem key={cat} value={cat}>{cat || 'Nenhuma'}</MenuItem>
-                  ))}
-                </Field.Select>
-                <Field.Text name="motherName" label="Nome da Mãe" />
-                <Field.Text name="fatherName" label="Nome do Pai" />
-              </Box>
-            </Card>
+        {/* Bloco 3: Perfil Profissional */}
+        <Card sx={{ p: 3.5, borderRadius: 2 }}>
+          <Typography variant="h6" sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1.5, fontWeight: 800 }}>
+            <Iconify icon="solar:case-round-bold" width={22} sx={{ color: 'primary.main' }} />
+            Perfil Profissional
+          </Typography>
 
-            {/* Bloco 2: Endereço Residencial */}
-            <Card sx={{ p: 3.5, borderRadius: 2 }}>
-              <Typography variant="h6" sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1.5, fontWeight: 800 }}>
-                <Iconify icon="solar:map-point-wave-bold" width={22} sx={{ color: 'primary.main' }} />
-                Endereço Residencial
-              </Typography>
+          <Box sx={{ rowGap: 2.5, columnGap: 2, display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
+            <Field.Text name="occupation" label="Profissão / Especialidade" />
+            <Field.Text name="company" label="Empresa Atual" />
+            <Box sx={{ gridColumn: '1 / -1' }}>
+              <Field.Text name="website" label="Website Pessoal ou Portfólio" />
+            </Box>
+            <Box sx={{ gridColumn: '1 / -1' }}>
+              <Field.Text name="about" multiline rows={4} label="Biografia Resumida" />
+            </Box>
+          </Box>
+        </Card>
 
-              <Box sx={{ rowGap: 2.5, columnGap: 2, display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
-                <Field.Text name="country" label="País" />
-                <Field.Text name="zipCode" label="CEP" />
-                <Field.Text name="state" label="Estado (UF)" />
-                <Field.Text name="city" label="Cidade" />
-                <Field.Text name="neighborhood" label="Bairro" />
-                <Field.Text name="addressNumber" label="Número / Km" placeholder="Ex: 120 ou Km 4" />
-                <Box sx={{ gridColumn: '1 / -1' }}>
-                  <Field.Text name="address" label="Logradouro / Rua / Estrada" />
-                </Box>
-                <Box sx={{ gridColumn: '1 / -1' }}>
-                  <Field.Text name="complement" label="Complemento (Opcional - Lote, Quadra, Apto)" />
-                </Box>
-              </Box>
-            </Card>
-
-            {/* Bloco 3: Perfil Profissional */}
-            <Card sx={{ p: 3.5, borderRadius: 2 }}>
-              <Typography variant="h6" sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1.5, fontWeight: 800 }}>
-                <Iconify icon="solar:case-round-bold" width={22} sx={{ color: 'primary.main' }} />
-                Perfil Profissional
-              </Typography>
-
-              <Box sx={{ rowGap: 2.5, columnGap: 2, display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
-                <Field.Text name="occupation" label="Profissão / Especialidade" />
-                <Field.Text name="company" label="Empresa Atual" />
-                <Box sx={{ gridColumn: '1 / -1' }}>
-                  <Field.Text name="website" label="Website Pessoal ou Portfólio" />
-                </Box>
-                <Box sx={{ gridColumn: '1 / -1' }}>
-                  <Field.Text name="about" multiline rows={4} label="Biografia Resumida" />
-                </Box>
-              </Box>
-            </Card>
-
-            {/* Botão de Salvar */}
-            <Stack direction="row" sx={{ justifyContent: 'flex-end', mt: 1 }}>
-              <Button
-                type="submit"
-                variant="contained"
-                color="primary"
-                disabled={isSubmitting || !isDirty}
-                size="large"
-                sx={{ px: 4, fontWeight: 800 }}
-              >
-                Salvar Alterações
-              </Button>
-            </Stack>
-          </Stack>
-        </Grid>
-      </Grid>
+        {/* Botão de Salvar */}
+        <Stack direction="row" sx={{ justifyContent: 'flex-end', mt: 1 }}>
+          <Button
+            type="submit"
+            variant="contained"
+            color="primary"
+            disabled={isSubmitting || !isDirty}
+            size="large"
+            sx={{ px: 4, fontWeight: 800 }}
+          >
+            Salvar Alterações
+          </Button>
+        </Stack>
+      </Stack>
     </Form>
   );
 }
