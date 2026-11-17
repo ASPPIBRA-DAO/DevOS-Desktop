@@ -24,21 +24,18 @@ export function UserProfileView() {
   const displayRole = accountUser.occupation || 'Operador de Nó';
 
   const [searchParams, setSearchParams] = useSearchParams();
-  const tabFromUrl = searchParams.get('tab') || 'profile';
-  const [currentTab, setCurrentTab] = useState(tabFromUrl);
-  const [visitedTabs, setVisitedTabs] = useState<Record<string, boolean>>({ [tabFromUrl]: true });
+  const currentTab = searchParams.get('tab') || 'profile';
+  const [visitedTabs, setVisitedTabs] = useState<Record<string, boolean>>({ [currentTab]: true });
 
   useEffect(() => {
-    const tab = searchParams.get('tab');
-    if (tab && tab !== currentTab) {
-      setCurrentTab(tab);
-      setVisitedTabs((prev) => (prev[tab] ? prev : { ...prev, [tab]: true }));
+    if (!visitedTabs[currentTab]) {
+      setVisitedTabs((prev) => ({ ...prev, [currentTab]: true }));
     }
-  }, [searchParams, currentTab]);
+  }, [currentTab, visitedTabs]);
 
   const handleChangeTab = (_event: React.SyntheticEvent, newValue: string) => {
-    setCurrentTab(newValue);
-    setVisitedTabs((prev) => (prev[newValue] ? prev : { ...prev, [newValue]: true }));
+    if (newValue === currentTab) return;
+    setVisitedTabs((prev) => ({ ...prev, [newValue]: true }));
     setSearchParams({ tab: newValue }, { replace: true });
   };
 
