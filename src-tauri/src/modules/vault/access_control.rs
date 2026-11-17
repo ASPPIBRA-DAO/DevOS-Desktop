@@ -330,9 +330,52 @@ impl VaultSession {
         }
     }
 
+    /// Executa uma operação passando uma referência para a chave de sessão ativa.
+    ///
+    /// Retorna `Err(AccessControlError::Locked)` se a sessão estiver bloqueada ou sem chave instalada.
+    pub fn with_session_key<F, R>(&self, f: F) -> Result<R, AccessControlError>
+    where
+        F: FnOnce(&str) -> Result<R, AccessControlError>,
+    {
+        match self.state.lock() {
+            Ok(state) => {
+                if state.epoch_exhausted || !state.unlocked {
+                    return Err(AccessControlError::Locked);
+                }
+
+                match state.session_key.as_ref() {
+                    Some(key) => f(key.as_str()),
+                    None => Err(AccessControlError::Locked),
+                }
+            }
+
+            Err(poisoned) => {
+                log::error!(
+                    "[Vault Security] Mutex envenenado em with_session_key(). \
+                     Aplicando Fail-Closed."
+                );
+
+                let mut state = poisoned.into_inner();
+                Self::fail_closed(&mut state);
+                self.state.clear_poison();
+
+                Err(AccessControlError::Locked)
+            }
+        }
+    }
+
     // --------------------------------------------------------------
     // Compatibilidade de testes
     // --------------------------------------------------------------
+
+    /// Define diretamente a chave de sessão e o estado de desbloqueio para testes.
+    #[cfg(test)]
+    pub fn set_session_key_for_test(&self, key: &str) {
+        if let Ok(mut state) = self.state.lock() {
+            state.unlocked = true;
+            state.session_key = Some(Zeroizing::new(key.to_string()));
+        }
+    }
 
     /// Define diretamente o estado apenas durante os testes unitários.
     ///
