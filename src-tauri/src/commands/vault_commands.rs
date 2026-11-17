@@ -137,6 +137,7 @@ pub fn get_vault_status(
 #[tauri::command]
 pub fn init_master_password(
     db: State<'_, LocalDatabase>,
+    session: State<'_, VaultSession>,
     master_password: String,
 ) -> Result<bool, String> {
     // 1. Encapsulamento IMEDIATO na entrada: qualquer retorno de erro ou término de escopo zera a memória RAM do heap
@@ -184,6 +185,9 @@ pub fn init_master_password(
             ),
         })?;
 
+    let epoch = session.current_epoch();
+    let _ = session.try_unlock_with_session_key(epoch, master_password);
+
     Ok(true)
 }
 
@@ -218,7 +222,7 @@ pub fn unlock_vault(
         return Err("Senha mestre incorreta.".to_string());
     }
 
-    if session.try_unlock(epoch_at_start) {
+    if session.try_unlock_with_session_key(epoch_at_start, master_password) {
         Ok(true)
     } else {
         Err("Operação de desbloqueio abortada: o cofre foi bloqueado concorrentemente.".to_string())
