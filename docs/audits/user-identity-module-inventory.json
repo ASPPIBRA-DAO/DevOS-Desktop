@@ -1,0 +1,1484 @@
+{
+  "audit_metadata": {
+    "title": "Inventário Estruturado do Módulo de Usuário, Conta e Identidade Digital",
+    "system": "DevOS Desktop (ASPPIBRA DAO)",
+    "date": "2026-11-16",
+    "auditor": "Arquiteto de Software Sênior & Auditor de Sistemas",
+    "nature": "Read-Only Architecture & Security Audit",
+    "target_editions": [
+      "DevOS Node (br.aspp.devos.node)",
+      "DevOS Cockpit (br.aspp.devos.cockpit)"
+    ],
+    "frontend_stack": "React 19.1.1, TypeScript 6.0.2, Vite 8.0.8, React Router 7.9.3, MUI v9, Zod 3.25.76, React Hook Form 7.63.0",
+    "backend_stack": "Tauri v2.12.1, Rust 1.92 (Edition 2024), Rusqlite 0.32 (SQLite), Typst 0.15",
+    "status": "CONCLUÍDO - PRONTO PARA FASE DE IMPLEMENTAÇÃO"
+  },
+  "files": [
+    {
+      "path": "DevOS-Desktop/src/pages/user/profile.tsx",
+      "name": "profile.tsx",
+      "category": "page",
+      "responsibility": "Ponto de entrada de rota para a visualização do perfil do usuário (/user/profile).",
+      "imports": [
+        "react",
+        "src/sections/user"
+      ],
+      "used_by": [
+        "src/app/editions/edition.node.ts",
+        "src/app/editions/edition.cockpit.ts"
+      ],
+      "hooks_services": [],
+      "external_libs": [
+        "react"
+      ],
+      "status": "ativo"
+    },
+    {
+      "path": "DevOS-Desktop/src/pages/user/account/index.tsx",
+      "name": "index.tsx",
+      "category": "page",
+      "responsibility": "Reexportação da página de conta geral.",
+      "imports": [
+        "./general"
+      ],
+      "used_by": [],
+      "hooks_services": [],
+      "external_libs": [],
+      "status": "legado/desnecessario"
+    },
+    {
+      "path": "DevOS-Desktop/src/pages/user/account/general.tsx",
+      "name": "general.tsx",
+      "category": "page",
+      "responsibility": "Ponto de entrada de rota para /user/account.",
+      "imports": [
+        "react",
+        "src/sections/account"
+      ],
+      "used_by": [
+        "src/app/editions/edition.node.ts",
+        "src/app/editions/edition.cockpit.ts",
+        "src/pages/user/account/index.tsx"
+      ],
+      "hooks_services": [],
+      "external_libs": [
+        "react"
+      ],
+      "status": "ativo"
+    },
+    {
+      "path": "DevOS-Desktop/src/pages/user/account/2fa.tsx",
+      "name": "2fa.tsx",
+      "category": "page",
+      "responsibility": "Ponto de entrada de rota para /user/account/2fa.",
+      "imports": [
+        "react",
+        "src/sections/account"
+      ],
+      "used_by": [
+        "src/app/editions/edition.node.ts",
+        "src/app/editions/edition.cockpit.ts"
+      ],
+      "hooks_services": [],
+      "external_libs": [
+        "react"
+      ],
+      "status": "ativo"
+    },
+    {
+      "path": "DevOS-Desktop/src/pages/user/account/change-password.tsx",
+      "name": "change-password.tsx",
+      "category": "page",
+      "responsibility": "Ponto de entrada de rota para /user/account/change-password.",
+      "imports": [
+        "react",
+        "src/sections/account"
+      ],
+      "used_by": [
+        "src/app/editions/edition.node.ts",
+        "src/app/editions/edition.cockpit.ts"
+      ],
+      "hooks_services": [],
+      "external_libs": [
+        "react"
+      ],
+      "status": "ativo"
+    },
+    {
+      "path": "DevOS-Desktop/src/pages/user/account/socials.tsx",
+      "name": "socials.tsx",
+      "category": "page",
+      "responsibility": "Ponto de entrada de rota para /user/account/socials.",
+      "imports": [
+        "react",
+        "src/sections/account"
+      ],
+      "used_by": [
+        "src/app/editions/edition.node.ts",
+        "src/app/editions/edition.cockpit.ts"
+      ],
+      "hooks_services": [],
+      "external_libs": [
+        "react"
+      ],
+      "status": "ativo"
+    },
+    {
+      "path": "DevOS-Desktop/src/pages/user/account/notifications.tsx",
+      "name": "notifications.tsx",
+      "category": "page",
+      "responsibility": "Ponto de entrada de rota para /user/account/notifications.",
+      "imports": [
+        "react",
+        "src/sections/account"
+      ],
+      "used_by": [
+        "src/app/editions/edition.node.ts",
+        "src/app/editions/edition.cockpit.ts"
+      ],
+      "hooks_services": [],
+      "external_libs": [
+        "react"
+      ],
+      "status": "ativo"
+    },
+    {
+      "path": "DevOS-Desktop/src/sections/user/types.ts",
+      "name": "types.ts",
+      "category": "tipo",
+      "responsibility": "Tipagens do perfil social público (UserProfile, UserProfileAbout, UserProfileSocials, UserPostItem, UserPostComment).",
+      "imports": [],
+      "used_by": [
+        "src/sections/user/_mock.ts",
+        "src/sections/user/profile-about.tsx",
+        "src/sections/user/profile-social-info.tsx",
+        "src/sections/user/profile-post-item.tsx",
+        "src/sections/user/index.ts"
+      ],
+      "hooks_services": [],
+      "external_libs": [],
+      "status": "ativo (legado de template minimal)"
+    },
+    {
+      "path": "DevOS-Desktop/src/sections/user/_mock.ts",
+      "name": "_mock.ts",
+      "category": "utilitário/mock",
+      "responsibility": "Dados estáticos fictícios em inglês para feed social, seguidores, sobre e redes sociais.",
+      "imports": [
+        "./types"
+      ],
+      "used_by": [
+        "src/sections/user/profile-home.tsx",
+        "src/sections/user/index.ts"
+      ],
+      "hooks_services": [],
+      "external_libs": [],
+      "status": "mock (deve ser eliminado na integração nativa)"
+    },
+    {
+      "path": "DevOS-Desktop/src/sections/user/index.ts",
+      "name": "index.ts",
+      "category": "utilitário/barril",
+      "responsibility": "Reexportação dos componentes, tipos e mocks da seção user.",
+      "imports": [
+        "./types",
+        "./_mock",
+        "./profile-home",
+        "./profile-cover",
+        "./profile-about",
+        "./profile-post-item",
+        "./profile-post-input",
+        "./profile-follow-info",
+        "./profile-social-info",
+        "./view/user-profile-view"
+      ],
+      "used_by": [
+        "src/pages/user/profile.tsx"
+      ],
+      "hooks_services": [],
+      "external_libs": [],
+      "status": "ativo"
+    },
+    {
+      "path": "DevOS-Desktop/src/sections/user/view/user-profile-view.tsx",
+      "name": "user-profile-view.tsx",
+      "category": "componente/view",
+      "responsibility": "Visão central integradora que agrupa o banner panorâmico e renderiza condicionalmente as abas (profile, identity, notifications, socials, security, 2fa).",
+      "imports": [
+        "react-router",
+        "react",
+        "@mui/material/Box",
+        "src/app/router/paths",
+        "src/shared/components/custom-breadcrumbs",
+        "../profile-home",
+        "../profile-cover",
+        "../../account/account-2fa",
+        "../../account/use-account",
+        "../../account/account-socials",
+        "../../account/account-general",
+        "../../account/account-notifications",
+        "../../account/account-change-password"
+      ],
+      "used_by": [
+        "src/sections/user/index.ts",
+        "src/pages/user/profile.tsx"
+      ],
+      "hooks_services": [
+        "useSearchParams",
+        "useState",
+        "useEffect",
+        "useAccountFacade"
+      ],
+      "external_libs": [
+        "react",
+        "react-router",
+        "@mui/material"
+      ],
+      "status": "ativo"
+    },
+    {
+      "path": "DevOS-Desktop/src/sections/user/profile-cover.tsx",
+      "name": "profile-cover.tsx",
+      "category": "componente",
+      "responsibility": "Banner panorâmico com avatar, capa personalizável, botões de upload e dock de navegação por abas.",
+      "imports": [
+        "react",
+        "@mui/material",
+        "src/shared/components/snackbar",
+        "src/shared/components/iconify"
+      ],
+      "used_by": [
+        "src/sections/user/view/user-profile-view.tsx",
+        "src/sections/user/index.ts"
+      ],
+      "hooks_services": [
+        "useTheme",
+        "useState (event handlers)"
+      ],
+      "external_libs": [
+        "react",
+        "@mui/material"
+      ],
+      "status": "ativo (contém bug de URL.createObjectURL volátil)"
+    },
+    {
+      "path": "DevOS-Desktop/src/sections/user/profile-home.tsx",
+      "name": "profile-home.tsx",
+      "category": "componente",
+      "responsibility": "Aba 'Visão Geral' contendo cards de seguidores, sobre, redes sociais, caixa de post e feed de postagens.",
+      "imports": [
+        "react",
+        "@mui/material/Grid",
+        "@mui/material/Stack",
+        "./profile-about",
+        "./profile-post-item",
+        "./profile-post-input",
+        "./profile-follow-info",
+        "./profile-social-info",
+        "./_mock"
+      ],
+      "used_by": [
+        "src/sections/user/view/user-profile-view.tsx",
+        "src/sections/user/index.ts"
+      ],
+      "hooks_services": [],
+      "external_libs": [
+        "react",
+        "@mui/material"
+      ],
+      "status": "ativo (100% acoplado a dados mockados em inglês)"
+    },
+    {
+      "path": "DevOS-Desktop/src/sections/user/profile-about.tsx",
+      "name": "profile-about.tsx",
+      "category": "componente",
+      "responsibility": "Card que exibe biografia, país, e-mail, cargo e escola do usuário em inglês.",
+      "imports": [
+        "react",
+        "@mui/material",
+        "src/shared/components/iconify",
+        "./types"
+      ],
+      "used_by": [
+        "src/sections/user/profile-home.tsx",
+        "src/sections/user/index.ts"
+      ],
+      "hooks_services": [],
+      "external_libs": [
+        "react",
+        "@mui/material"
+      ],
+      "status": "ativo (mock visual desatualizado)"
+    },
+    {
+      "path": "DevOS-Desktop/src/sections/user/profile-social-info.tsx",
+      "name": "profile-social-info.tsx",
+      "category": "componente",
+      "responsibility": "Card que renderiza links públicos de redes sociais (Facebook, Instagram, LinkedIn, Twitter/X).",
+      "imports": [
+        "react",
+        "@mui/material",
+        "src/shared/components/iconify",
+        "./types"
+      ],
+      "used_by": [
+        "src/sections/user/profile-home.tsx",
+        "src/sections/user/index.ts"
+      ],
+      "hooks_services": [],
+      "external_libs": [
+        "react",
+        "@mui/material"
+      ],
+      "status": "ativo"
+    },
+    {
+      "path": "DevOS-Desktop/src/sections/user/profile-follow-info.tsx",
+      "name": "profile-follow-info.tsx",
+      "category": "componente",
+      "responsibility": "Card que exibe métricas de seguidores (Follower e Following).",
+      "imports": [
+        "react",
+        "@mui/material"
+      ],
+      "used_by": [
+        "src/sections/user/profile-home.tsx",
+        "src/sections/user/index.ts"
+      ],
+      "hooks_services": [],
+      "external_libs": [
+        "react",
+        "@mui/material"
+      ],
+      "status": "ativo (formatação incorreta de inteiros com 2 casas decimais)"
+    },
+    {
+      "path": "DevOS-Desktop/src/sections/user/profile-post-input.tsx",
+      "name": "profile-post-input.tsx",
+      "category": "componente",
+      "responsibility": "Caixa de composição de postagens com botões de mídia e botão Post.",
+      "imports": [
+        "react",
+        "@mui/material",
+        "src/shared/components/iconify"
+      ],
+      "used_by": [
+        "src/sections/user/profile-home.tsx",
+        "src/sections/user/index.ts"
+      ],
+      "hooks_services": [
+        "useState"
+      ],
+      "external_libs": [
+        "react",
+        "@mui/material"
+      ],
+      "status": "ativo (apenas mock de interface)"
+    },
+    {
+      "path": "DevOS-Desktop/src/sections/user/profile-post-item.tsx",
+      "name": "profile-post-item.tsx",
+      "category": "componente",
+      "responsibility": "Item individual de publicação no feed com comentários, curtidas e reações.",
+      "imports": [
+        "react",
+        "@mui/material",
+        "src/shared/components/image",
+        "src/shared/components/iconify",
+        "./types"
+      ],
+      "used_by": [
+        "src/sections/user/profile-home.tsx",
+        "src/sections/user/index.ts"
+      ],
+      "hooks_services": [
+        "useState"
+      ],
+      "external_libs": [
+        "react",
+        "@mui/material"
+      ],
+      "status": "ativo (apenas estado volátil local)"
+    },
+    {
+      "path": "DevOS-Desktop/src/sections/account/use-account.ts",
+      "name": "use-account.ts",
+      "category": "hook/store/modelo",
+      "responsibility": "Única fonte atual de estado de identidade civil do usuário; armazena e lê UserAccountData no localStorage com fixture estática de Sandro de Souza.",
+      "imports": [
+        "react"
+      ],
+      "used_by": [
+        "src/sections/user/view/user-profile-view.tsx",
+        "src/sections/account/account-general.tsx",
+        "src/sections/account/account-2fa.tsx",
+        "src/sections/account/index.ts"
+      ],
+      "hooks_services": [
+        "useState",
+        "useCallback"
+      ],
+      "external_libs": [
+        "react"
+      ],
+      "status": "ativo (crítico: armazena dados em localStorage sem persistência SQLite ou criptografia)"
+    },
+    {
+      "path": "DevOS-Desktop/src/sections/account/account-layout.tsx",
+      "name": "account-layout.tsx",
+      "category": "componente/layout",
+      "responsibility": "Layout secundário de abas horizontais para as rotas /user/account/*.",
+      "imports": [
+        "react",
+        "@mui/material",
+        "src/app/router/paths",
+        "src/app/router/hooks",
+        "src/app/router/components/router-link",
+        "src/shared/components/iconify",
+        "src/shared/components/custom-breadcrumbs"
+      ],
+      "used_by": [
+        "src/sections/account/view/*",
+        "src/sections/account/index.ts"
+      ],
+      "hooks_services": [
+        "usePathname"
+      ],
+      "external_libs": [
+        "react",
+        "@mui/material"
+      ],
+      "status": "ativo (sobreposição com abas de user-profile-view)"
+    },
+    {
+      "path": "DevOS-Desktop/src/sections/account/account-general.tsx",
+      "name": "account-general.tsx",
+      "category": "componente/formulario",
+      "responsibility": "Formulário de qualificação civil completa (PF/PJ, CPF, RG, CNH, filiação, endereço, profissão) com cálculo de Completeness Score e validação Zod.",
+      "imports": [
+        "zod",
+        "react",
+        "react-hook-form",
+        "@hookform/resolvers/zod",
+        "@mui/material",
+        "src/shared/components/snackbar",
+        "src/shared/components/iconify",
+        "src/shared/components/hook-form",
+        "./use-account"
+      ],
+      "used_by": [
+        "src/sections/user/view/user-profile-view.tsx",
+        "src/sections/account/view/account-general-view.tsx",
+        "src/sections/account/index.ts"
+      ],
+      "hooks_services": [
+        "useForm",
+        "useEffect",
+        "useAccountFacade"
+      ],
+      "external_libs": [
+        "zod",
+        "react-hook-form",
+        "@hookform/resolvers/zod",
+        "@mui/material"
+      ],
+      "status": "ativo"
+    },
+    {
+      "path": "DevOS-Desktop/src/sections/account/account-2fa.tsx",
+      "name": "account-2fa.tsx",
+      "category": "componente/seguranca",
+      "responsibility": "Interface de autenticação em 2 fatores (TOTP mockado), vínculo de carteira Web3 externa, contas Google e GitHub e modo de segurança estrito.",
+      "imports": [
+        "react",
+        "@mui/material",
+        "src/shared/components/snackbar",
+        "src/shared/components/iconify",
+        "./use-account"
+      ],
+      "used_by": [
+        "src/sections/user/view/user-profile-view.tsx",
+        "src/sections/account/view/account-2fa-view.tsx",
+        "src/sections/account/index.ts"
+      ],
+      "hooks_services": [
+        "useState",
+        "useAccountFacade"
+      ],
+      "external_libs": [
+        "react",
+        "@mui/material"
+      ],
+      "status": "ativo (segurança simulada, sem criptografia real)"
+    },
+    {
+      "path": "DevOS-Desktop/src/sections/account/account-change-password.tsx",
+      "name": "account-change-password.tsx",
+      "category": "componente/seguranca",
+      "responsibility": "Formulário de troca de senha com validação Zod, toggle de biometria nativa simulada e lista mockada de dispositivos conectados.",
+      "imports": [
+        "zod",
+        "react",
+        "react-hook-form",
+        "@hookform/resolvers/zod",
+        "@mui/material",
+        "src/shared/components/snackbar",
+        "src/shared/components/iconify",
+        "src/shared/components/hook-form"
+      ],
+      "used_by": [
+        "src/sections/user/view/user-profile-view.tsx",
+        "src/sections/account/view/account-change-password-view.tsx",
+        "src/sections/account/index.ts"
+      ],
+      "hooks_services": [
+        "useState",
+        "useForm"
+      ],
+      "external_libs": [
+        "zod",
+        "react-hook-form",
+        "@hookform/resolvers/zod",
+        "@mui/material"
+      ],
+      "status": "ativo (crítico: simula alteração sem chamar cofre nativo VaultBridge)"
+    },
+    {
+      "path": "DevOS-Desktop/src/sections/account/account-socials.tsx",
+      "name": "account-socials.tsx",
+      "category": "componente/formulario",
+      "responsibility": "Formulário para cadastro de perfis sociais (Facebook, Instagram, LinkedIn, X/Twitter).",
+      "imports": [
+        "react",
+        "react-hook-form",
+        "@mui/material",
+        "src/shared/components/snackbar",
+        "src/shared/components/iconify",
+        "src/shared/components/hook-form"
+      ],
+      "used_by": [
+        "src/sections/user/view/user-profile-view.tsx",
+        "src/sections/account/view/account-socials-view.tsx",
+        "src/sections/account/index.ts"
+      ],
+      "hooks_services": [
+        "useForm"
+      ],
+      "external_libs": [
+        "react",
+        "react-hook-form",
+        "@mui/material"
+      ],
+      "status": "ativo (crítico: onSubmit não salva dados no useAccountFacade nem em storage)"
+    },
+    {
+      "path": "DevOS-Desktop/src/sections/account/account-notifications.tsx",
+      "name": "account-notifications.tsx",
+      "category": "componente/formulario",
+      "responsibility": "Formulário de seleção de canais de notificação (Email, SMS, WhatsApp, Push) e eventos cadastrais.",
+      "imports": [
+        "react",
+        "react-hook-form",
+        "@mui/material",
+        "src/shared/components/snackbar"
+      ],
+      "used_by": [
+        "src/sections/user/view/user-profile-view.tsx",
+        "src/sections/account/view/account-notifications-view.tsx",
+        "src/sections/account/index.ts"
+      ],
+      "hooks_services": [
+        "useForm"
+      ],
+      "external_libs": [
+        "react",
+        "react-hook-form",
+        "@mui/material"
+      ],
+      "status": "ativo (crítico: onSubmit não salva preferências em nenhum local)"
+    },
+    {
+      "path": "DevOS-Desktop/src/sections/account/index.ts",
+      "name": "index.ts",
+      "category": "utilitário/barril",
+      "responsibility": "Reexportação de todos os componentes e views de conta.",
+      "imports": [
+        "./view",
+        "./use-account",
+        "./account-2fa",
+        "./account-layout",
+        "./account-general",
+        "./account-socials",
+        "./account-notifications",
+        "./account-change-password"
+      ],
+      "used_by": [
+        "src/pages/user/account/*"
+      ],
+      "hooks_services": [],
+      "external_libs": [],
+      "status": "ativo"
+    },
+    {
+      "path": "DevOS-Desktop/src/sections/account/view/account-general-view.tsx",
+      "name": "account-general-view.tsx",
+      "category": "componente/view",
+      "responsibility": "Envolve AccountGeneral dentro de AccountLayout para rota dedicada.",
+      "imports": [
+        "react",
+        "../account-layout",
+        "../account-general"
+      ],
+      "used_by": [
+        "./index.ts",
+        "src/pages/user/account/general.tsx"
+      ],
+      "hooks_services": [],
+      "external_libs": [
+        "react"
+      ],
+      "status": "ativo (duplicidade conceitual com user-profile-view)"
+    },
+    {
+      "path": "DevOS-Desktop/src/sections/account/view/account-socials-view.tsx",
+      "name": "account-socials-view.tsx",
+      "category": "componente/view",
+      "responsibility": "Envolve AccountSocials dentro de AccountLayout para rota dedicada.",
+      "imports": [
+        "react",
+        "../account-layout",
+        "../account-socials"
+      ],
+      "used_by": [
+        "./index.ts",
+        "src/pages/user/account/socials.tsx"
+      ],
+      "hooks_services": [],
+      "external_libs": [
+        "react"
+      ],
+      "status": "ativo"
+    },
+    {
+      "path": "DevOS-Desktop/src/sections/account/view/account-2fa-view.tsx",
+      "name": "account-2fa-view.tsx",
+      "category": "componente/view",
+      "responsibility": "Envolve AccountTwoFA dentro de AccountLayout para rota dedicada.",
+      "imports": [
+        "react",
+        "../account-layout",
+        "../account-2fa"
+      ],
+      "used_by": [
+        "./index.ts",
+        "src/pages/user/account/2fa.tsx"
+      ],
+      "hooks_services": [],
+      "external_libs": [
+        "react"
+      ],
+      "status": "ativo"
+    },
+    {
+      "path": "DevOS-Desktop/src/sections/account/view/account-change-password-view.tsx",
+      "name": "account-change-password-view.tsx",
+      "category": "componente/view",
+      "responsibility": "Envolve AccountChangePassword dentro de AccountLayout para rota dedicada.",
+      "imports": [
+        "react",
+        "../account-layout",
+        "../account-change-password"
+      ],
+      "used_by": [
+        "./index.ts",
+        "src/pages/user/account/change-password.tsx"
+      ],
+      "hooks_services": [],
+      "external_libs": [
+        "react"
+      ],
+      "status": "ativo"
+    },
+    {
+      "path": "DevOS-Desktop/src/sections/account/view/account-notifications-view.tsx",
+      "name": "account-notifications-view.tsx",
+      "category": "componente/view",
+      "responsibility": "Envolve AccountNotifications dentro de AccountLayout para rota dedicada.",
+      "imports": [
+        "react",
+        "../account-layout",
+        "../account-notifications"
+      ],
+      "used_by": [
+        "./index.ts",
+        "src/pages/user/account/notifications.tsx"
+      ],
+      "hooks_services": [],
+      "external_libs": [
+        "react"
+      ],
+      "status": "ativo"
+    },
+    {
+      "path": "DevOS-Desktop/src/sections/account/view/index.ts",
+      "name": "index.ts",
+      "category": "utilitário/barril",
+      "responsibility": "Reexportação das views de conta.",
+      "imports": [
+        "./account-2fa-view",
+        "./account-general-view",
+        "./account-socials-view",
+        "./account-notifications-view",
+        "./account-change-password-view"
+      ],
+      "used_by": [
+        "../index.ts"
+      ],
+      "hooks_services": [],
+      "external_libs": [],
+      "status": "ativo"
+    },
+    {
+      "path": "DevOS-Desktop/src/modules/identity/index.ts",
+      "name": "index.ts",
+      "category": "utilitário/barril",
+      "responsibility": "Reexportação pública do módulo identity.",
+      "imports": [
+        "./presentation/components/host-integrity-card"
+      ],
+      "used_by": [],
+      "hooks_services": [],
+      "external_libs": [],
+      "status": "ativo (stub: módulo subutilizado)"
+    },
+    {
+      "path": "DevOS-Desktop/src/modules/identity/presentation/components/host-integrity-card.tsx",
+      "name": "host-integrity-card.tsx",
+      "category": "componente",
+      "responsibility": "Apresenta status do hardware host, isolamento de privilégios e estado de enrollment.",
+      "imports": [
+        "react",
+        "@mui/material",
+        "src/shared/components/data-display",
+        "src/theme",
+        "src/platform/tauri"
+      ],
+      "used_by": [
+        "../index.ts"
+      ],
+      "hooks_services": [],
+      "external_libs": [
+        "react",
+        "@mui/material"
+      ],
+      "status": "ativo"
+    },
+    {
+      "path": "DevOS-Desktop/src/modules/authentication/application/facades.ts",
+      "name": "facades.ts",
+      "category": "hook/fachada",
+      "responsibility": "Fachada que expõe useUserProfile() com valores fixos ('Operador DevOS', 'operador@asppibra.com').",
+      "imports": [],
+      "used_by": [
+        "src/app/layouts/components/nav-upgrade.tsx"
+      ],
+      "hooks_services": [],
+      "external_libs": [],
+      "status": "mock (duplicidade de useUserProfile)"
+    },
+    {
+      "path": "DevOS-Desktop/src/modules/authentication/application/hooks.ts",
+      "name": "hooks.ts",
+      "category": "hook/contexto",
+      "responsibility": "Define tipos AuthUser, AuthContextValue e DEFAULT_OPERATOR_USER estático com id '01'.",
+      "imports": [],
+      "used_by": [
+        "src/modules/authentication/index.ts"
+      ],
+      "hooks_services": [],
+      "external_libs": [],
+      "status": "ativo (dados de sessão estáticos)"
+    },
+    {
+      "path": "DevOS-Desktop/src/modules/authentication/context/jwt.ts",
+      "name": "jwt.ts",
+      "category": "serviço/autenticação",
+      "responsibility": "Ponte entre tela de autenticação e cofre nativo Tauri (VaultBridge.unlock/setup); rejeita login Web3 com erro explícito por ausência de prova criptográfica.",
+      "imports": [
+        "src/platform/tauri/core/invoke",
+        "src/platform/tauri/vault/vault-bridge"
+      ],
+      "used_by": [
+        "src/modules/authentication/presentation/views/*"
+      ],
+      "hooks_services": [],
+      "external_libs": [],
+      "status": "ativo"
+    },
+    {
+      "path": "DevOS-Desktop/src/app/editions/node/hooks/use-user-profile.ts",
+      "name": "use-user-profile.ts",
+      "category": "hook",
+      "responsibility": "Hook de perfil para edição DevOS Node retornando dados fixos de 'Operador de Nó Holder'.",
+      "imports": [],
+      "used_by": [
+        "src/app/editions/node/node-dashboard-page.tsx"
+      ],
+      "hooks_services": [],
+      "external_libs": [],
+      "status": "mock (duplicidade com useAccountFacade e facades.ts)"
+    },
+    {
+      "path": "DevOS-Desktop/src-tauri/templates/contrato_adesao_associado.typ",
+      "name": "contrato_adesao_associado.typ",
+      "category": "template/typst",
+      "responsibility": "Modelo canônico Typst ABNT NBR 14724 para filiação e admissão ao quadro social da ASPPIBRA DAO.",
+      "imports": [
+        "asppibra_layout.typ"
+      ],
+      "used_by": [
+        "src-tauri/src/modules/documents/typst_renderer.rs"
+      ],
+      "hooks_services": [],
+      "external_libs": [
+        "Typst 0.15"
+      ],
+      "status": "ativo (desconectado do frontend de cadastro de usuário)"
+    }
+  ],
+  "routes": [
+    {
+      "path": "/user",
+      "page": "UserProfilePage",
+      "component": "UserProfileView",
+      "layout": "DevOSLayout",
+      "protection": "Cofre desbloqueado (AppBootstrapProvider state == READY_UNLOCKED)",
+      "purpose": "Alias raiz para perfil do usuário"
+    },
+    {
+      "path": "/user/profile",
+      "page": "UserProfilePage",
+      "component": "UserProfileView",
+      "layout": "DevOSLayout",
+      "query_params": [
+        "tab = profile | identity | notifications | socials | security | 2fa"
+      ],
+      "protection": "Cofre desbloqueado",
+      "purpose": "Página panorâmica com perfil e abas integradas"
+    },
+    {
+      "path": "/user/account",
+      "page": "AccountGeneralPage",
+      "component": "AccountGeneralView",
+      "layout": "DevOSLayout > AccountLayout",
+      "protection": "Cofre desbloqueado",
+      "purpose": "Aba Perfil Geral / Identidade Civil"
+    },
+    {
+      "path": "/user/account/notifications",
+      "page": "AccountNotificationsPage",
+      "component": "AccountNotificationsView",
+      "layout": "DevOSLayout > AccountLayout",
+      "protection": "Cofre desbloqueado",
+      "purpose": "Aba Canais de Notificação"
+    },
+    {
+      "path": "/user/account/socials",
+      "page": "AccountSocialsPage",
+      "component": "AccountSocialsView",
+      "layout": "DevOSLayout > AccountLayout",
+      "protection": "Cofre desbloqueado",
+      "purpose": "Aba Redes Sociais"
+    },
+    {
+      "path": "/user/account/change-password",
+      "page": "AccountChangePasswordPage",
+      "component": "AccountChangePasswordView",
+      "layout": "DevOSLayout > AccountLayout",
+      "protection": "Cofre desbloqueado",
+      "purpose": "Aba Segurança e Alteração de Senha"
+    },
+    {
+      "path": "/user/account/2fa",
+      "page": "AccountTwoFAPage",
+      "component": "AccountTwoFAView",
+      "layout": "DevOSLayout > AccountLayout",
+      "protection": "Cofre desbloqueado",
+      "purpose": "Aba Autenticador 2FA e Vínculos Web3/SSO"
+    }
+  ],
+  "ipc_matrix": [
+    {
+      "operation": "Carregar Perfil do Usuário",
+      "frontend_component": "useAccountFacade / UserProfileView",
+      "ipc_command": "devos_get_user_profile",
+      "rust_function": "INEXISTENTE",
+      "sqlite_table": "INEXISTENTE (lê do localStorage)",
+      "status": "NÃO IMPLEMENTADA (pendência crítica)"
+    },
+    {
+      "operation": "Salvar Perfil do Usuário",
+      "frontend_component": "AccountGeneral / useAccountFacade",
+      "ipc_command": "devos_save_user_profile",
+      "rust_function": "INEXISTENTE",
+      "sqlite_table": "INEXISTENTE (grava no localStorage)",
+      "status": "NÃO IMPLEMENTADA (pendência crítica)"
+    },
+    {
+      "operation": "Atualizar Preferências de Notificação",
+      "frontend_component": "AccountNotifications",
+      "ipc_command": "devos_update_notification_preferences",
+      "rust_function": "INEXISTENTE",
+      "sqlite_table": "INEXISTENTE",
+      "status": "APENAS SIMULADA (toast no onSubmit)"
+    },
+    {
+      "operation": "Atualizar Redes Sociais",
+      "frontend_component": "AccountSocials",
+      "ipc_command": "devos_update_user_socials",
+      "rust_function": "INEXISTENTE",
+      "sqlite_table": "INEXISTENTE",
+      "status": "APENAS SIMULADA (toast no onSubmit)"
+    },
+    {
+      "operation": "Alterar Senha Mestre de Acesso",
+      "frontend_component": "AccountChangePassword",
+      "ipc_command": "devos_change_master_password",
+      "rust_function": "INEXISTENTE (apenas init_master_password existe no setup)",
+      "sqlite_table": "vault_header",
+      "status": "APENAS SIMULADA (toast no onSubmit)"
+    },
+    {
+      "operation": "Configurar e Validar TOTP 2FA",
+      "frontend_component": "AccountTwoFA",
+      "ipc_command": "devos_verify_totp_token",
+      "rust_function": "INEXISTENTE",
+      "sqlite_table": "INEXISTENTE",
+      "status": "APENAS SIMULADA (valida length == 6)"
+    },
+    {
+      "operation": "Vincular Carteira Externa Web3",
+      "frontend_component": "AccountTwoFA",
+      "ipc_command": "devos_link_external_wallet",
+      "rust_function": "INEXISTENTE",
+      "sqlite_table": "wallets (campo client_doc e user_name existem)",
+      "status": "APENAS SIMULADA (valida 0x no input)"
+    },
+    {
+      "operation": "Geração do Contrato de Adesão Associativa",
+      "frontend_component": "DocumentTemplatesGalleryView",
+      "ipc_command": "generate_document",
+      "rust_function": "generate_document",
+      "sqlite_table": "N/A (arquivos no disco)",
+      "status": "IMPLEMENTADA NO BACKEND, MAS DESCONECTADA DO FORMULÁRIO DE USUÁRIO"
+    }
+  ],
+  "data_models": {
+    "UserAccountData": {
+      "source_file": "src/sections/account/use-account.ts",
+      "fields": [
+        {
+          "field": "firstName",
+          "type": "string",
+          "required": true,
+          "default": "'Sandro'",
+          "origin": "Formulário / localStorage",
+          "destination": "UI Header/Profile",
+          "validation": "min(1)"
+        },
+        {
+          "field": "lastName",
+          "type": "string",
+          "required": true,
+          "default": "'de Souza'",
+          "origin": "Formulário / localStorage",
+          "destination": "UI Header/Profile",
+          "validation": "min(1)"
+        },
+        {
+          "field": "username",
+          "type": "string",
+          "required": true,
+          "default": "'sandro_asppibra'",
+          "origin": "Formulário / localStorage",
+          "destination": "Identificador único",
+          "validation": "min(3), max(30), regex(^[a-z0-9_]+$)"
+        },
+        {
+          "field": "email",
+          "type": "string",
+          "required": true,
+          "default": "'sandro_ceo@asppibra.com.br'",
+          "origin": "Formulário / localStorage",
+          "destination": "Acesso e comunicação",
+          "validation": "email()"
+        },
+        {
+          "field": "photoURL",
+          "type": "string | null",
+          "required": false,
+          "default": "null",
+          "origin": "Upload local (blob:)",
+          "destination": "Avatar UI",
+          "validation": "optional"
+        },
+        {
+          "field": "coverURL",
+          "type": "string | null",
+          "required": false,
+          "default": "null",
+          "origin": "Upload local (blob:)",
+          "destination": "Banner UI",
+          "validation": "optional"
+        },
+        {
+          "field": "phoneNumber",
+          "type": "string",
+          "required": false,
+          "default": "'(21) 98765-4321'",
+          "origin": "Formulário",
+          "destination": "Contratos / Notificações",
+          "validation": "optional"
+        },
+        {
+          "field": "cpf",
+          "type": "string",
+          "required": false,
+          "default": "'123.456.789-00'",
+          "origin": "Formulário",
+          "destination": "Identidade civil / Contratos Typst",
+          "validation": "optional no schema (falha grave)"
+        },
+        {
+          "field": "rg",
+          "type": "string",
+          "required": false,
+          "default": "'20.123.456-7'",
+          "origin": "Formulário",
+          "destination": "Contratos Typst",
+          "validation": "optional"
+        },
+        {
+          "field": "rgIssuer",
+          "type": "string",
+          "required": false,
+          "default": "'SSP/RJ'",
+          "origin": "Formulário",
+          "destination": "Contratos Typst",
+          "validation": "optional"
+        },
+        {
+          "field": "cnh",
+          "type": "string",
+          "required": false,
+          "default": "'04829104829'",
+          "origin": "Formulário",
+          "destination": "Contratos Typst",
+          "validation": "optional"
+        },
+        {
+          "field": "cnhCategory",
+          "type": "string",
+          "required": false,
+          "default": "'AB'",
+          "origin": "Formulário",
+          "destination": "Contratos Typst",
+          "validation": "optional"
+        },
+        {
+          "field": "motherName",
+          "type": "string",
+          "required": false,
+          "default": "'Maria Silva de Souza'",
+          "origin": "Formulário",
+          "destination": "Qualificação Civil",
+          "validation": "optional"
+        },
+        {
+          "field": "fatherName",
+          "type": "string",
+          "required": false,
+          "default": "'José de Souza'",
+          "origin": "Formulário",
+          "destination": "Qualificação Civil",
+          "validation": "optional"
+        },
+        {
+          "field": "birthDate",
+          "type": "string | null",
+          "required": false,
+          "default": "'15/05/1985'",
+          "origin": "Formulário",
+          "destination": "Contratos Typst",
+          "validation": "optional"
+        },
+        {
+          "field": "nationality",
+          "type": "string",
+          "required": false,
+          "default": "'Brasileira'",
+          "origin": "Formulário",
+          "destination": "Contratos Typst",
+          "validation": "optional"
+        },
+        {
+          "field": "gender",
+          "type": "string",
+          "required": false,
+          "default": "'Masculino'",
+          "origin": "Formulário",
+          "destination": "Perfil",
+          "validation": "ausente no Zod"
+        },
+        {
+          "field": "maritalStatus",
+          "type": "string",
+          "required": false,
+          "default": "'Casado(a)'",
+          "origin": "Formulário",
+          "destination": "Contratos Typst",
+          "validation": "optional"
+        },
+        {
+          "field": "country",
+          "type": "string",
+          "required": true,
+          "default": "'Brasil'",
+          "origin": "Formulário",
+          "destination": "Endereço",
+          "validation": "min(1)"
+        },
+        {
+          "field": "address",
+          "type": "string",
+          "required": true,
+          "default": "'Estrada de Bambuí'",
+          "origin": "Formulário",
+          "destination": "Contratos Typst",
+          "validation": "min(1)"
+        },
+        {
+          "field": "addressNumber",
+          "type": "string",
+          "required": false,
+          "default": "'Km 4'",
+          "origin": "Formulário",
+          "destination": "Contratos Typst",
+          "validation": "optional"
+        },
+        {
+          "field": "complement",
+          "type": "string",
+          "required": false,
+          "default": "''",
+          "origin": "Formulário",
+          "destination": "Contratos Typst",
+          "validation": "optional"
+        },
+        {
+          "field": "neighborhood",
+          "type": "string",
+          "required": false,
+          "default": "'Bambuí'",
+          "origin": "Formulário",
+          "destination": "Contratos Typst",
+          "validation": "optional"
+        },
+        {
+          "field": "state",
+          "type": "string",
+          "required": true,
+          "default": "'RJ'",
+          "origin": "Formulário",
+          "destination": "Contratos Typst",
+          "validation": "min(1)"
+        },
+        {
+          "field": "city",
+          "type": "string",
+          "required": true,
+          "default": "'Maricá'",
+          "origin": "Formulário",
+          "destination": "Contratos Typst",
+          "validation": "min(1)"
+        },
+        {
+          "field": "zipCode",
+          "type": "string",
+          "required": true,
+          "default": "'24900-000'",
+          "origin": "Formulário",
+          "destination": "Contratos Typst",
+          "validation": "min(1)"
+        },
+        {
+          "field": "occupation",
+          "type": "string",
+          "required": false,
+          "default": "'Presidente Executivo / Operador de Nó'",
+          "origin": "Formulário",
+          "destination": "Contratos Typst",
+          "validation": "optional"
+        },
+        {
+          "field": "company",
+          "type": "string",
+          "required": false,
+          "default": "'ASPPIBRA DAO'",
+          "origin": "Formulário",
+          "destination": "Perfil",
+          "validation": "optional"
+        },
+        {
+          "field": "website",
+          "type": "string",
+          "required": false,
+          "default": "'https://asppibra.org.br'",
+          "origin": "Formulário",
+          "destination": "Perfil",
+          "validation": "optional"
+        },
+        {
+          "field": "about",
+          "type": "string",
+          "required": false,
+          "default": "'Liderança associativa...'",
+          "origin": "Formulário",
+          "destination": "Perfil",
+          "validation": "optional"
+        },
+        {
+          "field": "isPublic",
+          "type": "boolean",
+          "required": true,
+          "default": true,
+          "origin": "Formulário",
+          "destination": "Diretório de membros",
+          "validation": "boolean()"
+        },
+        {
+          "field": "personType",
+          "type": "'PF' | 'PJ'",
+          "required": false,
+          "default": "'PF'",
+          "origin": "Formulário",
+          "destination": "Qualificação jurídica",
+          "validation": "ausente no Zod"
+        },
+        {
+          "field": "legalRepresentative",
+          "type": "string",
+          "required": false,
+          "default": "''",
+          "origin": "Formulário",
+          "destination": "Contratos PJ",
+          "validation": "ausente no Zod"
+        },
+        {
+          "field": "legalRepresentativeCpf",
+          "type": "string",
+          "required": false,
+          "default": "''",
+          "origin": "Formulário",
+          "destination": "Contratos PJ",
+          "validation": "ausente no Zod"
+        },
+        {
+          "field": "linkedProviders",
+          "type": "LinkedProviders",
+          "required": false,
+          "default": "Objeto fixture",
+          "origin": "AccountTwoFA",
+          "destination": "Sessão e Web3",
+          "validation": "ausente no Zod"
+        }
+      ]
+    }
+  },
+  "typst_mapping": [
+    {
+      "typst_var": "associado_nome",
+      "frontend_source": "firstName + ' ' + lastName",
+      "backend_source": "user_profiles.full_name",
+      "required_in_template": true
+    },
+    {
+      "typst_var": "associado_cpf_cnpj",
+      "frontend_source": "cpf",
+      "backend_source": "user_profiles.cpf_cnpj",
+      "required_in_template": true
+    },
+    {
+      "typst_var": "associado_rg",
+      "frontend_source": "rg + ' ' + rgIssuer",
+      "backend_source": "user_profiles.rg_full",
+      "required_in_template": false
+    },
+    {
+      "typst_var": "associado_nacionalidade",
+      "frontend_source": "nationality",
+      "backend_source": "user_profiles.nationality",
+      "required_in_template": false
+    },
+    {
+      "typst_var": "associado_estado_civil",
+      "frontend_source": "maritalStatus",
+      "backend_source": "user_profiles.marital_status",
+      "required_in_template": false
+    },
+    {
+      "typst_var": "associado_profissao",
+      "frontend_source": "occupation",
+      "backend_source": "user_profiles.occupation",
+      "required_in_template": false
+    },
+    {
+      "typst_var": "associado_nascimento",
+      "frontend_source": "birthDate",
+      "backend_source": "user_profiles.birth_date",
+      "required_in_template": false
+    },
+    {
+      "typst_var": "associado_endereco",
+      "frontend_source": "address + ', ' + addressNumber + ' ' + complement + ', ' + neighborhood",
+      "backend_source": "user_profiles.address_line",
+      "required_in_template": true
+    },
+    {
+      "typst_var": "associado_municipio",
+      "frontend_source": "city",
+      "backend_source": "user_profiles.city",
+      "required_in_template": true
+    },
+    {
+      "typst_var": "associado_uf",
+      "frontend_source": "state",
+      "backend_source": "user_profiles.state",
+      "required_in_template": true
+    },
+    {
+      "typst_var": "associado_cep",
+      "frontend_source": "zipCode",
+      "backend_source": "user_profiles.zip_code",
+      "required_in_template": true
+    },
+    {
+      "typst_var": "associado_telefone",
+      "frontend_source": "phoneNumber",
+      "backend_source": "user_profiles.phone_number",
+      "required_in_template": false
+    },
+    {
+      "typst_var": "associado_email",
+      "frontend_source": "email",
+      "backend_source": "user_profiles.email",
+      "required_in_template": true
+    },
+    {
+      "typst_var": "associado_rep_legal",
+      "frontend_source": "legalRepresentative",
+      "backend_source": "user_profiles.legal_representative",
+      "required_in_template": false
+    },
+    {
+      "typst_var": "associado_rep_cpf",
+      "frontend_source": "legalRepresentativeCpf",
+      "backend_source": "user_profiles.legal_rep_cpf",
+      "required_in_template": false
+    },
+    {
+      "typst_var": "associado_categoria",
+      "frontend_source": "'Associado Titular Efetivo'",
+      "backend_source": "user_profiles.membership_category",
+      "required_in_template": true
+    }
+  ],
+  "issues_summary": {
+    "critical_count": 4,
+    "high_count": 6,
+    "medium_count": 5,
+    "low_count": 4,
+    "issues": [
+      {
+        "id": "SEC-01",
+        "severity": "CRÍTICO",
+        "title": "Armazenamento de Dados Pessoais Sensíveis e Identificadores Civis em localStorage Não Criptografado",
+        "file": "DevOS-Desktop/src/sections/account/use-account.ts",
+        "line": 105,
+        "evidence": "localStorage.setItem('devos_user_account_profile', JSON.stringify(updated)) armazena CPF, RG, filiação, CNH, data de nascimento e endereço em texto plano acessível por qualquer script no webview."
+      },
+      {
+        "id": "SEC-02",
+        "severity": "CRÍTICO",
+        "title": "Falsa Validação de Posse de Carteira Web3 (Zero Verificação Criptográfica)",
+        "file": "DevOS-Desktop/src/sections/account/account-2fa.tsx",
+        "line": 115,
+        "evidence": "O sistema apenas valida se a string digitada começa com '0x' e tem mais de 20 caracteres, marcando imediatamente walletVerified = true sem solicitar assinatura EIP-712/EIP-191 ou validar chave privada."
+      },
+      {
+        "id": "SEC-03",
+        "severity": "CRÍTICO",
+        "title": "Simulador de Alteração de Senha Mestre Sem Comunicação com o Cofre Criptográfico Nativo",
+        "file": "DevOS-Desktop/src/sections/account/account-change-password.tsx",
+        "line": 48,
+        "evidence": "O formulário de troca de senha valida oldPassword e newPassword mas na submissão apenas executa reset() e exibe toast de sucesso, deixando a senha do cofre nativo intocada."
+      },
+      {
+        "id": "SEC-04",
+        "severity": "CRÍTICO",
+        "title": "Comandos IPC devos_save_user_profile e devos_get_user_profile Não Existem no Backend Rust",
+        "file": "DevOS-Desktop/src-tauri/src/commands/mod.rs e lib.rs",
+        "line": 42,
+        "evidence": "Varredura completa confirmou que não existe nenhum comando IPC registrado ou implementado para salvar ou carregar perfil de usuário no backend Tauri/Rust."
+      },
+      {
+        "id": "INT-01",
+        "severity": "ALTO",
+        "title": "Ausência Total de Tabela de Usuário/Perfil no SQLite Local",
+        "file": "DevOS-Desktop/src-tauri/src/storage/migrations.rs",
+        "line": 35,
+        "evidence": "O banco SQLite local (devos_vault.sqlite) possui apenas tabelas vault_header, wallets e vault_secrets. Não existe tabela para persistir dados cadastrais, civis ou de conta do usuário."
+      },
+      {
+        "id": "INT-02",
+        "severity": "ALTO",
+        "title": "Perda Imediata de Imagens de Capa e Avatar por Uso de URL.createObjectURL Efêmero",
+        "file": "DevOS-Desktop/src/sections/user/profile-cover.tsx",
+        "line": 46,
+        "evidence": "URL.createObjectURL(file) gera blob: URLs que deixam de existir ao reiniciar a aplicação. O link quebrado é persistido no localStorage, corrompendo a renderização após o reload."
+      },
+      {
+        "id": "INT-03",
+        "severity": "ALTO",
+        "title": "Perda Silenciosa de Dados nas Telas de Redes Sociais e Notificações",
+        "file": "DevOS-Desktop/src/sections/account/account-socials.tsx e account-notifications.tsx",
+        "line": 39,
+        "evidence": "As telas possuem formulários completos mas os manipuladores onSubmit apenas disparam toast.success() sem salvar no useAccountFacade, localStorage ou backend."
+      },
+      {
+        "id": "INT-04",
+        "severity": "ALTO",
+        "title": "Desconexão Total Entre Dados do Usuário e o Motor de Emissão Typst (contrato_adesao_associado.typ)",
+        "file": "DevOS-Desktop/src/modules/documents/presentation/catalog/data/document-templates-registry.ts",
+        "line": 236,
+        "evidence": "O template Typst existe e funciona, mas é alimentado por uma fixture estática (sampleRequest com 'JOÃO SILVA DOS SANTOS') e o botão direciona para /devos/cessao-posse em vez de consumir os dados cadastrados em UserAccountData."
+      },
+      {
+        "id": "INT-05",
+        "severity": "ALTO",
+        "title": "Múltiplos Modelos de Usuário Divergentes e Conflitantes no Código",
+        "file": "src/sections/account/use-account.ts, src/sections/user/types.ts, src/modules/authentication/application/hooks.ts, src/app/editions/node/hooks/use-user-profile.ts",
+        "line": 1,
+        "evidence": "Existem pelo menos 4 tipos UserProfile / UserAccountData / AuthUser com propriedades incompatíveis e hardcodes distintos em cada módulo."
+      },
+      {
+        "id": "INT-06",
+        "severity": "ALTO",
+        "title": "Zero Testes Automatizados no Módulo de Usuário e Identidade",
+        "file": "DevOS-Desktop/src/test/",
+        "line": 1,
+        "evidence": "Nenhum arquivo de teste existe para testar o hook useAccountFacade, os componentes de formulário, validações ou fluxos de persistência."
+      }
+    ]
+  }
+}
