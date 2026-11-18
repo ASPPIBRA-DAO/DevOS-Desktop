@@ -12,6 +12,20 @@ fn default_person_type() -> String {
     PERSON_TYPE_PF.to_string()
 }
 
+/// DTO canônico de presenças sociais digitais cifrado no cofre.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SocialLinksDto {
+    #[serde(default)]
+    pub facebook: Option<String>,
+    #[serde(default)]
+    pub instagram: Option<String>,
+    #[serde(default)]
+    pub linkedin: Option<String>,
+    #[serde(default)]
+    pub twitter: Option<String>,
+}
+
 /// DTO canônico do Perfil do Usuário e Qualificação Civil exposto via Tauri IPC.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -59,6 +73,8 @@ pub struct UserProfileDto {
     pub cover_url: Option<String>,
     #[serde(default)]
     pub linked_providers: Vec<String>,
+    #[serde(default)]
+    pub social_links: Option<SocialLinksDto>,
 }
 
 impl Default for UserProfileDto {
@@ -104,6 +120,7 @@ impl Default for UserProfileDto {
             photo_url: None,
             cover_url: None,
             linked_providers: Vec::new(),
+            social_links: None,
         }
     }
 }
@@ -124,6 +141,8 @@ pub struct PublicUserProfileDto {
     pub photo_url: Option<String>,
     pub cover_url: Option<String>,
     pub is_public: bool,
+    #[serde(default)]
+    pub social_links: Option<SocialLinksDto>,
 }
 
 impl UserProfileDto {
@@ -143,6 +162,7 @@ impl UserProfileDto {
             photo_url: self.photo_url.clone(),
             cover_url: self.cover_url.clone(),
             is_public: true,
+            social_links: self.social_links.clone(),
         })
     }
 }
@@ -225,7 +245,55 @@ pub struct SaveUserProfileRequest {
     pub cover_url: Option<String>,
     #[serde(default)]
     pub linked_providers: Vec<String>,
+    #[serde(default)]
+    pub social_links: Option<SocialLinksDto>,
     pub expected_revision: Option<u64>,
+}
+
+impl Default for SaveUserProfileRequest {
+    fn default() -> Self {
+        Self {
+            person_type: default_person_type(),
+            username: None,
+            first_name: String::new(),
+            last_name: String::new(),
+            display_name: None,
+            cpf: String::new(),
+            rg: String::new(),
+            rg_issuer: String::new(),
+            cnh: String::new(),
+            cnh_category: String::new(),
+            mother_name: String::new(),
+            father_name: String::new(),
+            birth_date: String::new(),
+            nationality: "Brasileira".to_string(),
+            marital_status: String::new(),
+            company_name: String::new(),
+            cnpj: String::new(),
+            legal_representative: String::new(),
+            legal_representative_cpf: String::new(),
+            email: String::new(),
+            phone_number: String::new(),
+            country: "Brasil".to_string(),
+            zip_code: String::new(),
+            state: String::new(),
+            city: String::new(),
+            neighborhood: String::new(),
+            address: String::new(),
+            address_number: String::new(),
+            complement: String::new(),
+            occupation: String::new(),
+            company: String::new(),
+            website: String::new(),
+            about: String::new(),
+            is_public: false,
+            photo_url: None,
+            cover_url: None,
+            linked_providers: Vec::new(),
+            social_links: None,
+            expected_revision: None,
+        }
+    }
 }
 
 // ----------------------------------------------------------------------
