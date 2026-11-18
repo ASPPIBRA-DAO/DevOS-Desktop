@@ -593,5 +593,23 @@ describe('IdentityBridge — Tauri Native Identity & Vault IPC', () => {
       resetAccountStore();
       expect(true).toBe(true);
     });
+
+    it('userProfileToAccountData e accountDataToSavePayload devem mapear socialLinks bidirecionalmente', () => {
+      const profileWithSocials: UserProfile = {
+        ...sampleProfile,
+        socialLinks: {
+          linkedin: 'https://linkedin.com/in/maria',
+          twitter: 'https://x.com/maria',
+        },
+      };
+
+      const accountData = userProfileToAccountData(profileWithSocials);
+      expect(accountData.socialLinks?.linkedin).toBe('https://linkedin.com/in/maria');
+      expect(accountData.socialLinks?.twitter).toBe('https://x.com/maria');
+
+      const payload = accountDataToSavePayload(accountData);
+      expect(payload.socialLinks?.linkedin).toBe('https://linkedin.com/in/maria');
+      expect(payload.socialLinks?.twitter).toBe('https://x.com/maria');
+    });
   });
 });
