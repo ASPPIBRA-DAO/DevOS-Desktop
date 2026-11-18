@@ -8,6 +8,10 @@
 
 export type PersonType = 'PF' | 'PJ';
 
+export type SocialField = 'facebook' | 'instagram' | 'linkedin' | 'twitter';
+
+export type SocialLinks = Partial<Record<SocialField, string>>;
+
 /**
  * Modelo de dados de Perfil e Qualificação Civil decifrado da custódia do cofre.
  */
@@ -52,6 +56,7 @@ export interface UserProfile {
   photoUrl?: string | null;
   coverUrl?: string | null;
   linkedProviders?: string[];
+  socialLinks?: SocialLinks;
 }
 
 /**
@@ -95,5 +100,6 @@ export interface SaveUserProfilePayload {
   photoUrl?: string | null;
   coverUrl?: string | null;
   linkedProviders?: string[];
+  socialLinks?: SocialLinks;
   expectedRevision?: number | null;
 }
