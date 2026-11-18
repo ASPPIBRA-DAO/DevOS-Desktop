@@ -87,6 +87,29 @@ describe('AccountSocials — Validação e Normalização de Presença Digital',
     expect(errors.linkedin).toContain('ultrapassa o tamanho permitido');
   });
 
+  it('deve rejeitar valores que não sejam strings em tempo de execução', () => {
+    const invalidTypes = {
+      linkedin: 123456 as any,
+      twitter: { url: 'https://x.com/sandro' } as any,
+      facebook: true as any,
+    };
+
+    const { errors } = normalizeSocialLinks(invalidTypes);
+    expect(errors.linkedin).toContain('texto válido');
+    expect(errors.twitter).toContain('texto válido');
+    expect(errors.facebook).toContain('texto válido');
+  });
+
+  it('deve normalizar espaços ao redor da URL', () => {
+    const padded = {
+      linkedin: '   https://www.linkedin.com/in/sandro-dev   ',
+    };
+
+    const { values, errors } = normalizeSocialLinks(padded);
+    expect(errors).toEqual({});
+    expect(values.linkedin).toBe('https://www.linkedin.com/in/sandro-dev');
+  });
+
   it('ALLOWED_HOSTS deve conter domínios legítimos de cada plataforma', () => {
     expect(ALLOWED_HOSTS.linkedin).toContain('linkedin.com');
     expect(ALLOWED_HOSTS.twitter).toContain('x.com');
