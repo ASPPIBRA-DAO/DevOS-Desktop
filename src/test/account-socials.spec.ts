@@ -110,6 +110,16 @@ describe('AccountSocials — Validação e Normalização de Presença Digital',
     expect(values.linkedin).toBe('https://www.linkedin.com/in/sandro-dev');
   });
 
+  it('deve contabilizar o tamanho em bytes UTF-8 para caracteres multibyte', () => {
+    // 1000 caracteres de emoji (4 bytes cada = 4000 bytes > 2048)
+    const multibyteOversized = {
+      linkedin: `https://www.linkedin.com/in/${'🌐'.repeat(600)}`,
+    };
+
+    const { errors } = normalizeSocialLinks(multibyteOversized);
+    expect(errors.linkedin).toContain('ultrapassa o tamanho permitido');
+  });
+
   it('ALLOWED_HOSTS deve conter domínios legítimos de cada plataforma', () => {
     expect(ALLOWED_HOSTS.linkedin).toContain('linkedin.com');
     expect(ALLOWED_HOSTS.twitter).toContain('x.com');
