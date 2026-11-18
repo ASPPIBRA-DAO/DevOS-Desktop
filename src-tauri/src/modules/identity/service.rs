@@ -3,6 +3,7 @@
 //! Orquestra validações, criptografia de ponta a ponta (AES-256-GCM com chave derivada
 //! do cofre) e persistência transacional em SQLite.
 
+use url::Url;
 use zeroize::Zeroizing;
 
 use super::models::{
@@ -72,6 +73,97 @@ pub fn normalize_username(raw: &str) -> String {
         result.truncate(30);
     }
     result
+}
+
+/// Valida e sanitiza rigorosamente uma URL de rede social contra a allowlist da plataforma.
+pub fn sanitize_social_url(
+    platform: &str,
+    value: &Option<String>,
+) -> Result<Option<String>, IdentityError> {
+    let Some(raw_value) = value else {
+        return Ok(None);
+    };
+
+    let trimmed = raw_value.trim();
+
+    // Campos opcionais podem ser vazios
+    if trimmed.is_empty() {
+        return Ok(None);
+    }
+
+    // Limite de 2048 bytes UTF-8
+    if trimmed.len() > 2048 {
+        return Err(IdentityError::Validation(
+            "URL de rede social excede o limite permitido de 2048 bytes.".to_string(),
+        ));
+    }
+
+    // Parse real da URL via crate url::Url
+    let parsed = Url::parse(trimmed).map_err(|_| {
+        IdentityError::Validation("URL de rede social inválida ou malformada.".to_string())
+    })?;
+
+    // HTTPS obrigatório (rejeita http, javascript, data, ftp, etc.)
+    if parsed.scheme() != "https" {
+        return Err(IdentityError::Validation(
+            "A URL de rede social deve utilizar protocolo seguro HTTPS.".to_string(),
+        ));
+    }
+
+    // Bloqueia credenciais embutidas (ex: https://user:pass@host)
+    if !parsed.username().is_empty() || parsed.password().is_some() {
+        return Err(IdentityError::Validation(
+            "URLs com credenciais embutidas não são permitidas.".to_string(),
+        ));
+    }
+
+    // Bloqueia portas não convencionais (ex: https://host:8080)
+    if parsed.port().is_some() {
+        return Err(IdentityError::Validation(
+            "Portas personalizadas não são permitidas em URLs de redes sociais.".to_string(),
+        ));
+    }
+
+    // Allowlist estrita de hostnames legítimos por plataforma
+    let allowed_hosts: &[&str] = match platform {
+        "facebook" => &[
+            "facebook.com",
+            "www.facebook.com",
+            "m.facebook.com",
+            "fb.com",
+            "www.fb.com",
+        ],
+        "instagram" => &[
+            "instagram.com",
+            "www.instagram.com",
+        ],
+        "linkedin" => &[
+            "linkedin.com",
+            "www.linkedin.com",
+        ],
+        "twitter" => &[
+            "x.com",
+            "www.x.com",
+            "twitter.com",
+            "www.twitter.com",
+        ],
+        _ => {
+            return Err(IdentityError::Validation(
+                "Plataforma de rede social não autorizada.".to_string(),
+            ));
+        }
+    };
+
+    let hostname = parsed.host_str().unwrap_or_default().to_ascii_lowercase();
+
+    if !allowed_hosts.contains(&hostname.as_str()) {
+        return Err(IdentityError::Validation(format!(
+            "O domínio '{}' não pertence à plataforma autorizada ({}).",
+            hostname, platform
+        )));
+    }
+
+    Ok(Some(parsed.to_string()))
 }
 
 pub struct IdentityService;
@@ -303,36 +395,12 @@ impl IdentityService {
         };
 
         let social_links = match &req.social_links {
-            Some(links) => {
-                let clean_url = |val: &Option<String>| -> Result<Option<String>, IdentityError> {
-                    match val {
-                        Some(u) => {
-                            let trimmed = u.trim();
-                            if trimmed.is_empty() {
-                                Ok(None)
-                            } else if trimmed.len() > 2048 {
-                                Err(IdentityError::Validation(
-                                    "URL de rede social excede o limite de 2048 caracteres.".to_string(),
-                                ))
-                            } else if !trimmed.starts_with("https://") {
-                                Err(IdentityError::Validation(
-                                    "URL de rede social deve utilizar protocolo seguro HTTPS.".to_string(),
-                                ))
-                            } else {
-                                Ok(Some(trimmed.to_string()))
-                            }
-                        }
-                        None => Ok(None),
-                    }
-                };
-
-                Some(SocialLinksDto {
-                    facebook: clean_url(&links.facebook)?,
-                    instagram: clean_url(&links.instagram)?,
-                    linkedin: clean_url(&links.linkedin)?,
-                    twitter: clean_url(&links.twitter)?,
-                })
-            }
+            Some(links) => Some(SocialLinksDto {
+                facebook: sanitize_social_url("facebook", &links.facebook)?,
+                instagram: sanitize_social_url("instagram", &links.instagram)?,
+                linkedin: sanitize_social_url("linkedin", &links.linkedin)?,
+                twitter: sanitize_social_url("twitter", &links.twitter)?,
+            }),
             None => existing_profile
                 .as_ref()
                 .and_then(|p| p.social_links.clone()),
@@ -437,8 +505,9 @@ impl IdentityService {
         let expected_revision = req.expected_revision;
         let mut profile = Self::sanitize_and_validate(&req, existing.as_ref())?;
 
-        let payload_json = serde_json::to_vec(&profile)
-            .map_err(|_| IdentityError::Serialization)?;
+        let payload_json = Zeroizing::new(
+            serde_json::to_vec(&profile).map_err(|_| IdentityError::Serialization)?
+        );
 
         // Cifra os dados com a chave do cofre em memória
         let envelope = session
@@ -916,5 +985,56 @@ mod tests {
         assert_eq!(saved_pf_again.company_name, "Minha Empresa Ltda");
         assert_eq!(saved_pf_again.cnpj, "12.ABC.345/01DE-35");
         assert_eq!(saved_pf_again.legal_representative, "João Silva");
+    }
+
+    #[test]
+    fn test_social_url_validation_security() {
+        // 1. URL legítima de cada plataforma com HTTPS
+        let linkedin = Some("https://www.linkedin.com/in/devos".to_string());
+        assert!(sanitize_social_url("linkedin", &linkedin).is_ok());
+
+        let twitter = Some("https://x.com/devos_dao".to_string());
+        assert!(sanitize_social_url("twitter", &twitter).is_ok());
+
+        let fb = Some("https://facebook.com/devos".to_string());
+        assert!(sanitize_social_url("facebook", &fb).is_ok());
+
+        let insta = Some("https://instagram.com/devos".to_string());
+        assert!(sanitize_social_url("instagram", &insta).is_ok());
+
+        // 2. Domínio falso (phishing / spoofing de subdomínio)
+        let fake_host = Some("https://linkedin.com.site-malicioso.com".to_string());
+        assert!(sanitize_social_url("linkedin", &fake_host).is_err());
+
+        // 3. Plataforma cruzada / incorreta
+        let wrong_platform = Some("https://linkedin.com/in/user".to_string());
+        assert!(sanitize_social_url("instagram", &wrong_platform).is_err());
+
+        // 4. Credenciais embutidas na URL
+        let credentials = Some("https://admin:secret@linkedin.com".to_string());
+        assert!(sanitize_social_url("linkedin", &credentials).is_err());
+
+        // 5. Porta não convencional
+        let custom_port = Some("https://x.com:8080/user".to_string());
+        assert!(sanitize_social_url("twitter", &custom_port).is_err());
+
+        // 6. Protocolo inseguro HTTP
+        let insecure = Some("http://linkedin.com/in/user".to_string());
+        assert!(sanitize_social_url("linkedin", &insecure).is_err());
+
+        // 7. URL malformada
+        let malformed = Some("https://".to_string());
+        assert!(sanitize_social_url("linkedin", &malformed).is_err());
+
+        // 8. Campo opcional vazio ou nulo
+        let empty = Some(String::new());
+        assert_eq!(sanitize_social_url("linkedin", &empty).unwrap(), None);
+
+        let none: Option<String> = None;
+        assert_eq!(sanitize_social_url("linkedin", &none).unwrap(), None);
+
+        // 9. Excesso de bytes (> 2048)
+        let too_long = Some(format!("https://linkedin.com/in/{}", "a".repeat(2048)));
+        assert!(sanitize_social_url("linkedin", &too_long).is_err());
     }
 }
