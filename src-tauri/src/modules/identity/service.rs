@@ -7,7 +7,7 @@ use zeroize::Zeroizing;
 
 use super::models::{
     calculate_completeness_score, validate_and_normalize_date, validate_cep, validate_cnpj,
-    validate_cpf, SaveUserProfileRequest, UserProfileDto, PERSON_TYPE_PF, PERSON_TYPE_PJ,
+    validate_cpf, SaveUserProfileRequest, SocialLinksDto, UserProfileDto, PERSON_TYPE_PF, PERSON_TYPE_PJ,
 };
 use super::repository::IdentityRepository;
 use crate::modules::vault::access_control::VaultSession;
@@ -302,6 +302,42 @@ impl IdentityService {
             )
         };
 
+        let social_links = match &req.social_links {
+            Some(links) => {
+                let clean_url = |val: &Option<String>| -> Result<Option<String>, IdentityError> {
+                    match val {
+                        Some(u) => {
+                            let trimmed = u.trim();
+                            if trimmed.is_empty() {
+                                Ok(None)
+                            } else if trimmed.len() > 2048 {
+                                Err(IdentityError::Validation(
+                                    "URL de rede social excede o limite de 2048 caracteres.".to_string(),
+                                ))
+                            } else if !trimmed.starts_with("https://") {
+                                Err(IdentityError::Validation(
+                                    "URL de rede social deve utilizar protocolo seguro HTTPS.".to_string(),
+                                ))
+                            } else {
+                                Ok(Some(trimmed.to_string()))
+                            }
+                        }
+                        None => Ok(None),
+                    }
+                };
+
+                Some(SocialLinksDto {
+                    facebook: clean_url(&links.facebook)?,
+                    instagram: clean_url(&links.instagram)?,
+                    linkedin: clean_url(&links.linkedin)?,
+                    twitter: clean_url(&links.twitter)?,
+                })
+            }
+            None => existing_profile
+                .as_ref()
+                .and_then(|p| p.social_links.clone()),
+        };
+
         let mut profile = UserProfileDto {
             person_type,
             username,
@@ -343,6 +379,7 @@ impl IdentityService {
             photo_url: req.photo_url.clone(),
             cover_url: req.cover_url.clone(),
             linked_providers: req.linked_providers.clone(),
+            social_links,
         };
 
         profile.completeness_score = calculate_completeness_score(&profile);
@@ -505,6 +542,7 @@ impl IdentityService {
             photo_url: value.get("photoURL").and_then(|v| v.as_str()).map(|s| s.to_string()),
             cover_url: value.get("coverURL").and_then(|v| v.as_str()).map(|s| s.to_string()),
             linked_providers: Vec::new(),
+            social_links: None,
             expected_revision: None,
         };
 
@@ -578,6 +616,12 @@ mod tests {
             photo_url: None,
             cover_url: None,
             linked_providers: Vec::new(),
+            social_links: Some(SocialLinksDto {
+                facebook: Some("https://facebook.com/carlos".to_string()),
+                instagram: Some("https://instagram.com/carlos".to_string()),
+                linkedin: Some("https://linkedin.com/in/carlos".to_string()),
+                twitter: Some("https://x.com/carlos".to_string()),
+            }),
             expected_revision: None,
         };
 
@@ -588,12 +632,20 @@ mod tests {
         assert_eq!(saved.zip_code, "01310-100");
         assert_eq!(saved.display_name, "Carlos Silva");
         assert!(saved.completeness_score > 70);
+        assert_eq!(
+            saved.social_links.as_ref().unwrap().linkedin.as_deref(),
+            Some("https://linkedin.com/in/carlos")
+        );
 
         let loaded = IdentityService::get_profile(&db, &session)
             .expect("Deveria ler")
             .expect("Perfil deve existir");
         assert_eq!(loaded.revision, 1);
         assert_eq!(loaded.username, "carlos_silva");
+        assert_eq!(
+            loaded.social_links.as_ref().unwrap().twitter.as_deref(),
+            Some("https://x.com/carlos")
+        );
         assert_eq!(loaded.first_name, "Carlos");
         assert_eq!(loaded.cpf, "529.982.247-25");
         assert_eq!(loaded.email, "carlos@exemplo.com.br");
@@ -641,6 +693,7 @@ mod tests {
             photo_url: None,
             cover_url: None,
             linked_providers: Vec::new(),
+            social_links: None,
             expected_revision: None,
         };
 
@@ -689,6 +742,7 @@ mod tests {
                 photo_url: None,
                 cover_url: None,
                 linked_providers: Vec::new(),
+                social_links: None,
                 expected_revision: None,
             }
         };
@@ -750,6 +804,7 @@ mod tests {
             photo_url: None,
             cover_url: None,
             linked_providers: Vec::new(),
+            social_links: None,
             expected_revision: None,
         };
 
@@ -796,6 +851,7 @@ mod tests {
             photo_url: None,
             cover_url: None,
             linked_providers: Vec::new(),
+            social_links: None,
             expected_revision: Some(saved_pf.revision),
         };
 
@@ -846,6 +902,7 @@ mod tests {
             photo_url: None,
             cover_url: None,
             linked_providers: Vec::new(),
+            social_links: None,
             expected_revision: Some(saved_pj.revision),
         };
 
