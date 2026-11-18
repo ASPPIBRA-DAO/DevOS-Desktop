@@ -1,4 +1,8 @@
-import type { UserProfile, SaveUserProfilePayload } from 'src/platform/tauri/contracts/identity-contracts';
+import type {
+  UserProfile,
+  SocialLinks,
+  SaveUserProfilePayload,
+} from 'src/platform/tauri/contracts/identity-contracts';
 
 import { useEffect, useSyncExternalStore } from 'react';
 
@@ -59,6 +63,7 @@ export type UserAccountData = {
   revision?: number;
   updatedAt?: string;
   linkedProviders?: LinkedProviders;
+  socialLinks?: SocialLinks;
 };
 
 export const LEGACY_STORAGE_KEY = 'devos_user_account_profile';
@@ -381,6 +386,7 @@ export function userProfileToAccountData(profile: UserProfile, current?: UserAcc
       githubVerified: false,
       strictAuthEnabled: false,
     },
+    socialLinks: profile.socialLinks ?? current?.socialLinks,
   };
 }
 
@@ -439,6 +445,7 @@ export function accountDataToSavePayload(
     isPublic: data.isPublic ?? false,
     photoUrl: data.photoURL ?? null,
     coverUrl: data.coverURL ?? null,
+    socialLinks: data.socialLinks,
     expectedRevision: currentRevision !== undefined && currentRevision > 0 ? currentRevision : undefined,
   };
 }
