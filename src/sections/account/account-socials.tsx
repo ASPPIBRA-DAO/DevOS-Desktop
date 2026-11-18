@@ -16,15 +16,16 @@ import { Form, Field } from 'src/shared/components/hook-form';
 
 export type SocialField = 'facebook' | 'instagram' | 'linkedin' | 'twitter';
 
-export type SocialLinks = Partial<Record<SocialField, string>>;
+export type SocialLinks = Partial<Record<SocialField, string | null>>;
 
 export type SocialFormValues = Record<SocialField, string>;
 
 export type SaveSocialLinks = (links: SocialFormValues) => Promise<void> | void;
 
 type Props = {
-  socialLinks?: SocialLinks;
+  socialLinks?: SocialLinks | null;
   onSave?: SaveSocialLinks;
+  canSave?: boolean;
 };
 
 type SocialFieldConfig = {
@@ -82,7 +83,7 @@ function safeString(value: unknown): string {
 
 // ----------------------------------------------------------------------
 
-export function createDefaultValues(socialLinks?: SocialLinks): SocialFormValues {
+export function createDefaultValues(socialLinks?: SocialLinks | null): SocialFormValues {
   return {
     facebook: safeString(socialLinks?.facebook),
     instagram: safeString(socialLinks?.instagram),
@@ -129,8 +130,9 @@ export function normalizeSocialLinks(
       continue;
     }
 
-    if (rawValue.length > MAX_URL_LENGTH) {
-      errors[name] = 'A URL ultrapassa o tamanho permitido de 2.048 caracteres.';
+    const urlByteLength = new TextEncoder().encode(rawValue).byteLength;
+    if (urlByteLength > MAX_URL_LENGTH) {
+      errors[name] = 'A URL ultrapassa o tamanho permitido de 2.048 bytes.';
       continue;
     }
 
@@ -160,7 +162,7 @@ export function normalizeSocialLinks(
 
 // ----------------------------------------------------------------------
 
-export function AccountSocials({ socialLinks, onSave }: Props) {
+export function AccountSocials({ socialLinks, onSave, canSave = true }: Props) {
   const methods = useForm<SocialFormValues>({
     defaultValues: createDefaultValues(socialLinks),
     mode: 'onBlur',
@@ -280,7 +282,7 @@ export function AccountSocials({ socialLinks, onSave }: Props) {
           <Button
             type="submit"
             variant="contained"
-            disabled={isSubmitting || !onSave}
+            disabled={isSubmitting || !onSave || !canSave}
             size="large"
             sx={{ px: 4, fontWeight: 800 }}
           >
