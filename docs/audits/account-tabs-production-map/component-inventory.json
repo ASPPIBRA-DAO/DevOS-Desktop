@@ -1,0 +1,129 @@
+{
+  "section": "Central de Identidade Digital / Minha Conta",
+  "totalComponents": 16,
+  "tabs": [
+    {
+      "id": "general",
+      "tabIndex": 1,
+      "name": "Perfil Geral / Identidade Civil",
+      "route": "/user/account",
+      "status": "IMPLEMENTADA E CONECTADA",
+      "page": {
+        "name": "AccountGeneralPage",
+        "path": "src/pages/user/account/general.tsx"
+      },
+      "view": {
+        "name": "AccountGeneralView",
+        "path": "src/sections/account/view/account-general-view.tsx"
+      },
+      "component": {
+        "name": "AccountGeneral",
+        "path": "src/sections/account/account-general.tsx",
+        "hooks": ["useAccountFacade", "useForm", "useWatch", "useMemo", "useEffect"],
+        "services": ["IdentityBridge.getUserProfile", "IdentityBridge.saveUserProfile", "IdentityBridge.importLegacyProfile"],
+        "persistence": "devos_vault.sqlite (user_profiles)",
+        "readiness": "APROVADA"
+      }
+    },
+    {
+      "id": "notifications",
+      "tabIndex": 2,
+      "name": "Notificações",
+      "route": "/user/account/notifications",
+      "status": "MOCK / SIMULAÇÃO",
+      "page": {
+        "name": "AccountNotificationsPage",
+        "path": "src/pages/user/account/notifications.tsx"
+      },
+      "view": {
+        "name": "AccountNotificationsView",
+        "path": "src/sections/account/view/account-notifications-view.tsx"
+      },
+      "component": {
+        "name": "AccountNotifications",
+        "path": "src/sections/account/account-notifications.tsx",
+        "hooks": ["useForm"],
+        "services": [],
+        "persistence": "NENHUMA (Memória Local)",
+        "readiness": "REPROVADA"
+      }
+    },
+    {
+      "id": "socials",
+      "tabIndex": 3,
+      "name": "Redes Sociais",
+      "route": "/user/account/socials",
+      "status": "IMPLEMENTADA E CONECTADA",
+      "page": {
+        "name": "AccountSocialsPage",
+        "path": "src/pages/user/account/socials.tsx"
+      },
+      "view": {
+        "name": "AccountSocialsView",
+        "path": "src/sections/account/view/account-socials-view.tsx"
+      },
+      "component": {
+        "name": "AccountSocials",
+        "path": "src/sections/account/account-socials.tsx",
+        "hooks": ["useForm", "useEffect"],
+        "services": ["useAccountFacade.updateProfile", "IdentityBridge.saveUserProfile", "IdentityBridge.getUserProfile"],
+        "persistence": "devos_vault.sqlite (user_profiles.social_links)",
+        "readiness": "APROVADA"
+      }
+    },
+    {
+      "id": "security",
+      "tabIndex": 4,
+      "name": "Segurança / Alteração de Senha",
+      "route": "/user/account/change-password",
+      "status": "IMPLEMENTADA PARCIALMENTE",
+      "page": {
+        "name": "AccountChangePasswordPage",
+        "path": "src/pages/user/account/change-password.tsx"
+      },
+      "view": {
+        "name": "AccountChangePasswordView",
+        "path": "src/sections/account/view/account-change-password-view.tsx"
+      },
+      "component": {
+        "name": "AccountChangePassword",
+        "path": "src/sections/account/account-change-password.tsx",
+        "hooks": ["useForm", "useState"],
+        "services": ["IdentitySessionService.changePassword", "onRevokeSession", "onConfigureBiometrics"],
+        "persistence": "Servidor de Autenticação / Cofre Mestre",
+        "readiness": "APROVADA COM RESSALVAS"
+      }
+    },
+    {
+      "id": "2fa",
+      "tabIndex": 5,
+      "name": "Autenticador 2FA",
+      "route": "/user/account/2fa",
+      "status": "MOCK / SIMULAÇÃO (Risco P0)",
+      "page": {
+        "name": "AccountTwoFAPage",
+        "path": "src/pages/user/account/2fa.tsx"
+      },
+      "view": {
+        "name": "AccountTwoFAView",
+        "path": "src/sections/account/view/account-2fa-view.tsx"
+      },
+      "component": {
+        "name": "AccountTwoFA",
+        "path": "src/sections/account/account-2fa.tsx",
+        "hooks": ["useAccountFacade", "useState"],
+        "services": ["updateProfile (useAccountFacade)"],
+        "persistence": "devos_vault.sqlite (user_profiles.linked_providers)",
+        "readiness": "REPROVADA"
+      }
+    }
+  ],
+  "sharedComponents": [
+    {
+      "name": "AccountLayout",
+      "path": "src/sections/account/account-layout.tsx",
+      "role": "Layout estrutural com Tabs e Breadcrumbs",
+      "hooks": ["usePathname"]
+    }
+  ]
+}
