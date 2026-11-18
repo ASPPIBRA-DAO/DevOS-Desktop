@@ -7,7 +7,7 @@ import TextField from '@mui/material/TextField';
 
 // ----------------------------------------------------------------------
 
-export type RHFTextFieldProps = TextFieldProps & {
+export type RHFTextFieldProps = Omit<TextFieldProps, 'name' | 'value' | 'defaultValue'> & {
   name: string;
 };
 
@@ -16,6 +16,8 @@ export function RHFTextField({
   helperText,
   slotProps,
   type = 'text',
+  onChange: onChangeProp,
+  onBlur: onBlurProp,
   ...other
 }: RHFTextFieldProps) {
   const { control } = useFormContext();
@@ -28,22 +30,26 @@ export function RHFTextField({
       control={control}
       render={({ field, fieldState: { error } }) => (
         <TextField
+          {...other}
           {...field}
           fullWidth
-          value={isNumberType ? transformValue(field.value) : field.value}
+          value={isNumberType ? transformValue(field.value) : (field.value ?? '')}
           onChange={(event) => {
             const transformedValue = isNumberType
               ? transformValueOnChange(event.target.value)
               : event.target.value;
 
             field.onChange(transformedValue);
+            onChangeProp?.(event);
           }}
           onBlur={(event) => {
-            const transformedValue = isNumberType
-              ? transformValueOnBlur(event.target.value)
-              : event.target.value;
+            if (isNumberType) {
+              field.onChange(transformValueOnBlur(event.target.value));
+            }
 
-            field.onChange(transformedValue);
+            // Mantém a notificação de blur e o controle de touched do React Hook Form
+            field.onBlur();
+            onBlurProp?.(event);
           }}
           type={isNumberType ? 'text' : type}
           error={!!error}
@@ -56,10 +62,8 @@ export function RHFTextField({
                 inputMode: 'decimal',
                 pattern: '[0-9]*\\.?[0-9]*',
               }),
-              autoComplete: 'new-password', // Disable autocomplete and autofill
             },
           }}
-          {...other}
         />
       )}
     />
