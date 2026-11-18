@@ -146,6 +146,7 @@ dependencies = [
  "typst-as-lib",
  "typst-pdf",
  "typst-svg",
+ "url",
  "uuid",
  "zeroize",
 ]
