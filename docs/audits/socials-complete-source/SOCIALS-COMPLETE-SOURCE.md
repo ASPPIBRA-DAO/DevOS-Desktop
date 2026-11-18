@@ -1,8 +1,8 @@
-# DOSSIÊ TÉCNICO DE EXTRAÇÃO INTEGRAL — ABA 3: REDES SOCIAIS
+# DOSSIÊ TÉCNICO DE EXTRAÇÃO INTEGRAL — ABA 3: REDES SOCIAIS (COMPLETO & HOMOLOGADO)
 **Projeto:** ASPPIBRA DAO — DevOS Desktop
-**Data da Extração:** 2026-11-18 13:57:16
+**Data da Extração:** 2026-11-18 14:37:57
 **Rota:** `/user/account/socials`
-**Status da Implementação:** PERSISTÊNCIA NATIVA TOTALMENTE IMPLEMENTADA E HOMOLOGADA
+**Status da Implementação:** PERSISTÊNCIA NATIVA TOTALMENTE INTEGRADA, VALIDADA COM PARSER RUST E HOMOLOGADA PARA PRODUÇÃO
 
 ---
 
@@ -10,14 +10,15 @@
 
 Este documento reúne o inventário completo e o código-fonte integral, sem resumos ou omissões, de todos os arquivos do DevOS Desktop envolvidos no funcionamento da **ABA 3 — Redes Sociais** (`/user/account/socials`).
 
-O escopo abrange o fluxo vertical completo:
+O escopo abrange o fluxo vertical completo com todas as correções da auditoria técnica implementadas:
 1. **Roteamento e Layout:** Registro de rota SPA e barra de navegação contextual da Central de Identidade Digital.
 2. **Frontend UI & Forms:** Formulário React Hook Form com Material UI, ícones SVG e inputs controlados.
-3. **Validação & Normalização:** Regras de segurança de URL (HTTPS obrigatório, allowlist de domínios, limite de caracteres, rejeição de credenciais embutidas, portas não convencionais e verificação de tipos em runtime).
+3. **Validação & Normalização:** Regras de segurança de URL (HTTPS obrigatório, allowlist de domínios, limite estrito de 2.048 bytes UTF-8 via `TextEncoder`, rejeição de credenciais embutidas, portas não convencionais e verificação de tipos em runtime).
 4. **Gerenciamento de Estado & IPC Bridge:** Hook facade `useAccountFacade`, store reativo `useSyncExternalStore` e ponte IPC `IdentityBridge`.
-5. **Backend Nativo Tauri / Rust:** Comandos IPC `save_user_profile` e `get_user_profile`, serviço de identidade, validação defensiva em Rust e criptografia de ponta a ponta AES-256-GCM.
-6. **Persistência Criptografada em SQLite:** Gravação e leitura segura no envelope do banco local `devos_vault.sqlite`.
-7. **Suítes de Testes Automatizados:** Testes unitários de validação frontend (Vitest) e testes de integração de persistência no cofre (Rust `cargo test`).
+5. **Backend Nativo Tauri / Rust:** Comandos IPC `save_user_profile` e `get_user_profile`, serviço de identidade, validação defensiva em Rust com parser `url::Url` e allowlist idêntica à do frontend, bloqueio de portas e credenciais, e zeroização de memória sensível (`Zeroizing`).
+6. **Persistência Criptografada em SQLite:** Gravação e leitura segura no envelope do banco local `devos_vault.sqlite` via `IdentityRepository`, `LocalDatabase` e `MigrationManager`.
+7. **Criptografia Autenticada:** Implementação `VaultCrypto` com AES-256-GCM, nonces de uso único de 96 bits e custódia segura da chave em memória via `VaultSession`.
+8. **Suítes de Testes Automatizados:** Testes unitários frontend (Vitest: 32/32 testes aprovados) e testes de integração e segurança no cofre (Rust `cargo test`: 10/10 testes aprovados, incluindo testes negativos de ataque a URLs).
 
 ---
 
@@ -26,8 +27,8 @@ O escopo abrange o fluxo vertical completo:
 | Nº | Arquivo | Caminho Relativo | Camada / Tipo | Linhas | Obrigatório para Auditoria |
 |:--:|---|---|---|:--:|:--:|
 | 1 | `socials.tsx` | `src/pages/user/account/socials.tsx` | Page | 9 | Sim |
-| 2 | `account-socials-view.tsx` | `src/sections/account/view/account-socials-view.tsx` | View | 31 | Sim |
-| 3 | `account-socials.tsx` | `src/sections/account/account-socials.tsx` | Component | 295 | Sim |
+| 2 | `account-socials-view.tsx` | `src/sections/account/view/account-socials-view.tsx` | View | 72 | Sim |
+| 3 | `account-socials.tsx` | `src/sections/account/account-socials.tsx` | Component | 297 | Sim |
 | 4 | `account-layout.tsx` | `src/sections/account/account-layout.tsx` | Layout | 129 | Sim |
 | 5 | `index.ts (account)` | `src/sections/account/index.ts` | Barrel Export | 8 | Sim |
 | 6 | `index.ts (view)` | `src/sections/account/view/index.ts` | Barrel Export | 5 | Sim |
@@ -42,13 +43,21 @@ O escopo abrange o fluxo vertical completo:
 | 15 | `identity-bridge.ts` | `src/platform/tauri/identity/identity-bridge.ts` | Bridge | 40 | Sim |
 | 16 | `use-account.ts` | `src/sections/account/use-account.ts` | Hook / Store | 1117 | Sim |
 | 17 | `models.rs` | `src-tauri/src/modules/identity/models.rs` | Backend Models | 696 | Sim |
-| 18 | `service.rs` | `src-tauri/src/modules/identity/service.rs` | Backend Service | 920 | Sim |
+| 18 | `service.rs` | `src-tauri/src/modules/identity/service.rs` | Backend Service | 1040 | Sim |
 | 19 | `identity_commands.rs` | `src-tauri/src/commands/identity_commands.rs` | Backend Commands | 53 | Sim |
-| 20 | `account-socials.spec.ts` | `src/test/account-socials.spec.ts` | Tests | 120 | Sim |
-| 21 | `identity-bridge.spec.ts` | `src/test/identity-bridge.spec.ts` | Tests | 615 | Sim |
+| 20 | `repository.rs` | `src-tauri/src/modules/identity/repository.rs` | Backend Persistence | 105 | Sim |
+| 21 | `local_database.rs` | `src-tauri/src/storage/local_database.rs` | Backend Infrastructure | 1236 | Sim |
+| 22 | `migrations.rs` | `src-tauri/src/storage/migrations.rs` | Backend Database | 89 | Sim |
+| 23 | `encryption.rs` | `src-tauri/src/modules/vault/encryption.rs` | Backend Cryptography | 511 | Sim |
+| 24 | `access_control.rs` | `src-tauri/src/modules/vault/access_control.rs` | Backend Security | 702 | Sim |
+| 25 | `lib.rs` | `src-tauri/src/lib.rs` | Backend Core | 227 | Sim |
+| 26 | `invoke.ts` | `src/platform/tauri/core/invoke.ts` | Platform IPC | 165 | Sim |
+| 27 | `Cargo.toml` | `src-tauri/Cargo.toml` | Configuration | 55 | Sim |
+| 28 | `account-socials.spec.ts` | `src/test/account-socials.spec.ts` | Tests | 130 | Sim |
+| 29 | `identity-bridge.spec.ts` | `src/test/identity-bridge.spec.ts` | Tests | 615 | Sim |
 
-**Total de arquivos catalogados:** 21
-**Volume total de código integral extraído:** 4364 linhas
+**Total de arquivos catalogados:** 29
+**Volume total de código integral extraído:** 7627 linhas
 
 ---
 
@@ -78,26 +87,38 @@ export default AccountSocialsPage;
 ### Arquivo 2: `account-socials-view.tsx`
 - **Caminho:** `src/sections/account/view/account-socials-view.tsx`
 - **Tipo / Camada:** View
-- **Responsabilidade:** View container da aba de Redes Sociais. Conecta-se de forma autônoma ao useAccountFacade() para buscar o perfil ativo e persistir alterações no cofre cifrado, preservando suporte a injeção de props para testes.
+- **Responsabilidade:** View container da aba de Redes Sociais. Conecta-se ao useAccountFacade() para buscar o perfil ativo, persistir alterações no cofre cifrado, repassar a flag canSave e alertar sobre cofre bloqueado ou erros.
 - **Dependências Internas:** `src/sections/account/account-layout.tsx`, `src/sections/account/use-account.ts`, `src/sections/account/account-socials.tsx`
-- **Relacionamento na ABA 3:** Orquestra a montagem do layout de abas e provê dados e callback onSave para o componente de formulário.
+- **Relacionamento na ABA 3:** Orquestra a montagem do layout de abas e provê dados, estados de prontidão (canSave) e callback onSave para o formulário.
 
 ```tsx
 import type { SocialLinks, SaveSocialLinks } from '../account-socials';
 
 import React from 'react';
 
+import Alert from '@mui/material/Alert';
+import Stack from '@mui/material/Stack';
+
 import { AccountLayout } from '../account-layout';
 import { useAccountFacade } from '../use-account';
 import { AccountSocials } from '../account-socials';
 
 type Props = {
-  socialLinks?: SocialLinks;
+  socialLinks?: SocialLinks | null;
   onSave?: SaveSocialLinks;
 };
 
 export function AccountSocialsView({ socialLinks: propSocialLinks, onSave: propOnSave }: Props) {
-  const { user, updateProfile } = useAccountFacade();
+  const {
+    user,
+    updateProfile,
+    loadStatus,
+    isLoading,
+    isVaultLocked,
+    isSaving,
+    migrationStatus,
+    error,
+  } = useAccountFacade();
 
   const activeSocialLinks = propSocialLinks ?? user.socialLinks;
   const handleSave: SaveSocialLinks =
@@ -106,9 +127,38 @@ export function AccountSocialsView({ socialLinks: propSocialLinks, onSave: propO
       await updateProfile({ socialLinks: links });
     });
 
+  const canSave =
+    Boolean(propOnSave) ||
+    (loadStatus === 'ready' &&
+      !isLoading &&
+      !isVaultLocked &&
+      !isSaving &&
+      migrationStatus !== 'conflict' &&
+      migrationStatus !== 'error');
+
   return (
     <AccountLayout>
-      <AccountSocials socialLinks={activeSocialLinks} onSave={handleSave} />
+      <Stack spacing={2} sx={{ mb: 2 }}>
+        {isVaultLocked && (
+          <Alert severity="warning">
+            O cofre seguro está bloqueado. Desbloqueie com sua senha mestre para alterar seus dados cadastrais.
+          </Alert>
+        )}
+
+        {migrationStatus === 'conflict' && (
+          <Alert severity="warning">
+            Existe um conflito de reconciliação de dados entre o cofre e o ambiente anterior.
+          </Alert>
+        )}
+
+        {error && <Alert severity="error">{error}</Alert>}
+      </Stack>
+
+      <AccountSocials
+        socialLinks={activeSocialLinks}
+        onSave={handleSave}
+        canSave={canSave}
+      />
     </AccountLayout>
   );
 }
@@ -121,7 +171,7 @@ export default AccountSocialsView;
 ### Arquivo 3: `account-socials.tsx`
 - **Caminho:** `src/sections/account/account-socials.tsx`
 - **Tipo / Camada:** Component
-- **Responsabilidade:** Componente principal do formulário de Redes Sociais. Gerencia o formulário com React Hook Form, validação de URL estrita com HTTPS, allowlist de domínios, limite de 2048 caracteres, controle de campos modificados (dirty fields) e feedback visual.
+- **Responsabilidade:** Componente principal do formulário de Redes Sociais. Gerencia o formulário com React Hook Form, validação de URL estrita com HTTPS, allowlist de domínios, limite de 2048 bytes UTF-8 (TextEncoder), dirty tracking, botão condicionado a canSave e feedback visual.
 - **Dependências Internas:** `src/shared/components/iconify`, `src/shared/components/hook-form`
 - **Relacionamento na ABA 3:** Apresenta os campos do formulário para o usuário e executa normalização antes de acionar a gravação.
 
@@ -144,15 +194,16 @@ import { Form, Field } from 'src/shared/components/hook-form';
 
 export type SocialField = 'facebook' | 'instagram' | 'linkedin' | 'twitter';
 
-export type SocialLinks = Partial<Record<SocialField, string>>;
+export type SocialLinks = Partial<Record<SocialField, string | null>>;
 
 export type SocialFormValues = Record<SocialField, string>;
 
 export type SaveSocialLinks = (links: SocialFormValues) => Promise<void> | void;
 
 type Props = {
-  socialLinks?: SocialLinks;
+  socialLinks?: SocialLinks | null;
   onSave?: SaveSocialLinks;
+  canSave?: boolean;
 };
 
 type SocialFieldConfig = {
@@ -210,7 +261,7 @@ function safeString(value: unknown): string {
 
 // ----------------------------------------------------------------------
 
-export function createDefaultValues(socialLinks?: SocialLinks): SocialFormValues {
+export function createDefaultValues(socialLinks?: SocialLinks | null): SocialFormValues {
   return {
     facebook: safeString(socialLinks?.facebook),
     instagram: safeString(socialLinks?.instagram),
@@ -257,8 +308,9 @@ export function normalizeSocialLinks(
       continue;
     }
 
-    if (rawValue.length > MAX_URL_LENGTH) {
-      errors[name] = 'A URL ultrapassa o tamanho permitido de 2.048 caracteres.';
+    const urlByteLength = new TextEncoder().encode(rawValue).byteLength;
+    if (urlByteLength > MAX_URL_LENGTH) {
+      errors[name] = 'A URL ultrapassa o tamanho permitido de 2.048 bytes.';
       continue;
     }
 
@@ -288,7 +340,7 @@ export function normalizeSocialLinks(
 
 // ----------------------------------------------------------------------
 
-export function AccountSocials({ socialLinks, onSave }: Props) {
+export function AccountSocials({ socialLinks, onSave, canSave = true }: Props) {
   const methods = useForm<SocialFormValues>({
     defaultValues: createDefaultValues(socialLinks),
     mode: 'onBlur',
@@ -408,7 +460,7 @@ export function AccountSocials({ socialLinks, onSave }: Props) {
           <Button
             type="submit"
             variant="contained"
-            disabled={isSubmitting || !onSave}
+            disabled={isSubmitting || !onSave || !canSave}
             size="large"
             sx={{ px: 4, fontWeight: 800 }}
           >
@@ -911,7 +963,7 @@ export * from './register-icons';
 ### Arquivo 14: `identity-contracts.ts`
 - **Caminho:** `src/platform/tauri/contracts/identity-contracts.ts`
 - **Tipo / Camada:** Contract
-- **Responsabilidade:** Contratos TypeScript tipados para IPC Tauri de Identidade e Perfil. Define SocialField, SocialLinks, UserProfile e SaveUserProfilePayload.
+- **Responsabilidade:** Contratos TypeScript tipados para IPC Tauri de Identidade e Perfil. Define SocialField, SocialLinks com nulabilidade permitida (string | null), UserProfile e SaveUserProfilePayload.
 - **Dependências Internas:** Nenhuma (componente base ou folha)
 - **Relacionamento na ABA 3:** Fronteira formal de tipos consumida por use-account.ts e IdentityBridge.
 
@@ -928,7 +980,7 @@ export type PersonType = 'PF' | 'PJ';
 
 export type SocialField = 'facebook' | 'instagram' | 'linkedin' | 'twitter';
 
-export type SocialLinks = Partial<Record<SocialField, string>>;
+export type SocialLinks = Partial<Record<SocialField, string | null>>;
 
 /**
  * Modelo de dados de Perfil e Qualificação Civil decifrado da custódia do cofre.
@@ -974,7 +1026,7 @@ export interface UserProfile {
   photoUrl?: string | null;
   coverUrl?: string | null;
   linkedProviders?: string[];
-  socialLinks?: SocialLinks;
+  socialLinks?: SocialLinks | null;
 }
 
 /**
@@ -1018,7 +1070,7 @@ export interface SaveUserProfilePayload {
   photoUrl?: string | null;
   coverUrl?: string | null;
   linkedProviders?: string[];
-  socialLinks?: SocialLinks;
+  socialLinks?: SocialLinks | null;
   expectedRevision?: number | null;
 }
 ```
@@ -2917,7 +2969,7 @@ mod tests {
 ### Arquivo 18: `service.rs`
 - **Caminho:** `src-tauri/src/modules/identity/service.rs`
 - **Tipo / Camada:** Backend Service
-- **Responsabilidade:** Serviço de Identidade Nativo. Realiza higienização e validação de URLs (exigindo HTTPS e limite de 2048 chars), criptografia AES-256-GCM via VaultCrypto, gravação transacional na tabela profile_records do SQLite e concorrência otimista.
+- **Responsabilidade:** Serviço de Identidade Nativo. Realiza higienização e validação de URLs via url::Url com allowlist estrita por plataforma, bloqueio de credenciais e portas, criptografia AES-256-GCM via VaultCrypto, gravação transacional na tabela profile_records do SQLite, zeroização de buffers em memória (Zeroizing) e concorrência otimista.
 - **Dependências Internas:** `src-tauri/src/modules/identity/models.rs`, `src-tauri/src/modules/vault`
 - **Relacionamento na ABA 3:** Executa as regras de validação no backend e cifra os dados de redes sociais na base devos_vault.sqlite.
 
@@ -2927,6 +2979,7 @@ mod tests {
 //! Orquestra validações, criptografia de ponta a ponta (AES-256-GCM com chave derivada
 //! do cofre) e persistência transacional em SQLite.
 
+use url::Url;
 use zeroize::Zeroizing;
 
 use super::models::{
@@ -2996,6 +3049,97 @@ pub fn normalize_username(raw: &str) -> String {
         result.truncate(30);
     }
     result
+}
+
+/// Valida e sanitiza rigorosamente uma URL de rede social contra a allowlist da plataforma.
+pub fn sanitize_social_url(
+    platform: &str,
+    value: &Option<String>,
+) -> Result<Option<String>, IdentityError> {
+    let Some(raw_value) = value else {
+        return Ok(None);
+    };
+
+    let trimmed = raw_value.trim();
+
+    // Campos opcionais podem ser vazios
+    if trimmed.is_empty() {
+        return Ok(None);
+    }
+
+    // Limite de 2048 bytes UTF-8
+    if trimmed.len() > 2048 {
+        return Err(IdentityError::Validation(
+            "URL de rede social excede o limite permitido de 2048 bytes.".to_string(),
+        ));
+    }
+
+    // Parse real da URL via crate url::Url
+    let parsed = Url::parse(trimmed).map_err(|_| {
+        IdentityError::Validation("URL de rede social inválida ou malformada.".to_string())
+    })?;
+
+    // HTTPS obrigatório (rejeita http, javascript, data, ftp, etc.)
+    if parsed.scheme() != "https" {
+        return Err(IdentityError::Validation(
+            "A URL de rede social deve utilizar protocolo seguro HTTPS.".to_string(),
+        ));
+    }
+
+    // Bloqueia credenciais embutidas (ex: https://user:pass@host)
+    if !parsed.username().is_empty() || parsed.password().is_some() {
+        return Err(IdentityError::Validation(
+            "URLs com credenciais embutidas não são permitidas.".to_string(),
+        ));
+    }
+
+    // Bloqueia portas não convencionais (ex: https://host:8080)
+    if parsed.port().is_some() {
+        return Err(IdentityError::Validation(
+            "Portas personalizadas não são permitidas em URLs de redes sociais.".to_string(),
+        ));
+    }
+
+    // Allowlist estrita de hostnames legítimos por plataforma
+    let allowed_hosts: &[&str] = match platform {
+        "facebook" => &[
+            "facebook.com",
+            "www.facebook.com",
+            "m.facebook.com",
+            "fb.com",
+            "www.fb.com",
+        ],
+        "instagram" => &[
+            "instagram.com",
+            "www.instagram.com",
+        ],
+        "linkedin" => &[
+            "linkedin.com",
+            "www.linkedin.com",
+        ],
+        "twitter" => &[
+            "x.com",
+            "www.x.com",
+            "twitter.com",
+            "www.twitter.com",
+        ],
+        _ => {
+            return Err(IdentityError::Validation(
+                "Plataforma de rede social não autorizada.".to_string(),
+            ));
+        }
+    };
+
+    let hostname = parsed.host_str().unwrap_or_default().to_ascii_lowercase();
+
+    if !allowed_hosts.contains(&hostname.as_str()) {
+        return Err(IdentityError::Validation(format!(
+            "O domínio '{}' não pertence à plataforma autorizada ({}).",
+            hostname, platform
+        )));
+    }
+
+    Ok(Some(parsed.to_string()))
 }
 
 pub struct IdentityService;
@@ -3227,36 +3371,12 @@ impl IdentityService {
         };
 
         let social_links = match &req.social_links {
-            Some(links) => {
-                let clean_url = |val: &Option<String>| -> Result<Option<String>, IdentityError> {
-                    match val {
-                        Some(u) => {
-                            let trimmed = u.trim();
-                            if trimmed.is_empty() {
-                                Ok(None)
-                            } else if trimmed.len() > 2048 {
-                                Err(IdentityError::Validation(
-                                    "URL de rede social excede o limite de 2048 caracteres.".to_string(),
-                                ))
-                            } else if !trimmed.starts_with("https://") {
-                                Err(IdentityError::Validation(
-                                    "URL de rede social deve utilizar protocolo seguro HTTPS.".to_string(),
-                                ))
-                            } else {
-                                Ok(Some(trimmed.to_string()))
-                            }
-                        }
-                        None => Ok(None),
-                    }
-                };
-
-                Some(SocialLinksDto {
-                    facebook: clean_url(&links.facebook)?,
-                    instagram: clean_url(&links.instagram)?,
-                    linkedin: clean_url(&links.linkedin)?,
-                    twitter: clean_url(&links.twitter)?,
-                })
-            }
+            Some(links) => Some(SocialLinksDto {
+                facebook: sanitize_social_url("facebook", &links.facebook)?,
+                instagram: sanitize_social_url("instagram", &links.instagram)?,
+                linkedin: sanitize_social_url("linkedin", &links.linkedin)?,
+                twitter: sanitize_social_url("twitter", &links.twitter)?,
+            }),
             None => existing_profile
                 .as_ref()
                 .and_then(|p| p.social_links.clone()),
@@ -3361,8 +3481,9 @@ impl IdentityService {
         let expected_revision = req.expected_revision;
         let mut profile = Self::sanitize_and_validate(&req, existing.as_ref())?;
 
-        let payload_json = serde_json::to_vec(&profile)
-            .map_err(|_| IdentityError::Serialization)?;
+        let payload_json = Zeroizing::new(
+            serde_json::to_vec(&profile).map_err(|_| IdentityError::Serialization)?
+        );
 
         // Cifra os dados com a chave do cofre em memória
         let envelope = session
@@ -3841,6 +3962,57 @@ mod tests {
         assert_eq!(saved_pf_again.cnpj, "12.ABC.345/01DE-35");
         assert_eq!(saved_pf_again.legal_representative, "João Silva");
     }
+
+    #[test]
+    fn test_social_url_validation_security() {
+        // 1. URL legítima de cada plataforma com HTTPS
+        let linkedin = Some("https://www.linkedin.com/in/devos".to_string());
+        assert!(sanitize_social_url("linkedin", &linkedin).is_ok());
+
+        let twitter = Some("https://x.com/devos_dao".to_string());
+        assert!(sanitize_social_url("twitter", &twitter).is_ok());
+
+        let fb = Some("https://facebook.com/devos".to_string());
+        assert!(sanitize_social_url("facebook", &fb).is_ok());
+
+        let insta = Some("https://instagram.com/devos".to_string());
+        assert!(sanitize_social_url("instagram", &insta).is_ok());
+
+        // 2. Domínio falso (phishing / spoofing de subdomínio)
+        let fake_host = Some("https://linkedin.com.site-malicioso.com".to_string());
+        assert!(sanitize_social_url("linkedin", &fake_host).is_err());
+
+        // 3. Plataforma cruzada / incorreta
+        let wrong_platform = Some("https://linkedin.com/in/user".to_string());
+        assert!(sanitize_social_url("instagram", &wrong_platform).is_err());
+
+        // 4. Credenciais embutidas na URL
+        let credentials = Some("https://admin:secret@linkedin.com".to_string());
+        assert!(sanitize_social_url("linkedin", &credentials).is_err());
+
+        // 5. Porta não convencional
+        let custom_port = Some("https://x.com:8080/user".to_string());
+        assert!(sanitize_social_url("twitter", &custom_port).is_err());
+
+        // 6. Protocolo inseguro HTTP
+        let insecure = Some("http://linkedin.com/in/user".to_string());
+        assert!(sanitize_social_url("linkedin", &insecure).is_err());
+
+        // 7. URL malformada
+        let malformed = Some("https://".to_string());
+        assert!(sanitize_social_url("linkedin", &malformed).is_err());
+
+        // 8. Campo opcional vazio ou nulo
+        let empty = Some(String::new());
+        assert_eq!(sanitize_social_url("linkedin", &empty).unwrap(), None);
+
+        let none: Option<String> = None;
+        assert_eq!(sanitize_social_url("linkedin", &none).unwrap(), None);
+
+        // 9. Excesso de bytes (> 2048)
+        let too_long = Some(format!("https://linkedin.com/in/{}", "a".repeat(2048)));
+        assert!(sanitize_social_url("linkedin", &too_long).is_err());
+    }
 }
 ```
 
@@ -3911,10 +4083,3191 @@ pub fn import_legacy_profile(
 
 ---
 
-### Arquivo 20: `account-socials.spec.ts`
+### Arquivo 20: `repository.rs`
+- **Caminho:** `src-tauri/src/modules/identity/repository.rs`
+- **Tipo / Camada:** Backend Persistence
+- **Responsabilidade:** Repositório transacional SQLite para Identidade Civil. Gerencia inserções, consultas e atualizações de registros criptografados na tabela profile_records com controle de concorrência otimista via revision.
+- **Dependências Internas:** `src-tauri/src/storage/local_database.rs`
+- **Relacionamento na ABA 3:** Executa o SQL real para gravar e recuperar o envelope encriptado de redes sociais.
+
+```rust
+//! Repositório de persistência SQLite para Perfil e Identidade Civil.
+//!
+//! Apenas o envelope criptográfico (AEAD AES-256-GCM) é persistido no banco local.
+//! Nenhum dado pessoal em claro é armazenado em tabelas, colunas ou índices.
+
+use rusqlite::{params, Connection, OptionalExtension};
+
+use crate::modules::vault::encryption::EncryptedEnvelope;
+use crate::storage::local_database::StorageError;
+
+pub struct StoredProfileRecord {
+    pub envelope: EncryptedEnvelope,
+    pub payload_version: u32,
+    pub revision: u64,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+pub struct IdentityRepository;
+
+impl IdentityRepository {
+    /// Carrega o registro criptografado único do usuário (id = 1).
+    pub fn get_profile_record(
+        conn: &Connection,
+    ) -> Result<Option<StoredProfileRecord>, StorageError> {
+        let result = conn
+            .query_row(
+                "SELECT encrypted_envelope, payload_version, revision, created_at, updated_at
+                 FROM user_profiles
+                 WHERE id = 1",
+                [],
+                |row| {
+                    let envelope_json: String = row.get(0)?;
+                    let payload_version: u32 = row.get(1)?;
+                    let revision: u64 = row.get(2)?;
+                    let created_at: String = row.get(3)?;
+                    let updated_at: String = row.get(4)?;
+
+                    let envelope: EncryptedEnvelope = serde_json::from_str(&envelope_json)
+                        .map_err(|e| rusqlite::Error::FromSqlConversionFailure(
+                            0,
+                            rusqlite::types::Type::Text,
+                            Box::new(e),
+                        ))?;
+
+                    Ok(StoredProfileRecord {
+                        envelope,
+                        payload_version,
+                        revision,
+                        created_at,
+                        updated_at,
+                    })
+                },
+            )
+            .optional()?;
+
+        Ok(result)
+    }
+
+    /// Salva ou atualiza atomicamente o envelope criptografado com verificação de concorrência otimista.
+    pub fn save_profile_record(
+        conn: &mut Connection,
+        envelope: &EncryptedEnvelope,
+        expected_revision: Option<u64>,
+    ) -> Result<u64, StorageError> {
+        let envelope_json = serde_json::to_string(envelope)
+            .map_err(|e| StorageError::InvalidData(format!("Falha na serialização do envelope: {}", e)))?;
+
+        let tx = conn.transaction()?;
+
+        let current_revision: Option<u64> = tx
+            .query_row(
+                "SELECT revision FROM user_profiles WHERE id = 1",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?;
+
+        if let (Some(expected), Some(current)) = (expected_revision, current_revision) {
+            if expected != current {
+                return Err(StorageError::InvalidData(format!(
+                    "CONCURRENCY_CONFLICT: O perfil foi atualizado concorrentemente (revisão atual: {}, informada: {}).",
+                    current, expected
+                )));
+            }
+        }
+
+        let next_revision = current_revision.unwrap_or(0) + 1;
+
+        tx.execute(
+            "INSERT INTO user_profiles (id, encrypted_envelope, payload_version, revision, created_at, updated_at)
+             VALUES (1, ?1, 1, ?2, datetime('now'), datetime('now'))
+             ON CONFLICT(id) DO UPDATE SET
+                 encrypted_envelope = excluded.encrypted_envelope,
+                 payload_version = excluded.payload_version,
+                 revision = excluded.revision,
+                 updated_at = datetime('now')",
+            params![envelope_json, next_revision],
+        )?;
+
+        tx.commit()?;
+
+        Ok(next_revision)
+    }
+}
+```
+
+---
+
+### Arquivo 21: `local_database.rs`
+- **Caminho:** `src-tauri/src/storage/local_database.rs`
+- **Tipo / Camada:** Backend Infrastructure
+- **Responsabilidade:** Gerenciador de conexões SQLite com modo WAL, busy_timeout de 5000ms, foreign keys e checagem de integridade fail-closed.
+- **Dependências Internas:** Nenhuma (componente base ou folha)
+- **Relacionamento na ABA 3:** Provedor de conexões do banco devos_vault.sqlite utilizado pelo IdentityRepository.
+
+```rust
+use rusqlite::{Connection, OptionalExtension, params};
+use serde::{Deserialize, Serialize};
+
+use std::fs::{self, OpenOptions};
+use std::path::{Path, PathBuf};
+use std::time::Duration;
+
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+
+use crate::modules::vault::access_control::{VaultHeader, VaultStatus};
+use crate::modules::vault::encryption::{EncryptedEnvelope, VaultCryptoError};
+
+// ----------------------------------------------------------------------
+// Erros de armazenamento
+// ----------------------------------------------------------------------
+
+#[derive(Debug, thiserror::Error)]
+pub enum StorageError {
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+
+    #[error("SQLite database error: {0}")]
+    Sqlite(#[from] rusqlite::Error),
+
+    #[error("JSON serialization error: {0}")]
+    Json(#[from] serde_json::Error),
+
+    #[error("Vault error: {0}")]
+    Vault(#[from] VaultCryptoError),
+
+    #[error("Vault not found: {0}")]
+    NotFound(String),
+
+    #[error("Invalid data: {0}")]
+    InvalidData(String),
+
+    #[error("O cofre do DevOS já foi inicializado anteriormente.")]
+    AlreadyInitialized,
+}
+
+// ----------------------------------------------------------------------
+// Modelos persistidos
+// ----------------------------------------------------------------------
+
+/// Metadados públicos da carteira persistida no SQLite.
+///
+/// Não registrar objetos completos desta estrutura nos logs operacionais,
+/// pois client_doc pode conter dados sensíveis ou informações de identificação pessoal.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct StoredWallet {
+    pub id: u64,
+    pub target: String,       // "DAO" | "CLIENT"
+    pub custody_type: String, // "WATCH_ONLY" | "CUSTODIAL_LOCAL"
+    pub user: String,         // Nome do usuário / rótulo da DAO
+    pub label: String,
+    pub derivation_path: String,
+    pub network: String,
+    pub address: String,
+    pub status: String,     // "ACTIVE" | "PENDING" | "ROTATED"
+    pub kyc_status: String, // "UNVERIFIED" | "SIMULATED_TEST" | "VERIFIED"
+    pub seed_words_count: usize,
+    pub created_at: String,
+    pub vault_id: Option<String>, // NULL se WATCH_ONLY
+    pub client_doc: Option<String>,
+}
+
+/// Registro criptografado do cofre (envelope AEAD) persistido no SQLite.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StoredSecret {
+    pub vault_id: String,
+    pub target: String,
+    pub envelope: EncryptedEnvelope,
+    pub created_at: String,
+}
+
+// ----------------------------------------------------------------------
+// Banco de dados local SQLite seguro do DevOS
+// ----------------------------------------------------------------------
+
+pub struct LocalDatabase {
+    db_path: PathBuf,
+}
+
+impl LocalDatabase {
+    pub fn new(base_dir: PathBuf) -> Self {
+        let db_path = base_dir.join("devos_vault.sqlite");
+        Self { db_path }
+    }
+
+    /// Retorna o caminho do banco.
+    pub fn db_path(&self) -> &PathBuf {
+        &self.db_path
+    }
+
+    // ------------------------------------------------------------------
+    // Utilitários internos para caminhos e arquivos
+    // ------------------------------------------------------------------
+
+    fn parent_directory(path: &Path) -> &Path {
+        path.parent()
+            .filter(|parent| !parent.as_os_str().is_empty())
+            .unwrap_or_else(|| Path::new("."))
+    }
+
+    /// Restringe as permissões do arquivo principal e de arquivos
+    /// temporários no Unix para 0600 (apenas proprietário).
+    fn set_private_file_permissions(path: &Path) -> Result<(), StorageError> {
+        #[cfg(unix)]
+        {
+            if path.exists() {
+                let mut permissions = fs::metadata(path)?.permissions();
+                permissions.set_mode(0o600);
+                fs::set_permissions(path, permissions)?;
+            }
+        }
+
+        #[cfg(not(unix))]
+        {
+            let _ = path;
+        }
+
+        Ok(())
+    }
+
+    fn sidecar_paths(&self) -> [PathBuf; 2] {
+        [
+            self.db_path.with_extension("sqlite-wal"),
+            self.db_path.with_extension("sqlite-shm"),
+        ]
+    }
+
+    /// Remove um arquivo somente se ele existir, propagando erros de I/O reais.
+    fn remove_file_if_exists(path: &Path) -> Result<(), StorageError> {
+        match fs::remove_file(path) {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(error) => Err(StorageError::Io(error)),
+        }
+    }
+
+    /// Confirma que uma origem ou destino não corresponde ao banco
+    /// ativo nem aos seus arquivos auxiliares WAL/SHM.
+    fn ensure_not_active_database_path(
+        &self,
+        candidate: &Path,
+        operation: &str,
+    ) -> Result<(), StorageError> {
+        let mut reserved_paths = vec![self.db_path.clone()];
+        reserved_paths.extend(self.sidecar_paths());
+
+        let candidate_canonical = candidate.canonicalize().ok();
+
+        for reserved in reserved_paths {
+            if candidate == reserved.as_path() {
+                return Err(StorageError::InvalidData(format!(
+                    "O caminho informado não pode ser utilizado como {}.",
+                    operation
+                )));
+            }
+
+            if let (Some(candidate_real), Ok(reserved_real)) =
+                (candidate_canonical.as_ref(), reserved.canonicalize())
+                && candidate_real == &reserved_real
+            {
+                return Err(StorageError::InvalidData(format!(
+                    "O caminho informado não pode ser utilizado como {}.",
+                    operation
+                )));
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Cria um arquivo temporário exclusivo no mesmo diretório do destino.
+    fn create_temporary_sibling(target: &Path, purpose: &str) -> Result<PathBuf, StorageError> {
+        let parent = Self::parent_directory(target);
+        fs::create_dir_all(parent)?;
+
+        let file_name = target
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("devos-vault");
+
+        for _ in 0..16 {
+            let candidate = parent.join(format!(
+                ".{}.{}.{}.tmp",
+                file_name,
+                purpose,
+                rand::random::<u64>()
+            ));
+
+            match OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&candidate)
+            {
+                Ok(file) => {
+                    drop(file);
+
+                    if let Err(error) = Self::set_private_file_permissions(&candidate) {
+                        let _ = fs::remove_file(&candidate);
+                        return Err(error);
+                    }
+
+                    return Ok(candidate);
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+                    continue;
+                }
+                Err(error) => return Err(StorageError::Io(error)),
+            }
+        }
+
+        Err(StorageError::InvalidData(
+            "Não foi possível criar um arquivo temporário exclusivo.".to_string(),
+        ))
+    }
+
+    /// Instala um arquivo temporário no destino, preservando a versão anterior
+    /// para rollback caso ocorra falha durante a substituição.
+    fn install_staged_file(staged: &Path, destination: &Path) -> Result<(), StorageError> {
+        let parent = Self::parent_directory(destination);
+        fs::create_dir_all(parent)?;
+
+        if destination.is_dir() {
+            return Err(StorageError::InvalidData(
+                "O destino informado é um diretório.".to_string(),
+            ));
+        }
+
+        if !destination.exists() {
+            match fs::rename(staged, destination) {
+                Ok(()) => {
+                    Self::set_private_file_permissions(destination)?;
+                    return Ok(());
+                }
+                Err(_) => {
+                    fs::copy(staged, destination)?;
+                    let _ = fs::remove_file(staged);
+                    Self::set_private_file_permissions(destination)?;
+                    return Ok(());
+                }
+            }
+        }
+
+        let previous = Self::create_temporary_sibling(destination, "previous")?;
+        let _ = fs::remove_file(&previous);
+
+        fs::rename(destination, &previous)?;
+
+        match fs::rename(staged, destination) {
+            Ok(()) => {
+                Self::set_private_file_permissions(destination)?;
+                if let Err(error) = fs::remove_file(&previous) {
+                    log::warn!(
+                        "[Vault Storage] Não foi possível remover o arquivo anterior após a substituição: {}",
+                        error
+                    );
+                }
+                Ok(())
+            }
+            Err(replace_error) => {
+                if let Err(restore_error) = fs::rename(&previous, destination) {
+                    log::error!(
+                        "[Vault Storage] Falha ao restaurar o banco anterior após substituição malsucedida: {}",
+                        restore_error
+                    );
+                }
+                Err(StorageError::Io(replace_error))
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Validação de integridade do backup
+    // ------------------------------------------------------------------
+
+    /// Valida o arquivo SQLite antes de permitir uma restauração.
+    fn validate_backup_file(path: &Path) -> Result<(), StorageError> {
+        if !path.is_file() {
+            return Err(StorageError::InvalidData(
+                "O arquivo de backup não é um arquivo regular.".to_string(),
+            ));
+        }
+
+        if fs::metadata(path)?.len() == 0 {
+            return Err(StorageError::InvalidData(
+                "O arquivo de backup está vazio.".to_string(),
+            ));
+        }
+
+        let conn = Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+
+        let integrity: String = conn.query_row("PRAGMA integrity_check", [], |row| row.get(0))?;
+
+        if !integrity.eq_ignore_ascii_case("ok") {
+            log::error!(
+                "[Vault Storage] O backup falhou na verificação de integridade SQLite: {}",
+                integrity
+            );
+            return Err(StorageError::InvalidData(
+                "O backup não passou na verificação de integridade.".to_string(),
+            ));
+        }
+
+        let header_table_count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'vault_header'",
+            [],
+            |row| row.get(0),
+        )?;
+
+        if header_table_count == 0 {
+            return Err(StorageError::InvalidData(
+                "O arquivo de backup não contém a tabela vault_header.".to_string(),
+            ));
+        }
+
+        // Confirma que a tabela possui as colunas esperadas
+        let _statement = conn
+            .prepare("SELECT id, version, canary_envelope, created_at FROM vault_header LIMIT 0")?;
+
+        // Quando existe um cabeçalho, confirma que o envelope pode ser desserializado
+        let envelope_json: Option<String> = conn
+            .query_row(
+                "SELECT canary_envelope FROM vault_header WHERE id = 1",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?;
+
+        if let Some(json) = envelope_json {
+            let _: EncryptedEnvelope = serde_json::from_str(&json)?;
+        }
+
+        Ok(())
+    }
+
+    // ------------------------------------------------------------------
+    // Conexão SQLite
+    // ------------------------------------------------------------------
+
+    /// Abre ou cria a conexão com o banco de dados SQLite local seguro
+    pub fn get_connection(&self) -> Result<Connection, StorageError> {
+        let parent = Self::parent_directory(&self.db_path);
+        fs::create_dir_all(parent)?;
+
+        let conn = Connection::open(&self.db_path)?;
+
+        // Configura busy_timeout para 5s evitando bloqueios abruptos sob concorrência
+        conn.busy_timeout(Duration::from_secs(5))?;
+        conn.execute_batch("PRAGMA foreign_keys = ON;")?;
+
+        let current_journal_mode: String =
+            conn.query_row("PRAGMA journal_mode", [], |row| row.get(0))?;
+
+        if !current_journal_mode.eq_ignore_ascii_case("wal") {
+            let journal_mode: String =
+                conn.query_row("PRAGMA journal_mode = WAL", [], |row| row.get(0))?;
+
+            if !journal_mode.eq_ignore_ascii_case("wal") {
+                return Err(StorageError::InvalidData(
+                    "Não foi possível habilitar o modo WAL do SQLite.".to_string(),
+                ));
+            }
+        }
+
+        Self::set_private_file_permissions(&self.db_path)?;
+        for sidecar in self.sidecar_paths() {
+            if sidecar.exists() {
+                let _ = Self::set_private_file_permissions(&sidecar);
+            }
+        }
+
+        Ok(conn)
+    }
+
+    // ------------------------------------------------------------------
+    // Cabeçalho do cofre
+    // ------------------------------------------------------------------
+
+    /// Retorna o cabeçalho persistido do cofre (se existir)
+    pub fn get_header(&self) -> Result<Option<VaultHeader>, StorageError> {
+        let conn = self.get_connection()?;
+        let mut stmt = conn.prepare(
+            "SELECT version, canary_envelope, created_at FROM vault_header WHERE id = 1",
+        )?;
+
+        let header = stmt
+            .query_row([], |row| {
+                let version: u32 = row.get(0)?;
+                let canary_json: String = row.get(1)?;
+                let created_at: String = row.get(2)?;
+                let canary_envelope: EncryptedEnvelope = serde_json::from_str(&canary_json)
+                    .map_err(|e| {
+                        rusqlite::Error::FromSqlConversionFailure(
+                            1,
+                            rusqlite::types::Type::Text,
+                            Box::new(e),
+                        )
+                    })?;
+
+                Ok(VaultHeader {
+                    version,
+                    canary_envelope,
+                    created_at,
+                })
+            })
+            .optional()?;
+
+        Ok(header)
+    }
+
+    /// Salva o cabeçalho do cofre de forma segura (delega obrigatoriamente para initialize_vault_if_absent)
+    pub fn save_header(&self, header: &VaultHeader) -> Result<(), StorageError> {
+        self.initialize_vault_if_absent(header)
+    }
+
+    /// Inicializa o cabeçalho do cofre com atomicidade comprovada (TransactionBehavior::Immediate).
+    /// Rejeita concorrentemente qualquer tentativa duplicada e impede sobrescrita do cabeçalho existente.
+    pub fn initialize_vault_if_absent(&self, header: &VaultHeader) -> Result<(), StorageError> {
+        let mut conn = self.get_connection()?;
+        let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+
+        let existing: Option<u32> = tx
+            .query_row("SELECT id FROM vault_header WHERE id = 1", [], |row| {
+                row.get(0)
+            })
+            .optional()?;
+
+        if existing.is_some() {
+            return Err(StorageError::AlreadyInitialized);
+        }
+
+        let canary_json = serde_json::to_string(&header.canary_envelope)?;
+        tx.execute(
+            "INSERT INTO vault_header (id, version, canary_envelope, created_at) VALUES (1, ?1, ?2, ?3)",
+            params![header.version, canary_json, header.created_at],
+        )?;
+
+        tx.commit()?;
+        Ok(())
+    }
+
+    // ------------------------------------------------------------------
+    // Carteiras
+    // ------------------------------------------------------------------
+
+    /// Lista todas as carteiras armazenadas na base SQLite
+    pub fn list_wallets(&self) -> Result<Vec<StoredWallet>, StorageError> {
+        let conn = self.get_connection()?;
+        let mut stmt = conn.prepare(
+            "SELECT id, target, custody_type, user_name, label, derivation_path, network, address, status, kyc_status, seed_words_count, created_at, vault_id, client_doc FROM wallets ORDER BY id ASC"
+        )?;
+
+        let wallet_iter = stmt.query_map([], |row| {
+            Ok(StoredWallet {
+                id: row.get(0)?,
+                target: row.get(1)?,
+                custody_type: row.get(2)?,
+                user: row.get(3)?,
+                label: row.get(4)?,
+                derivation_path: row.get(5)?,
+                network: row.get(6)?,
+                address: row.get(7)?,
+                status: row.get(8)?,
+                kyc_status: row.get(9)?,
+                seed_words_count: row.get(10)?,
+                created_at: row.get(11)?,
+                vault_id: row.get(12)?,
+                client_doc: row.get(13)?,
+            })
+        })?;
+
+        let mut wallets = Vec::new();
+        for w in wallet_iter {
+            wallets.push(w?);
+        }
+        Ok(wallets)
+    }
+
+    /// Insere uma lista de carteiras dentro de uma transação atômica
+    pub fn append_wallets(
+        &self,
+        new_wallets: &[StoredWallet],
+    ) -> Result<Vec<StoredWallet>, StorageError> {
+        let mut conn = self.get_connection()?;
+        let tx = conn.transaction()?;
+
+        {
+            let mut stmt = tx.prepare(
+                "INSERT INTO wallets (id, target, custody_type, user_name, label, derivation_path, network, address, status, kyc_status, seed_words_count, created_at, vault_id, client_doc)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)"
+            )?;
+
+            for w in new_wallets {
+                let id = i64::try_from(w.id).map_err(|_| {
+                    StorageError::InvalidData(
+                        "O ID da carteira excede o intervalo suportado pelo SQLite.".to_string(),
+                    )
+                })?;
+
+                let seed_words_count = i64::try_from(w.seed_words_count).map_err(|_| {
+                    StorageError::InvalidData(
+                        "A quantidade de palavras excede o intervalo suportado pelo SQLite."
+                            .to_string(),
+                    )
+                })?;
+
+                stmt.execute(params![
+                    id,
+                    w.target,
+                    w.custody_type,
+                    w.user,
+                    w.label,
+                    w.derivation_path,
+                    w.network,
+                    w.address,
+                    w.status,
+                    w.kyc_status,
+                    seed_words_count,
+                    w.created_at,
+                    w.vault_id,
+                    w.client_doc
+                ])?;
+            }
+        }
+
+        tx.commit()?;
+        self.list_wallets()
+    }
+
+    // ------------------------------------------------------------------
+    // Segredos criptografados
+    // ------------------------------------------------------------------
+
+    /// Salva o envelope secreto cifrado dentro da tabela vault_secrets via UPSERT explícito
+    pub fn save_secret(&self, secret: StoredSecret) -> Result<(), StorageError> {
+        let mut conn = self.get_connection()?;
+        let tx = conn.transaction()?;
+        let envelope_json = serde_json::to_string(&secret.envelope)?;
+
+        tx.execute(
+            "INSERT INTO vault_secrets (vault_id, target, envelope, created_at)
+             VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT(vault_id) DO UPDATE SET
+                target = excluded.target,
+                envelope = excluded.envelope,
+                created_at = excluded.created_at",
+            params![
+                secret.vault_id,
+                secret.target,
+                envelope_json,
+                secret.created_at
+            ],
+        )?;
+
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Busca o envelope secreto correspondente a um vault_id
+    pub fn get_secret_by_vault_id(
+        &self,
+        vault_id: &str,
+    ) -> Result<Option<StoredSecret>, StorageError> {
+        let conn = self.get_connection()?;
+        let mut stmt = conn.prepare(
+            "SELECT vault_id, target, envelope, created_at FROM vault_secrets WHERE vault_id = ?1",
+        )?;
+
+        let secret = stmt
+            .query_row(params![vault_id], |row| {
+                let v_id: String = row.get(0)?;
+                let target: String = row.get(1)?;
+                let env_json: String = row.get(2)?;
+                let created_at: String = row.get(3)?;
+                let envelope: EncryptedEnvelope = serde_json::from_str(&env_json).map_err(|e| {
+                    rusqlite::Error::FromSqlConversionFailure(
+                        2,
+                        rusqlite::types::Type::Text,
+                        Box::new(e),
+                    )
+                })?;
+
+                Ok(StoredSecret {
+                    vault_id: v_id,
+                    target,
+                    envelope,
+                    created_at,
+                })
+            })
+            .optional()?;
+
+        Ok(secret)
+    }
+
+    // ------------------------------------------------------------------
+    // Status operacional
+    // ------------------------------------------------------------------
+
+    /// Retorna o status operacional do cofre SQLite utilizando conexão única e agregação direta
+    pub fn get_status(&self, is_unlocked: bool) -> Result<VaultStatus, StorageError> {
+        let conn = self.get_connection()?;
+
+        let is_initialized: bool = conn
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM vault_header WHERE id = 1)",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap_or(false);
+
+        let (dao_count, client_count): (i64, i64) = conn
+            .query_row(
+                "SELECT \
+                    COALESCE(SUM(CASE WHEN target = 'DAO' THEN 1 ELSE 0 END), 0), \
+                    COALESCE(SUM(CASE WHEN target = 'CLIENT' THEN 1 ELSE 0 END), 0) \
+                 FROM wallets",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap_or((0, 0));
+
+        let dao_wallets_count = usize::try_from(dao_count).map_err(|_| {
+            StorageError::InvalidData("Quantidade de carteiras DAO inválida.".to_string())
+        })?;
+
+        let client_wallets_count = usize::try_from(client_count).map_err(|_| {
+            StorageError::InvalidData("Quantidade de carteiras de clientes inválida.".to_string())
+        })?;
+
+        Ok(VaultStatus {
+            is_initialized,
+            is_unlocked,
+            dao_wallets_count,
+            client_wallets_count,
+        })
+    }
+
+    // ------------------------------------------------------------------
+    // Checkpoint WAL
+    // ------------------------------------------------------------------
+
+    /// Executa checkpoint explícito e valida a conclusão do SQLite
+    fn checkpoint_wal(&self) -> Result<(), StorageError> {
+        if !self.db_path.exists() {
+            return Ok(());
+        }
+
+        let conn = self.get_connection()?;
+        let (busy, _log_frames, _checkpointed_frames): (i64, i64, i64) =
+            conn.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |row| {
+                Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+            })?;
+
+        if busy != 0 {
+            return Err(StorageError::InvalidData(
+                "Não foi possível concluir o checkpoint WAL devido a conexões ocupadas."
+                    .to_string(),
+            ));
+        }
+
+        drop(conn);
+        Ok(())
+    }
+
+    // ------------------------------------------------------------------
+    // Exportação de backup
+    // ------------------------------------------------------------------
+
+    /// Executa backup atômico e transacional do banco de dados SQLite via VACUUM INTO
+    pub fn export_backup(&self, destination_path: &Path) -> Result<u64, StorageError> {
+        self.ensure_not_active_database_path(destination_path, "destino do backup")?;
+
+        let parent = Self::parent_directory(destination_path);
+        fs::create_dir_all(parent)?;
+
+        let staged = Self::create_temporary_sibling(destination_path, "backup")?;
+        // Remove o placeholder vazio para o VACUUM INTO criar um banco novo de forma limpa
+        let _ = fs::remove_file(&staged);
+
+        let result = (|| {
+            let conn = self.get_connection()?;
+            let staged_name = staged.to_string_lossy().into_owned();
+
+            conn.execute("VACUUM INTO ?1", params![staged_name])?;
+            drop(conn);
+
+            Self::set_private_file_permissions(&staged)?;
+
+            if fs::metadata(&staged)?.len() == 0 {
+                return Err(StorageError::InvalidData(
+                    "O backup gerado está vazio.".to_string(),
+                ));
+            }
+
+            Self::install_staged_file(&staged, destination_path)?;
+            let metadata = fs::metadata(destination_path)?;
+            Ok(metadata.len())
+        })();
+
+        if result.is_err() {
+            let _ = fs::remove_file(&staged);
+        }
+
+        result
+    }
+
+    // ------------------------------------------------------------------
+    // Restauração de backup
+    // ------------------------------------------------------------------
+
+    /// Restaura o banco de dados a partir de um arquivo de backup verificado
+    pub fn restore_backup(&self, source_path: &Path) -> Result<(), StorageError> {
+        if !source_path.is_file() {
+            return Err(StorageError::InvalidData(
+                "O arquivo de backup informado não existe ou não é um arquivo regular.".to_string(),
+            ));
+        }
+
+        self.ensure_not_active_database_path(source_path, "origem do backup")?;
+
+        let staged = Self::create_temporary_sibling(&self.db_path, "restore")?;
+
+        let result = (|| {
+            // Prepara a restauração sem destruir o banco ativo
+            fs::copy(source_path, &staged)?;
+            Self::set_private_file_permissions(&staged)?;
+
+            // Valida a integridade do snapshot antes de alterar o banco atual
+            Self::validate_backup_file(&staged)?;
+
+            // Executa checkpoint WAL do banco atual
+            self.checkpoint_wal()?;
+
+            // Remove sidecars WAL/SHM associados antes da substituição atômica
+            for sidecar in self.sidecar_paths() {
+                Self::remove_file_if_exists(&sidecar)?;
+            }
+
+            // Substitui o banco ativo preservando versão anterior caso ocorra falha de rename
+            Self::install_staged_file(&staged, &self.db_path)?;
+            Self::set_private_file_permissions(&self.db_path)?;
+
+            Ok(())
+        })();
+
+        if result.is_err() {
+            let _ = fs::remove_file(&staged);
+        }
+
+        result
+    }
+}
+
+// ----------------------------------------------------------------------
+// Testes unitários
+// ----------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sqlite_persistence_across_reconnect() {
+        let test_dir =
+            std::env::temp_dir().join(format!("devos_test_db_{}", rand::random::<u32>()));
+        let db = LocalDatabase::new(test_dir.clone());
+
+        let conn = db.get_connection().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS vault_header (id INTEGER PRIMARY KEY, version INTEGER NOT NULL, canary_envelope TEXT NOT NULL, created_at TEXT NOT NULL);
+             CREATE TABLE IF NOT EXISTS wallets (id INTEGER PRIMARY KEY, target TEXT NOT NULL, custody_type TEXT NOT NULL, user_name TEXT NOT NULL, label TEXT NOT NULL, derivation_path TEXT NOT NULL, network TEXT NOT NULL, address TEXT NOT NULL, status TEXT NOT NULL, kyc_status TEXT NOT NULL, seed_words_count INTEGER NOT NULL, created_at TEXT NOT NULL, vault_id TEXT, client_doc TEXT);
+             CREATE TABLE IF NOT EXISTS vault_secrets (vault_id TEXT PRIMARY KEY, target TEXT NOT NULL, envelope TEXT NOT NULL, created_at TEXT NOT NULL);"
+        ).unwrap();
+        drop(conn);
+
+        let w = StoredWallet {
+            id: 1,
+            target: "DAO".to_string(),
+            custody_type: "CUSTODIAL_LOCAL".to_string(),
+            user: "ASPPIBRA DAO".to_string(),
+            label: "Caixa Operacional".to_string(),
+            derivation_path: "m/44'/60'/0'/0/0".to_string(),
+            network: "Arbitrum One".to_string(),
+            address: "0x9858EfFD232B4033E47d90003D41EC34EcaEda94".to_string(),
+            status: "ACTIVE".to_string(),
+            kyc_status: "UNVERIFIED".to_string(),
+            seed_words_count: 24,
+            created_at: "2026-10-12 00:00".to_string(),
+            vault_id: Some("dao_vault_1".to_string()),
+            client_doc: None,
+        };
+
+        db.append_wallets(std::slice::from_ref(&w)).unwrap();
+
+        let reloaded_db = LocalDatabase::new(test_dir.clone());
+        let loaded = reloaded_db.list_wallets().unwrap();
+
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(
+            loaded[0].address,
+            "0x9858EfFD232B4033E47d90003D41EC34EcaEda94"
+        );
+        assert_eq!(loaded[0].custody_type, "CUSTODIAL_LOCAL");
+
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn test_wallet_isolation_and_custody_segregation() {
+        let test_dir =
+            std::env::temp_dir().join(format!("devos_test_isolation_{}", rand::random::<u32>()));
+        let db = LocalDatabase::new(test_dir.clone());
+
+        let conn = db.get_connection().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS vault_header (id INTEGER PRIMARY KEY, version INTEGER NOT NULL, canary_envelope TEXT NOT NULL, created_at TEXT NOT NULL);
+             CREATE TABLE IF NOT EXISTS wallets (id INTEGER PRIMARY KEY, target TEXT NOT NULL, custody_type TEXT NOT NULL, user_name TEXT NOT NULL, label TEXT NOT NULL, derivation_path TEXT NOT NULL, network TEXT NOT NULL, address TEXT NOT NULL, status TEXT NOT NULL, kyc_status TEXT NOT NULL, seed_words_count INTEGER NOT NULL, created_at TEXT NOT NULL, vault_id TEXT, client_doc TEXT);
+             CREATE TABLE IF NOT EXISTS vault_secrets (vault_id TEXT PRIMARY KEY, target TEXT NOT NULL, envelope TEXT NOT NULL, created_at TEXT NOT NULL);"
+        ).unwrap();
+        drop(conn);
+
+        let dao_custodial = StoredWallet {
+            id: 1,
+            target: "DAO".to_string(),
+            custody_type: "CUSTODIAL_LOCAL".to_string(),
+            user: "ASPPIBRA DAO".to_string(),
+            label: "Caixa Cripto".to_string(),
+            derivation_path: "m/44'/60'/0'/0/0".to_string(),
+            network: "Arbitrum One".to_string(),
+            address: "0x9858EfFD232B4033E47d90003D41EC34EcaEda94".to_string(),
+            status: "ACTIVE".to_string(),
+            kyc_status: "UNVERIFIED".to_string(),
+            seed_words_count: 24,
+            created_at: "2026-10-12 00:00".to_string(),
+            vault_id: Some("dao_vault_1".to_string()),
+            client_doc: None,
+        };
+
+        let client_watch_only = StoredWallet {
+            id: 2,
+            target: "CLIENT".to_string(),
+            custody_type: "WATCH_ONLY".to_string(),
+            user: "Associado 01".to_string(),
+            label: "Monitoramento".to_string(),
+            derivation_path: "N/A".to_string(),
+            network: "Arbitrum One".to_string(),
+            address: "0x1111111111111111111111111111111111111111".to_string(),
+            status: "ACTIVE".to_string(),
+            kyc_status: "UNVERIFIED".to_string(),
+            seed_words_count: 0,
+            created_at: "2026-10-12 00:00".to_string(),
+            vault_id: None,
+            client_doc: Some("123.456.789-00".to_string()),
+        };
+
+        db.append_wallets(&[dao_custodial, client_watch_only])
+            .unwrap();
+
+        let all = db.list_wallets().unwrap();
+        assert_eq!(all.len(), 2);
+
+        let secret_none = db.get_secret_by_vault_id("non_existent").unwrap();
+        assert!(secret_none.is_none());
+
+        let fake_envelope =
+            crate::modules::vault::encryption::VaultCrypto::encrypt("master_123", b"secret_words")
+                .unwrap();
+        let stored_secret = StoredSecret {
+            vault_id: "dao_vault_1".to_string(),
+            target: "DAO".to_string(),
+            envelope: fake_envelope.clone(),
+            created_at: "2026-10-12 00:00".to_string(),
+        };
+        db.save_secret(stored_secret).unwrap();
+
+        let retrieved = db
+            .get_secret_by_vault_id("dao_vault_1")
+            .unwrap()
+            .expect("Segredo deve existir");
+        assert_eq!(retrieved.vault_id, "dao_vault_1");
+        assert_eq!(
+            retrieved.envelope.ciphertext_hex,
+            fake_envelope.ciphertext_hex
+        );
+
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn test_vault_header_persistence_and_recovery() {
+        let test_dir =
+            std::env::temp_dir().join(format!("devos_test_header_{}", rand::random::<u32>()));
+        let db = LocalDatabase::new(test_dir.clone());
+
+        let conn = db.get_connection().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS vault_header (id INTEGER PRIMARY KEY, version INTEGER NOT NULL, canary_envelope TEXT NOT NULL, created_at TEXT NOT NULL);"
+        ).unwrap();
+        drop(conn);
+
+        let canary =
+            crate::modules::vault::encryption::VaultCrypto::encrypt("master_123", b"canary_canary")
+                .unwrap();
+        let header = VaultHeader {
+            version: 1,
+            canary_envelope: canary.clone(),
+            created_at: "2026-10-12 00:00".to_string(),
+        };
+
+        db.save_header(&header).unwrap();
+
+        let reloaded_db = LocalDatabase::new(test_dir.clone());
+        let loaded_header = reloaded_db
+            .get_header()
+            .unwrap()
+            .expect("Header deve existir");
+        assert_eq!(
+            loaded_header.canary_envelope.ciphertext_hex,
+            canary.ciphertext_hex
+        );
+
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn test_complete_vault_lifecycle_and_backup() {
+        let test_dir =
+            std::env::temp_dir().join(format!("devos_full_lifecycle_{}", rand::random::<u32>()));
+        let db = LocalDatabase::new(test_dir.clone());
+        let master_password = "SuperMasterPassword2026!Secure";
+
+        let conn = db.get_connection().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS vault_header (id INTEGER PRIMARY KEY, version INTEGER NOT NULL, canary_envelope TEXT NOT NULL, created_at TEXT NOT NULL);
+             CREATE TABLE IF NOT EXISTS wallets (id INTEGER PRIMARY KEY, target TEXT NOT NULL, custody_type TEXT NOT NULL, user_name TEXT NOT NULL, label TEXT NOT NULL, derivation_path TEXT NOT NULL, network TEXT NOT NULL, address TEXT NOT NULL, status TEXT NOT NULL, kyc_status TEXT NOT NULL, seed_words_count INTEGER NOT NULL, created_at TEXT NOT NULL, vault_id TEXT, client_doc TEXT);
+             CREATE TABLE IF NOT EXISTS vault_secrets (vault_id TEXT PRIMARY KEY, target TEXT NOT NULL, envelope TEXT NOT NULL, created_at TEXT NOT NULL);"
+        ).unwrap();
+        drop(conn);
+
+        let header = VaultHeader::new(master_password).expect("Header deve ser gerado com sucesso");
+        db.save_header(&header).expect("Header deve ser persistido");
+
+        let mnemonic = crate::modules::wallets::mnemonic::MnemonicService::generate(24)
+            .expect("Mnemônica de 24 palavras");
+        let seed = crate::modules::wallets::mnemonic::MnemonicService::to_seed(&mnemonic, "")
+            .expect("Seed derivada");
+        let previews = crate::modules::wallets::derivation::DerivationService::derive_batch(
+            &seed,
+            0,
+            1,
+            "Caixa Primário",
+            "Arbitrum One",
+        )
+        .expect("Derivação");
+        let derived_address = previews[0].address.clone();
+        let derivation_path = previews[0].derivation_path.clone();
+
+        let envelope = crate::modules::vault::encryption::VaultCrypto::encrypt(
+            master_password,
+            mnemonic.as_bytes(),
+        )
+        .expect("Cifragem AEAD");
+        let vault_id = "dao_vault_lifecycle_test".to_string();
+        let secret_record = StoredSecret {
+            vault_id: vault_id.clone(),
+            target: "DAO".to_string(),
+            envelope,
+            created_at: "2026-10-12 00:00".to_string(),
+        };
+        db.save_secret(secret_record).expect("Segredo persistido");
+
+        let stored_wallet = StoredWallet {
+            id: 1,
+            target: "DAO".to_string(),
+            custody_type: "CUSTODIAL_LOCAL".to_string(),
+            user: "ASPPIBRA DAO".to_string(),
+            label: "Caixa Primário".to_string(),
+            derivation_path: derivation_path.clone(),
+            network: "Arbitrum One".to_string(),
+            address: derived_address.clone(),
+            status: "ACTIVE".to_string(),
+            kyc_status: "UNVERIFIED".to_string(),
+            seed_words_count: 24,
+            created_at: "2026-10-12 00:00".to_string(),
+            vault_id: Some(vault_id.clone()),
+            client_doc: None,
+        };
+        db.append_wallets(&[stored_wallet]).expect("Carteira salva");
+
+        let reloaded_db = LocalDatabase::new(test_dir.clone());
+
+        let reloaded_header = reloaded_db
+            .get_header()
+            .unwrap()
+            .expect("Header recarregado deve existir");
+        assert!(
+            reloaded_header.verify_password(master_password),
+            "Senha mestre válida deve desbloquear"
+        );
+        assert!(
+            !reloaded_header.verify_password("SenhaErrada!"),
+            "Senha errada deve ser rejeitada"
+        );
+
+        let wallets = reloaded_db.list_wallets().expect("Listagem pós-reboot");
+        assert_eq!(wallets.len(), 1);
+        assert_eq!(wallets[0].address, derived_address);
+        assert_eq!(wallets[0].custody_type, "CUSTODIAL_LOCAL");
+
+        let retrieved_secret = reloaded_db
+            .get_secret_by_vault_id(&vault_id)
+            .unwrap()
+            .expect("Segredo deve existir");
+        let decrypted_bytes = crate::modules::vault::encryption::VaultCrypto::decrypt(
+            master_password,
+            &retrieved_secret.envelope,
+        )
+        .expect("Decifragem autorizada");
+        let recovered_mnemonic = String::from_utf8(decrypted_bytes).expect("UTF-8 válido");
+        assert_eq!(recovered_mnemonic, mnemonic);
+
+        let recovered_seed =
+            crate::modules::wallets::mnemonic::MnemonicService::to_seed(&recovered_mnemonic, "")
+                .expect("Seed recuperada");
+        let recovered_previews =
+            crate::modules::wallets::derivation::DerivationService::derive_batch(
+                &recovered_seed,
+                0,
+                1,
+                "Teste",
+                "Arbitrum One",
+            )
+            .expect("Derivação conferida");
+        assert_eq!(
+            recovered_previews[0].address, wallets[0].address,
+            "Endereço decifrado deve coincidir com o salvo"
+        );
+
+        assert!(!retrieved_secret.envelope.ciphertext_hex.is_empty());
+        assert!(!retrieved_secret.envelope.ciphertext_hex.contains(&mnemonic));
+
+        let fail_result = crate::modules::vault::encryption::VaultCrypto::decrypt(
+            "SenhaIncorreta999!",
+            &retrieved_secret.envelope,
+        );
+        assert!(
+            fail_result.is_err(),
+            "Decifragem com senha incorreta deve retornar erro AEAD"
+        );
+
+        // Validação de Backup e Restauração via VACUUM INTO
+        let backup_path = test_dir.join("backups").join("vault_backup.bak");
+        let copied = reloaded_db
+            .export_backup(&backup_path)
+            .expect("Backup deve ser exportado");
+        assert!(copied > 0);
+        assert!(backup_path.exists());
+
+        let restore_dir =
+            std::env::temp_dir().join(format!("devos_restored_{}", rand::random::<u32>()));
+        let restored_db = LocalDatabase::new(restore_dir.clone());
+        restored_db
+            .restore_backup(&backup_path)
+            .expect("Restauração de backup deve ser concluída");
+
+        let restored_wallets = restored_db
+            .list_wallets()
+            .expect("Carteiras no banco restaurado");
+        assert_eq!(restored_wallets.len(), 1);
+        assert_eq!(restored_wallets[0].address, derived_address);
+
+        let _ = fs::remove_dir_all(test_dir);
+        let _ = fs::remove_dir_all(restore_dir);
+    }
+
+    #[test]
+    fn test_atomic_initialize_vault_if_absent_prevents_overwrite() {
+        let test_dir =
+            std::env::temp_dir().join(format!("devos_atomic_vault_{}", rand::random::<u32>()));
+        let db = LocalDatabase::new(test_dir.clone());
+        let conn = db.get_connection().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS vault_header (id INTEGER PRIMARY KEY, version INTEGER NOT NULL, canary_envelope TEXT NOT NULL, created_at TEXT NOT NULL);"
+        ).unwrap();
+        drop(conn);
+
+        let header1 = VaultHeader::new("InitialMasterPassword123!").expect("Header 1 válido");
+        let header2 = VaultHeader::new("AttackerOrOverwritePassword456!").expect("Header 2 válido");
+
+        let first_res = db.initialize_vault_if_absent(&header1);
+        assert!(first_res.is_ok(), "Primeira inicialização deve ter sucesso");
+
+        let second_res = db.initialize_vault_if_absent(&header2);
+        assert!(
+            second_res.is_err(),
+            "Segunda inicialização deve ser rejeitada"
+        );
+        match second_res {
+            Err(StorageError::AlreadyInitialized) => {}
+            _ => panic!("Esperado StorageError::AlreadyInitialized"),
+        }
+
+        let loaded = db.get_header().unwrap().expect("Header deve existir");
+        assert!(loaded.verify_password("InitialMasterPassword123!"));
+        assert!(!loaded.verify_password("AttackerOrOverwritePassword456!"));
+
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn test_concurrent_multithread_initialization_race() {
+        use std::sync::{Arc, Barrier};
+        use std::thread;
+
+        let test_dir =
+            std::env::temp_dir().join(format!("devos_concurrency_race_{}", rand::random::<u32>()));
+        let db = LocalDatabase::new(test_dir.clone());
+        let conn = db.get_connection().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS vault_header (id INTEGER PRIMARY KEY, version INTEGER NOT NULL, canary_envelope TEXT NOT NULL, created_at TEXT NOT NULL);"
+        ).unwrap();
+        drop(conn);
+
+        const THREAD_COUNT: usize = 10;
+        let barrier = Arc::new(Barrier::new(THREAD_COUNT));
+        let mut handles = Vec::new();
+
+        for i in 0..THREAD_COUNT {
+            let b = Arc::clone(&barrier);
+            let dir = test_dir.clone();
+            let thread_password = format!("PasswordForThread{}!Secure123", i);
+
+            let handle = thread::spawn(move || {
+                let thread_db = LocalDatabase::new(dir);
+                let header = VaultHeader::new(&thread_password).expect("Header gerado");
+                b.wait();
+                let res = thread_db.initialize_vault_if_absent(&header);
+                (i, thread_password, res.is_ok())
+            });
+
+            handles.push(handle);
+        }
+
+        let mut success_count = 0;
+        let mut winning_password = String::new();
+
+        for h in handles {
+            let (_i, pwd, is_ok) = h.join().unwrap();
+            if is_ok {
+                success_count += 1;
+                winning_password = pwd;
+            }
+        }
+
+        assert_eq!(
+            success_count, 1,
+            "Exatamente UMA thread concorrente deve ter sucesso na inicialização atômica"
+        );
+
+        let final_header = db.get_header().unwrap().expect("Header persistido");
+        assert!(
+            final_header.verify_password(&winning_password),
+            "Header deve ser da thread vencedora"
+        );
+
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn test_restore_rejects_invalid_sqlite_without_replacing_active_db() {
+        let test_dir =
+            std::env::temp_dir().join(format!("devos_restore_invalid_{}", rand::random::<u64>()));
+        let db = LocalDatabase::new(test_dir.clone());
+
+        let conn = db.get_connection().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS vault_header (
+                id INTEGER PRIMARY KEY,
+                version INTEGER NOT NULL,
+                canary_envelope TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );",
+        )
+        .unwrap();
+
+        let header = VaultHeader::new("RestoreTestPassword123!").expect("Header válido");
+        db.save_header(&header).unwrap();
+        drop(conn);
+
+        let original_header = db.get_header().unwrap().unwrap();
+
+        let invalid_backup = test_dir.join("invalid_backup.bak");
+        std::fs::write(&invalid_backup, b"not a sqlite database").unwrap();
+
+        assert!(db.restore_backup(&invalid_backup).is_err());
+
+        let persisted_header = db.get_header().unwrap().unwrap();
+        assert_eq!(
+            persisted_header.canary_envelope,
+            original_header.canary_envelope
+        );
+
+        let _ = std::fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn test_export_rejects_database_as_backup_destination() {
+        let test_dir =
+            std::env::temp_dir().join(format!("devos_export_self_{}", rand::random::<u64>()));
+        let db = LocalDatabase::new(test_dir.clone());
+
+        let conn = db.get_connection().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS vault_header (
+                id INTEGER PRIMARY KEY,
+                version INTEGER NOT NULL,
+                canary_envelope TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );",
+        )
+        .unwrap();
+        drop(conn);
+
+        let result = db.export_backup(db.db_path());
+        assert!(
+            result.is_err(),
+            "O banco ativo não pode ser o destino do próprio backup."
+        );
+
+        let _ = std::fs::remove_dir_all(test_dir);
+    }
+}
+```
+
+---
+
+### Arquivo 22: `migrations.rs`
+- **Caminho:** `src-tauri/src/storage/migrations.rs`
+- **Tipo / Camada:** Backend Database
+- **Responsabilidade:** Gerenciador de schema e migrações do banco devos_vault.sqlite. Criação da tabela profile_records (id, ciphertext, nonce, tag, revision, created_at, updated_at).
+- **Dependências Internas:** Nenhuma (componente base ou folha)
+- **Relacionamento na ABA 3:** Garante a existência e integridade da tabela onde os links sociais são persistidos.
+
+```rust
+use super::local_database::{LocalDatabase, StorageError};
+
+pub struct MigrationManager;
+
+impl MigrationManager {
+    /// Executa as migrações versionadas no banco SQLite local dentro de transação
+    pub fn run_migrations(db: &LocalDatabase) -> Result<(), StorageError> {
+        let mut conn = db.get_connection()?;
+        let tx = conn.transaction()?;
+
+        // 1. Tabela de controle de versão de migrações
+        tx.execute_batch(
+            "CREATE TABLE IF NOT EXISTS schema_migrations (
+                version INTEGER PRIMARY KEY,
+                applied_at TEXT NOT NULL
+            );",
+        )?;
+
+        // Consulta última migração aplicada
+        let current_version: u32 = tx
+            .query_row(
+                "SELECT COALESCE(MAX(version), 0) FROM schema_migrations",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
+
+        // Migração 1: Estrutura inicial do cofre e tabelas de custódia
+        if current_version < 1 {
+            tx.execute_batch(
+                "CREATE TABLE IF NOT EXISTS vault_header (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    version INTEGER NOT NULL,
+                    canary_envelope TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS wallets (
+                    id INTEGER PRIMARY KEY,
+                    target TEXT NOT NULL,
+                    custody_type TEXT NOT NULL,
+                    user_name TEXT NOT NULL,
+                    label TEXT NOT NULL,
+                    derivation_path TEXT NOT NULL,
+                    network TEXT NOT NULL,
+                    address TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    kyc_status TEXT NOT NULL,
+                    seed_words_count INTEGER NOT NULL,
+                    created_at TEXT NOT NULL,
+                    vault_id TEXT,
+                    client_doc TEXT
+                );
+
+                CREATE TABLE IF NOT EXISTS vault_secrets (
+                    vault_id TEXT PRIMARY KEY,
+                    target TEXT NOT NULL,
+                    envelope TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                );
+
+                INSERT INTO schema_migrations (version, applied_at)
+                VALUES (1, datetime('now'));",
+            )?;
+        }
+
+        // Migração 2: Tabela de perfil e identidade civil com envelope criptográfico
+        if current_version < 2 {
+            tx.execute_batch(
+                "CREATE TABLE IF NOT EXISTS user_profiles (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    encrypted_envelope TEXT NOT NULL,
+                    payload_version INTEGER NOT NULL DEFAULT 1,
+                    revision INTEGER NOT NULL DEFAULT 1,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+
+                INSERT INTO schema_migrations (version, applied_at)
+                VALUES (2, datetime('now'));",
+            )?;
+        }
+
+        tx.commit()?;
+
+        // Banco de dados inicializado limpo, pronto para carteiras reais
+        Ok(())
+    }
+}
+```
+
+---
+
+### Arquivo 23: `encryption.rs`
+- **Caminho:** `src-tauri/src/modules/vault/encryption.rs`
+- **Tipo / Camada:** Backend Cryptography
+- **Responsabilidade:** Motor criptográfico do cofre VaultCrypto. Executa cifragem e decifragem autenticada AES-256-GCM com nonce aleatório de 96 bits de uso único, tag de 128 bits e zeroização de memória sensível.
+- **Dependências Internas:** Nenhuma (componente base ou folha)
+- **Relacionamento na ABA 3:** Garante que os dados de redes sociais e do perfil transitem e descansem criptografados.
+
+```rust
+use aes_gcm::aead::{Aead, KeyInit};
+use aes_gcm::{Aes256Gcm, Nonce};
+use argon2::{Algorithm, Argon2, Params, Version};
+use rand::RngCore;
+use serde::{Deserialize, Serialize};
+use zeroize::{Zeroize, ZeroizeOnDrop};
+
+// ----------------------------------------------------------------------
+// Parâmetros criptográficos
+// ----------------------------------------------------------------------
+
+const ENVELOPE_VERSION: u32 = 1;
+
+const KDF_NAME: &str = "Argon2id";
+const CIPHER_NAME: &str = "AES-256-GCM";
+
+const SALT_BYTES: usize = 16;
+const NONCE_BYTES: usize = 12;
+const KEY_BYTES: usize = 32;
+const GCM_TAG_BYTES: usize = 16;
+
+const ARGON2_MEMORY_KIB: u32 = 64 * 1024;
+const ARGON2_ITERATIONS: u32 = 3;
+const ARGON2_LANES: u32 = 1;
+
+const MAX_PASSWORD_CHARS: usize = 128;
+const MAX_PASSWORD_BYTES: usize = 512;
+
+// Limite defensivo para envelopes que armazenam segredos de custódia e carteiras.
+const MAX_PLAINTEXT_BYTES: usize = 16 * 1024 * 1024;
+const MAX_CIPHERTEXT_BYTES: usize = MAX_PLAINTEXT_BYTES + GCM_TAG_BYTES;
+const MAX_CIPHERTEXT_HEX_CHARS: usize = MAX_CIPHERTEXT_BYTES * 2;
+
+// ----------------------------------------------------------------------
+// Erros públicos
+// ----------------------------------------------------------------------
+
+#[derive(Debug, thiserror::Error)]
+pub enum VaultCryptoError {
+    #[error("Encryption failed: {0}")]
+    EncryptionFailed(String),
+
+    #[error("Decryption failed / Invalid password or corrupted payload")]
+    DecryptionFailed,
+
+    // Mantido para compatibilidade com consumidores existentes.
+    #[error("Hex decode error: {0}")]
+    HexError(String),
+
+    // Mantido para compatibilidade com consumidores existentes.
+    #[error("Serialization error: {0}")]
+    SerializationError(String),
+}
+
+// ----------------------------------------------------------------------
+// Envelope criptográfico versionado
+// ----------------------------------------------------------------------
+
+/// Envelope criptográfico versionado com proteção AEAD.
+///
+/// A versão 1 utiliza Argon2id para derivação de chave e AES-256-GCM
+/// para cifragem autenticada.
+///
+/// Os metadados são validados explicitamente durante a decifragem.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct EncryptedEnvelope {
+    pub version: u32,
+    pub kdf: String,
+    pub cipher: String,
+    pub salt_hex: String,
+    pub nonce_hex: String,
+    pub ciphertext_hex: String,
+}
+
+// ----------------------------------------------------------------------
+// Chave derivada
+// ----------------------------------------------------------------------
+
+/// Chave temporária protegida contra leitura residual por descarte.
+///
+/// A chave é derivada diretamente neste objeto para evitar a criação
+/// de uma cópia intermediária desnecessária na pilha.
+#[derive(Zeroize, ZeroizeOnDrop)]
+struct DerivedKey([u8; KEY_BYTES]);
+
+// ----------------------------------------------------------------------
+// Implementação criptográfica
+// ----------------------------------------------------------------------
+
+pub struct VaultCrypto;
+
+impl VaultCrypto {
+    // --------------------------------------------------------------
+    // Validação de entradas
+    // --------------------------------------------------------------
+
+    /// Valida o tamanho máximo suportado pela API criptográfica.
+    ///
+    /// Não normaliza, trunca nem modifica a senha.
+    fn validate_password_size(password: &str) -> Result<(), VaultCryptoError> {
+        if password.len() > MAX_PASSWORD_BYTES {
+            return Err(VaultCryptoError::EncryptionFailed(
+                "Password exceeds the supported size limit.".to_string(),
+            ));
+        }
+
+        if password.chars().count() > MAX_PASSWORD_CHARS {
+            return Err(VaultCryptoError::EncryptionFailed(
+                "Password exceeds the supported size limit.".to_string(),
+            ));
+        }
+
+        Ok(())
+    }
+
+    /// Valida o comprimento da representação hexadecimal do ciphertext
+    /// antes de alocar um vetor com os bytes decodificados.
+    fn validate_ciphertext_hex_length(hex_length: usize) -> Result<(), VaultCryptoError> {
+        let minimum_hex_length = GCM_TAG_BYTES * 2;
+
+        if hex_length < minimum_hex_length
+            || hex_length > MAX_CIPHERTEXT_HEX_CHARS
+            || !hex_length.is_multiple_of(2)
+        {
+            return Err(VaultCryptoError::DecryptionFailed);
+        }
+
+        Ok(())
+    }
+
+    /// Valida o identificador do algoritmo e a versão do envelope.
+    ///
+    /// O formato atual rejeita algoritmos desconhecidos.
+    fn validate_envelope_metadata(envelope: &EncryptedEnvelope) -> Result<(), VaultCryptoError> {
+        if envelope.version != ENVELOPE_VERSION {
+            return Err(VaultCryptoError::DecryptionFailed);
+        }
+
+        if envelope.kdf != KDF_NAME {
+            return Err(VaultCryptoError::DecryptionFailed);
+        }
+
+        if envelope.cipher != CIPHER_NAME {
+            return Err(VaultCryptoError::DecryptionFailed);
+        }
+
+        Ok(())
+    }
+
+    // --------------------------------------------------------------
+    // Derivação de chave
+    // --------------------------------------------------------------
+
+    /// Deriva uma chave simétrica de 256 bits utilizando Argon2id.
+    ///
+    /// Parâmetros preservados:
+    /// - Memória: 64 MiB.
+    /// - Iterações: 3.
+    /// - Paralelismo: 1.
+    /// - Comprimento da chave: 32 bytes.
+    fn derive_key(password: &str, salt: &[u8; SALT_BYTES]) -> Result<DerivedKey, VaultCryptoError> {
+        Self::validate_password_size(password)?;
+
+        let params = Params::new(
+            ARGON2_MEMORY_KIB,
+            ARGON2_ITERATIONS,
+            ARGON2_LANES,
+            Some(KEY_BYTES),
+        )
+        .map_err(|_| {
+            VaultCryptoError::EncryptionFailed("Invalid Argon2id parameters.".to_string())
+        })?;
+
+        let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
+
+        // A chave nasce diretamente dentro do tipo que a zera no descarte (ZeroizeOnDrop).
+        let mut derived_key = DerivedKey([0u8; KEY_BYTES]);
+
+        argon2
+            .hash_password_into(password.as_bytes(), salt, &mut derived_key.0)
+            .map_err(|_| {
+                VaultCryptoError::EncryptionFailed("Argon2id key derivation failed.".to_string())
+            })?;
+
+        Ok(derived_key)
+    }
+
+    // --------------------------------------------------------------
+    // Cifragem
+    // --------------------------------------------------------------
+
+    /// Cifra dados sensíveis utilizando Argon2id + AES-256-GCM.
+    ///
+    /// O chamador permanece responsável pelo ciclo de vida do plaintext
+    /// recebido por referência.
+    pub fn encrypt(
+        password: &str,
+        plaintext: &[u8],
+    ) -> Result<EncryptedEnvelope, VaultCryptoError> {
+        Self::validate_password_size(password)?;
+
+        if plaintext.len() > MAX_PLAINTEXT_BYTES {
+            return Err(VaultCryptoError::EncryptionFailed(
+                "Plaintext exceeds the supported size limit.".to_string(),
+            ));
+        }
+
+        // Salt e nonce são gerados com CSPRNG seguro com tratamento de falhas.
+        let mut rng = rand::thread_rng();
+
+        let mut salt = [0u8; SALT_BYTES];
+        rng.try_fill_bytes(&mut salt).map_err(|_| {
+            VaultCryptoError::EncryptionFailed("Secure random generation failed.".to_string())
+        })?;
+
+        let mut nonce_bytes = [0u8; NONCE_BYTES];
+        rng.try_fill_bytes(&mut nonce_bytes).map_err(|_| {
+            VaultCryptoError::EncryptionFailed("Secure random generation failed.".to_string())
+        })?;
+
+        let derived_key = Self::derive_key(password, &salt)?;
+
+        let cipher = Aes256Gcm::new_from_slice(&derived_key.0).map_err(|_| {
+            VaultCryptoError::EncryptionFailed("AES-256-GCM initialization failed.".to_string())
+        })?;
+
+        // O nonce foi construído a partir de um array fixo de 12 bytes.
+        let nonce = Nonce::from_slice(&nonce_bytes);
+
+        let ciphertext = cipher.encrypt(nonce, plaintext).map_err(|_| {
+            VaultCryptoError::EncryptionFailed("AES-256-GCM encryption failed.".to_string())
+        })?;
+
+        Ok(EncryptedEnvelope {
+            version: ENVELOPE_VERSION,
+            kdf: KDF_NAME.to_string(),
+            cipher: CIPHER_NAME.to_string(),
+            salt_hex: hex::encode(salt),
+            nonce_hex: hex::encode(nonce_bytes),
+            ciphertext_hex: hex::encode(ciphertext),
+        })
+    }
+
+    // --------------------------------------------------------------
+    // Decifragem
+    // --------------------------------------------------------------
+
+    /// Decifra e autentica um envelope criptográfico.
+    ///
+    /// Retorna erro controlado quando a senha está incorreta ou o
+    /// envelope não pode ser autenticado.
+    ///
+    /// O vetor retornado contém plaintext. O chamador deve protegê-lo
+    /// com Zeroizing ou mecanismo equivalente quando contiver segredos.
+    pub fn decrypt(
+        password: &str,
+        envelope: &EncryptedEnvelope,
+    ) -> Result<Vec<u8>, VaultCryptoError> {
+        // 1. Validação estrita de versão, KDF e cifra antes de qualquer cálculo
+        Self::validate_envelope_metadata(envelope)?;
+
+        // 2. Validação defensiva de tamanho da senha
+        if password.len() > MAX_PASSWORD_BYTES || password.chars().count() > MAX_PASSWORD_CHARS {
+            return Err(VaultCryptoError::DecryptionFailed);
+        }
+
+        // 3. Validação antecipada de tamanhos hexadecimais para evitar pânicos ou alocações espúrias
+        if envelope.salt_hex.len() != SALT_BYTES * 2 {
+            return Err(VaultCryptoError::DecryptionFailed);
+        }
+
+        if envelope.nonce_hex.len() != NONCE_BYTES * 2 {
+            return Err(VaultCryptoError::DecryptionFailed);
+        }
+
+        Self::validate_ciphertext_hex_length(envelope.ciphertext_hex.len())?;
+
+        // 4. Conversão para arrays de tamanho estrito fixo (impede pânico em Nonce::from_slice)
+        let salt: [u8; SALT_BYTES] = hex::decode(&envelope.salt_hex)
+            .map_err(|_| VaultCryptoError::DecryptionFailed)?
+            .try_into()
+            .map_err(|_| VaultCryptoError::DecryptionFailed)?;
+
+        let nonce_bytes: [u8; NONCE_BYTES] = hex::decode(&envelope.nonce_hex)
+            .map_err(|_| VaultCryptoError::DecryptionFailed)?
+            .try_into()
+            .map_err(|_| VaultCryptoError::DecryptionFailed)?;
+
+        let ciphertext = hex::decode(&envelope.ciphertext_hex)
+            .map_err(|_| VaultCryptoError::DecryptionFailed)?;
+
+        if ciphertext.len() < GCM_TAG_BYTES || ciphertext.len() > MAX_CIPHERTEXT_BYTES {
+            return Err(VaultCryptoError::DecryptionFailed);
+        }
+
+        // 5. Derivação e decifragem com chave em DerivedKey (protegida por ZeroizeOnDrop)
+        let derived_key =
+            Self::derive_key(password, &salt).map_err(|_| VaultCryptoError::DecryptionFailed)?;
+
+        let cipher = Aes256Gcm::new_from_slice(&derived_key.0)
+            .map_err(|_| VaultCryptoError::DecryptionFailed)?;
+
+        let nonce = Nonce::from_slice(&nonce_bytes);
+
+        cipher
+            .decrypt(nonce, ciphertext.as_ref())
+            .map_err(|_| VaultCryptoError::DecryptionFailed)
+    }
+}
+
+// ----------------------------------------------------------------------
+// Testes
+// ----------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_invalid_envelope() -> EncryptedEnvelope {
+        EncryptedEnvelope {
+            version: ENVELOPE_VERSION,
+            kdf: KDF_NAME.to_string(),
+            cipher: CIPHER_NAME.to_string(),
+            salt_hex: "00".repeat(SALT_BYTES),
+            nonce_hex: "00".repeat(NONCE_BYTES),
+            ciphertext_hex: "00".repeat(GCM_TAG_BYTES),
+        }
+    }
+
+    #[test]
+    fn test_vault_encrypt_decrypt_success() {
+        let secret = b"sensitive_wallet_seed";
+        let password = "SuperMasterPasswordDevOS#2026";
+
+        let envelope = VaultCrypto::encrypt(password, secret).expect("Encryption should succeed");
+
+        assert_eq!(envelope.version, ENVELOPE_VERSION);
+        assert_eq!(envelope.cipher, CIPHER_NAME);
+        assert_eq!(envelope.kdf, KDF_NAME);
+
+        let decrypted =
+            VaultCrypto::decrypt(password, &envelope).expect("Decryption should succeed");
+
+        assert_eq!(decrypted, secret);
+    }
+
+    #[test]
+    fn test_vault_rejects_incorrect_password() {
+        let secret = b"sensitive_wallet_seed";
+        let password = "CorrectPassword123";
+        let wrong_password = "WrongPassword456";
+
+        let envelope = VaultCrypto::encrypt(password, secret).expect("Encryption should succeed");
+
+        let result = VaultCrypto::decrypt(wrong_password, &envelope);
+
+        assert!(result.is_err(), "An incorrect password must be rejected.");
+    }
+
+    #[test]
+    fn test_vault_rejects_tampered_ciphertext() {
+        let secret = b"sensitive_wallet_seed";
+        let password = "CorrectPassword123";
+
+        let mut envelope =
+            VaultCrypto::encrypt(password, secret).expect("Encryption should succeed");
+
+        let mut tampered_bytes =
+            hex::decode(&envelope.ciphertext_hex).expect("Generated ciphertext must be valid hex");
+
+        assert!(
+            !tampered_bytes.is_empty(),
+            "A valid AES-GCM ciphertext must contain its authentication tag."
+        );
+
+        let last = tampered_bytes.len() - 1;
+        tampered_bytes[last] ^= 0xFF;
+
+        envelope.ciphertext_hex = hex::encode(tampered_bytes);
+
+        let result = VaultCrypto::decrypt(password, &envelope);
+
+        assert!(
+            result.is_err(),
+            "Tampered ciphertext must fail authentication."
+        );
+    }
+
+    #[test]
+    fn test_vault_rejects_unsupported_version() {
+        let mut envelope = make_invalid_envelope();
+        envelope.version = ENVELOPE_VERSION + 1;
+
+        let result = VaultCrypto::decrypt("CorrectPassword123", &envelope);
+
+        assert!(
+            matches!(result, Err(VaultCryptoError::DecryptionFailed)),
+            "Unsupported envelope versions must be rejected."
+        );
+    }
+
+    #[test]
+    fn test_vault_rejects_unsupported_kdf() {
+        let mut envelope = make_invalid_envelope();
+        envelope.kdf = "PBKDF2".to_string();
+
+        let result = VaultCrypto::decrypt("CorrectPassword123", &envelope);
+
+        assert!(
+            matches!(result, Err(VaultCryptoError::DecryptionFailed)),
+            "Unsupported KDF metadata must be rejected."
+        );
+    }
+
+    #[test]
+    fn test_vault_rejects_unsupported_cipher() {
+        let mut envelope = make_invalid_envelope();
+        envelope.cipher = "AES-128-GCM".to_string();
+
+        let result = VaultCrypto::decrypt("CorrectPassword123", &envelope);
+
+        assert!(
+            matches!(result, Err(VaultCryptoError::DecryptionFailed)),
+            "Unsupported cipher metadata must be rejected."
+        );
+    }
+
+    #[test]
+    fn test_vault_rejects_invalid_salt_length() {
+        let mut envelope = make_invalid_envelope();
+        envelope.salt_hex = "0011".to_string();
+
+        let result = VaultCrypto::decrypt("CorrectPassword123", &envelope);
+
+        assert!(
+            matches!(result, Err(VaultCryptoError::DecryptionFailed)),
+            "Invalid salt lengths must be rejected."
+        );
+    }
+
+    #[test]
+    fn test_vault_rejects_invalid_nonce_length_without_panicking() {
+        let mut envelope = make_invalid_envelope();
+        // Hexadecimal válido, mas apenas um byte: NUNCA deve entrar em pânico!
+        envelope.nonce_hex = "00".to_string();
+
+        let result = VaultCrypto::decrypt("CorrectPassword123", &envelope);
+
+        assert!(
+            matches!(result, Err(VaultCryptoError::DecryptionFailed)),
+            "An invalid nonce length must return an error rather than panic."
+        );
+    }
+
+    #[test]
+    fn test_vault_rejects_invalid_ciphertext_length() {
+        let mut envelope = make_invalid_envelope();
+        // Menor que a tag de autenticação GCM.
+        envelope.ciphertext_hex = "00".repeat(GCM_TAG_BYTES - 1);
+
+        let result = VaultCrypto::decrypt("CorrectPassword123", &envelope);
+
+        assert!(
+            matches!(result, Err(VaultCryptoError::DecryptionFailed)),
+            "Ciphertext shorter than the GCM tag must be rejected."
+        );
+    }
+
+    #[test]
+    fn test_vault_rejects_odd_ciphertext_hex_length() {
+        let result = VaultCrypto::validate_ciphertext_hex_length(33);
+
+        assert!(
+            matches!(result, Err(VaultCryptoError::DecryptionFailed)),
+            "Odd-length hexadecimal representations must be rejected."
+        );
+    }
+
+    #[test]
+    fn test_vault_rejects_oversized_ciphertext_before_decoding() {
+        let oversized_length = MAX_CIPHERTEXT_HEX_CHARS + 2;
+        let result = VaultCrypto::validate_ciphertext_hex_length(oversized_length);
+
+        assert!(
+            matches!(result, Err(VaultCryptoError::DecryptionFailed)),
+            "Oversized ciphertext representations must be rejected."
+        );
+    }
+
+    #[test]
+    fn test_vault_rejects_oversized_password() {
+        let oversized_password = "a".repeat(MAX_PASSWORD_CHARS + 1);
+        let result = VaultCrypto::encrypt(&oversized_password, b"test");
+
+        assert!(
+            matches!(result, Err(VaultCryptoError::EncryptionFailed(_))),
+            "Oversized passwords must be rejected before key derivation."
+        );
+    }
+
+    #[test]
+    fn test_vault_rejects_oversized_plaintext() {
+        let plaintext = vec![0u8; MAX_PLAINTEXT_BYTES + 1];
+        let result = VaultCrypto::encrypt("CorrectPassword123", &plaintext);
+
+        assert!(
+            matches!(result, Err(VaultCryptoError::EncryptionFailed(_))),
+            "Oversized plaintext must be rejected before Argon2id."
+        );
+    }
+}
+```
+
+---
+
+### Arquivo 24: `access_control.rs`
+- **Caminho:** `src-tauri/src/modules/vault/access_control.rs`
+- **Tipo / Camada:** Backend Security
+- **Responsabilidade:** Controle de acesso à sessão do cofre (VaultSession). Mantém a chave mestra em memória protegida com Zeroizing, validação de timeout e descarte imediato ao bloquear o cofre.
+- **Dependências Internas:** Nenhuma (componente base ou folha)
+- **Relacionamento na ABA 3:** Impede gravação ou leitura de links sociais caso o cofre esteja bloqueado.
+
+```rust
+use serde::{Deserialize, Serialize};
+use std::sync::Mutex;
+use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
+
+use super::encryption::{EncryptedEnvelope, VaultCrypto, VaultCryptoError};
+
+// ----------------------------------------------------------------------
+// Erros de controle de acesso
+// ----------------------------------------------------------------------
+
+#[derive(Debug, thiserror::Error)]
+pub enum AccessControlError {
+    #[error("Vault is not initialized. Please set master password first.")]
+    NotInitialized,
+
+    #[error("Vault is locked. Master password required.")]
+    Locked,
+
+    #[error("Authentication failed. Invalid master password.")]
+    InvalidPassword,
+
+    // Evita expor detalhes internos da operação criptográfica
+    // por meio da representação pública do erro.
+    #[error("Cryptographic operation failed.")]
+    Crypto(#[from] VaultCryptoError),
+}
+
+// ----------------------------------------------------------------------
+// Estado público do cofre
+// ----------------------------------------------------------------------
+
+/// Estado de segurança do cofre exposto ao frontend.
+///
+/// Não inclui senhas, chaves de sessão ou conteúdo criptográfico.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct VaultStatus {
+    pub is_initialized: bool,
+    pub is_unlocked: bool,
+    pub dao_wallets_count: usize,
+    pub client_wallets_count: usize,
+}
+
+// ----------------------------------------------------------------------
+// Estado interno da sessão
+// ----------------------------------------------------------------------
+
+/// Estado privado da sessão.
+///
+/// Não derivar Debug: a estrutura contém material sensível (session_key).
+#[derive(Default)]
+struct SessionState {
+    unlocked: bool,
+
+    /// Geração sincronizada pelo Mutex.
+    ///
+    /// Uma operação iniciada com uma época antiga não pode concluir
+    /// o desbloqueio depois de uma invalidação da sessão.
+    epoch: u64,
+
+    /// Indica que o contador atingiu seu limite.
+    ///
+    /// Nesse estado, a sessão permanece bloqueada permanentemente,
+    /// evitando a reutilização de uma época por wraparound.
+    epoch_exhausted: bool,
+
+    /// Material sensível da sessão.
+    ///
+    /// A chave é zerada pelo mecanismo RAII ao ser descartada.
+    session_key: Option<Zeroizing<String>>,
+}
+
+// ----------------------------------------------------------------------
+// Gerenciador autoritativo da sessão
+// ----------------------------------------------------------------------
+
+/// Gerenciador autoritativo da sessão do cofre.
+///
+/// O Mutex protege as transições entre bloqueado e desbloqueado,
+/// a geração da sessão e o material criptográfico mantido em memória.
+#[derive(Default)]
+pub struct VaultSession {
+    state: Mutex<SessionState>,
+}
+
+impl VaultSession {
+    /// Cria uma sessão bloqueada.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    // --------------------------------------------------------------
+    // Invariantes internos
+    // --------------------------------------------------------------
+
+    /// Avança a geração sem permitir wraparound.
+    ///
+    /// Se o contador estiver esgotado, a sessão permanece bloqueada.
+    fn advance_epoch(state: &mut SessionState) {
+        if state.epoch_exhausted {
+            state.unlocked = false;
+            state.session_key = None;
+            return;
+        }
+
+        match state.epoch.checked_add(1) {
+            Some(next_epoch) => {
+                state.epoch = next_epoch;
+            }
+
+            None => {
+                // Não reutilizar a época zero nem aceitar ABA.
+                state.epoch_exhausted = true;
+                state.unlocked = false;
+                state.session_key = None;
+
+                log::error!(
+                    "[Vault Security] Época da sessão esgotada. \
+                     O cofre permanecerá bloqueado."
+                );
+            }
+        }
+    }
+
+    /// Restaura o estado seguro após uma falha interna.
+    ///
+    /// A chave é descartada, a sessão é bloqueada e a época é
+    /// invalidada para impedir que operações antigas prossigam.
+    fn fail_closed(state: &mut SessionState) {
+        state.unlocked = false;
+        state.session_key = None;
+
+        Self::advance_epoch(state);
+    }
+
+    // --------------------------------------------------------------
+    // Consulta do estado
+    // --------------------------------------------------------------
+
+    /// Retorna true somente quando a sessão está desbloqueada
+    /// e a geração não está esgotada.
+    pub fn is_unlocked(&self) -> bool {
+        match self.state.lock() {
+            Ok(state) => state.unlocked && !state.epoch_exhausted,
+
+            Err(poisoned) => {
+                log::error!(
+                    "[Vault Security] Mutex envenenado em is_unlocked(). \
+                     Aplicando Fail-Closed."
+                );
+
+                let mut state = poisoned.into_inner();
+
+                // Mantém o Mutex envenenado nesta operação de consulta.
+                // Uma tentativa de desbloqueio que encontre o poison
+                // ainda deverá ser rejeitada explicitamente.
+                Self::fail_closed(&mut state);
+
+                false
+            }
+        }
+    }
+
+    /// Obtém a geração atual da sessão.
+    ///
+    /// O estado permanece bloqueado se o Mutex estiver envenenado.
+    /// Nesse caso, a época também é invalidada.
+    pub fn current_epoch(&self) -> u64 {
+        match self.state.lock() {
+            Ok(state) => state.epoch,
+
+            Err(poisoned) => {
+                log::error!(
+                    "[Vault Security] Mutex envenenado em current_epoch(). \
+                     Invalidando a sessão."
+                );
+
+                let mut state = poisoned.into_inner();
+
+                Self::fail_closed(&mut state);
+
+                state.epoch
+            }
+        }
+    }
+
+    /// Verifica se existe uma chave de sessão instalada em uma
+    /// sessão efetivamente desbloqueada.
+    pub fn has_session_key(&self) -> bool {
+        match self.state.lock() {
+            Ok(mut state) => {
+                if state.epoch_exhausted || !state.unlocked {
+                    // Corrige também eventuais inconsistências internas.
+                    state.session_key = None;
+                    return false;
+                }
+
+                state.session_key.is_some()
+            }
+
+            Err(poisoned) => {
+                log::error!(
+                    "[Vault Security] Mutex envenenado em has_session_key(). \
+                     Limpando o estado da sessão."
+                );
+
+                let mut state = poisoned.into_inner();
+
+                Self::fail_closed(&mut state);
+
+                false
+            }
+        }
+    }
+
+    // --------------------------------------------------------------
+    // Bloqueio
+    // --------------------------------------------------------------
+
+    /// Bloqueia a sessão, invalida operações pendentes e descarta
+    /// qualquer material sensível instalado.
+    ///
+    /// Se o Mutex estiver envenenado, restaura o estado seguro
+    /// e limpa a flag de poison depois da recuperação.
+    pub fn lock(&self) {
+        match self.state.lock() {
+            Ok(mut state) => {
+                state.unlocked = false;
+                state.session_key = None;
+
+                Self::advance_epoch(&mut state);
+            }
+
+            Err(poisoned) => {
+                log::error!(
+                    "[Vault Security] Mutex envenenado em lock(). \
+                     Restaurando o estado seguro."
+                );
+
+                let mut state = poisoned.into_inner();
+
+                Self::fail_closed(&mut state);
+
+                // O estado já foi restaurado para a condição segura.
+                // Operações que encontraram o poison continuam tendo
+                // que lidar explicitamente com sua tentativa.
+                self.state.clear_poison();
+            }
+        }
+    }
+
+    // --------------------------------------------------------------
+    // Desbloqueio
+    // --------------------------------------------------------------
+
+    /// Desbloqueia a sessão somente se a geração esperada continuar válida.
+    ///
+    /// Uma tentativa que encontrar um Mutex envenenado é recusada.
+    /// A recuperação não transforma essa tentativa em um desbloqueio
+    /// bem-sucedido.
+    pub fn try_unlock(&self, expected_epoch: u64) -> bool {
+        match self.state.lock() {
+            Ok(mut state) => {
+                if state.epoch_exhausted || state.epoch != expected_epoch {
+                    return false;
+                }
+
+                state.unlocked = true;
+
+                true
+            }
+
+            Err(poisoned) => {
+                log::error!(
+                    "[Vault Security] Mutex envenenado em try_unlock(). \
+                     A tentativa atual será recusada."
+                );
+
+                let mut state = poisoned.into_inner();
+
+                Self::fail_closed(&mut state);
+
+                // Recupera a disponibilidade do objeto somente depois
+                // de forçar o bloqueio e descartar a chave.
+                //
+                // Esta chamada retorna false: uma tentativa posterior
+                // deverá realizar uma nova autenticação.
+                self.state.clear_poison();
+
+                false
+            }
+        }
+    }
+
+    /// Instala uma chave de sessão somente quando a geração esperada
+    /// permanece válida.
+    ///
+    /// Se a operação for rejeitada, `key` sai de escopo e o tipo
+    /// Zeroizing solicita a zeragem do conteúdo ao ser descartado.
+    pub fn try_unlock_with_session_key(&self, expected_epoch: u64, key: Zeroizing<String>) -> bool {
+        match self.state.lock() {
+            Ok(mut state) => {
+                if state.epoch_exhausted || state.epoch != expected_epoch {
+                    // A chave não é instalada.
+                    // O argumento será descartado na saída do método.
+                    return false;
+                }
+
+                state.unlocked = true;
+                state.session_key = Some(key);
+
+                true
+            }
+
+            Err(poisoned) => {
+                log::error!(
+                    "[Vault Security] Mutex envenenado em \
+                     try_unlock_with_session_key(). \
+                     A instalação será recusada."
+                );
+
+                let mut state = poisoned.into_inner();
+
+                Self::fail_closed(&mut state);
+
+                self.state.clear_poison();
+
+                // A chave recebida não foi instalada e será descartada.
+                false
+            }
+        }
+    }
+
+    /// Executa uma operação passando uma referência para a chave de sessão ativa.
+    ///
+    /// Retorna `Err(AccessControlError::Locked)` se a sessão estiver bloqueada ou sem chave instalada.
+    pub fn with_session_key<F, R>(&self, f: F) -> Result<R, AccessControlError>
+    where
+        F: FnOnce(&str) -> Result<R, AccessControlError>,
+    {
+        match self.state.lock() {
+            Ok(state) => {
+                if state.epoch_exhausted || !state.unlocked {
+                    return Err(AccessControlError::Locked);
+                }
+
+                match state.session_key.as_ref() {
+                    Some(key) => f(key.as_str()),
+                    None => Err(AccessControlError::Locked),
+                }
+            }
+
+            Err(poisoned) => {
+                log::error!(
+                    "[Vault Security] Mutex envenenado em with_session_key(). \
+                     Aplicando Fail-Closed."
+                );
+
+                let mut state = poisoned.into_inner();
+                Self::fail_closed(&mut state);
+                self.state.clear_poison();
+
+                Err(AccessControlError::Locked)
+            }
+        }
+    }
+
+    // --------------------------------------------------------------
+    // Compatibilidade de testes
+    // --------------------------------------------------------------
+
+    /// Define diretamente a chave de sessão e o estado de desbloqueio para testes.
+    #[cfg(test)]
+    pub fn set_session_key_for_test(&self, key: &str) {
+        if let Ok(mut state) = self.state.lock() {
+            state.unlocked = true;
+            state.session_key = Some(Zeroizing::new(key.to_string()));
+        }
+    }
+
+    /// Define diretamente o estado apenas durante os testes unitários.
+    ///
+    /// Não disponibilizar este método em builds de produção:
+    /// permitir `unlocked = true` sem autenticação violaria o modelo
+    /// de controle de acesso.
+    #[cfg(test)]
+    pub fn set_unlocked(&self, unlocked: bool) {
+        match self.state.lock() {
+            Ok(mut state) => {
+                Self::advance_epoch(&mut state);
+
+                if state.epoch_exhausted {
+                    state.unlocked = false;
+                    state.session_key = None;
+                    return;
+                }
+
+                state.unlocked = unlocked;
+
+                if !unlocked {
+                    state.session_key = None;
+                }
+            }
+
+            Err(poisoned) => {
+                log::error!(
+                    "[Vault Security] Mutex envenenado em set_unlocked(). \
+                     Mantendo o Fail-Closed."
+                );
+
+                let mut state = poisoned.into_inner();
+
+                Self::fail_closed(&mut state);
+
+                self.state.clear_poison();
+            }
+        }
+    }
+}
+
+// ----------------------------------------------------------------------
+// Material sensível de sessão
+// ----------------------------------------------------------------------
+
+/// Token em memória de sessão.
+///
+/// O conteúdo é zerado pelo destrutor fornecido pelo derive.
+#[derive(Default, Zeroize, ZeroizeOnDrop)]
+pub struct SessionKey(pub Option<String>);
+
+// ----------------------------------------------------------------------
+// Cabeçalho persistido do cofre
+// ----------------------------------------------------------------------
+
+/// Cabeçalho persistido utilizado para verificar a senha mestre.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VaultHeader {
+    pub version: u32,
+    pub canary_envelope: EncryptedEnvelope,
+    pub created_at: String,
+}
+
+impl VaultHeader {
+    const CURRENT_VERSION: u32 = 1;
+
+    const CANARY_PLAINTEXT: &'static [u8] = b"ASPPIBRA_DEVOS_VAULT_CANARY_V1";
+
+    /// Cria um cabeçalho para a versão atualmente suportada.
+    pub fn new(password: &str) -> Result<Self, VaultCryptoError> {
+        let canary_envelope = VaultCrypto::encrypt(password, Self::CANARY_PLAINTEXT)?;
+
+        let now = chrono::Utc::now().to_rfc3339();
+
+        Ok(Self {
+            version: Self::CURRENT_VERSION,
+            canary_envelope,
+            created_at: now,
+        })
+    }
+
+    /// Verifica a senha mestre sem expor os bytes decifrados.
+    ///
+    /// Versões desconhecidas não são aceitas como cabeçalhos válidos.
+    pub fn verify_password(&self, password: &str) -> bool {
+        if self.version != Self::CURRENT_VERSION {
+            return false;
+        }
+
+        match VaultCrypto::decrypt(password, &self.canary_envelope) {
+            Ok(decrypted_bytes) => {
+                let decrypted = Zeroizing::new(decrypted_bytes);
+
+                decrypted.as_slice() == Self::CANARY_PLAINTEXT
+            }
+
+            Err(_) => false,
+        }
+    }
+}
+
+// ----------------------------------------------------------------------
+// Testes unitários
+// ----------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_vault_session_normal_lifecycle() {
+        let session = VaultSession::new();
+
+        assert!(!session.is_unlocked());
+
+        let epoch = session.current_epoch();
+
+        assert!(session.try_unlock(epoch));
+        assert!(session.is_unlocked());
+
+        session.lock();
+
+        assert!(!session.is_unlocked());
+        assert!(!session.has_session_key());
+    }
+
+    #[test]
+    fn test_vault_session_prevents_unlock_after_concurrent_lock() {
+        let session = VaultSession::new();
+
+        let epoch_at_start = session.current_epoch();
+
+        session.lock();
+
+        assert!(!session.is_unlocked());
+
+        let unlocked = session.try_unlock(epoch_at_start);
+
+        assert!(
+            !unlocked,
+            "O desbloqueio iniciado na época antiga deve ser recusado."
+        );
+
+        assert!(!session.is_unlocked(), "O cofre deve permanecer bloqueado.");
+    }
+
+    #[test]
+    fn test_vault_session_deterministic_concurrency_barrier() {
+        use std::sync::{Arc, Barrier};
+        use std::thread;
+
+        let session = Arc::new(VaultSession::new());
+        let barrier = Arc::new(Barrier::new(2));
+
+        let unlock_session = Arc::clone(&session);
+        let unlock_barrier = Arc::clone(&barrier);
+
+        let handle = thread::spawn(move || {
+            let epoch = unlock_session.current_epoch();
+
+            // A operação de desbloqueio captura a época.
+            unlock_barrier.wait();
+
+            // Aguarda a operação de bloqueio.
+            unlock_barrier.wait();
+
+            unlock_session.try_unlock(epoch)
+        });
+
+        // A thread de controle aguarda a captura da época.
+        barrier.wait();
+
+        // Invalida a tentativa concorrente.
+        session.lock();
+
+        // Autoriza o teste de desbloqueio a prosseguir.
+        barrier.wait();
+
+        let unlock_result = handle.join().expect("Thread de teste falhou.");
+
+        assert!(!unlock_result, "A tentativa atrasada deve ser recusada.");
+
+        assert!(
+            !session.is_unlocked(),
+            "A sessão deve permanecer bloqueada."
+        );
+    }
+
+    #[test]
+    fn test_vault_session_poison_recovery_fail_closed() {
+        use std::sync::Arc;
+        use std::thread;
+
+        let session = Arc::new(VaultSession::new());
+
+        let poison_session = Arc::clone(&session);
+
+        // Simula um pânico enquanto o Mutex está bloqueado.
+        let _ = thread::spawn(move || {
+            let _guard = poison_session.state.lock().unwrap();
+
+            panic!("Pânico intencional para testar a recuperação do Mutex.");
+        })
+        .join();
+
+        // A consulta detecta o poison e força o estado seguro.
+        assert!(
+            !session.is_unlocked(),
+            "A sessão deve permanecer bloqueada após o poison."
+        );
+
+        // A primeira tentativa de desbloqueio que encontra o poison
+        // deve falhar, mesmo que o chamador tenha uma época numérica.
+        let rejected_epoch = session.current_epoch();
+
+        assert!(
+            !session.try_unlock(rejected_epoch),
+            "A tentativa que encontra o Mutex envenenado deve falhar."
+        );
+
+        // A recuperação permite iniciar uma operação nova.
+        session.lock();
+
+        assert!(!session.is_unlocked());
+
+        let recovered_epoch = session.current_epoch();
+
+        assert!(
+            session.try_unlock(recovered_epoch),
+            "Uma tentativa posterior deve poder prosseguir após a recuperação."
+        );
+
+        assert!(session.is_unlocked());
+    }
+
+    #[test]
+    fn test_vault_session_stale_key_is_not_installed() {
+        let session = VaultSession::new();
+
+        // Captura a época anterior ao bloqueio.
+        let stale_epoch = session.current_epoch();
+
+        // Invalida todas as operações que utilizaram a época anterior.
+        session.lock();
+
+        let stale_key = Zeroizing::new("stale_session_key_material".to_string());
+
+        // A chave é consumida pelo método, mas não deve ser instalada.
+        let installed = session.try_unlock_with_session_key(stale_epoch, stale_key);
+
+        assert!(
+            !installed,
+            "Uma chave associada a uma época antiga deve ser recusada."
+        );
+
+        assert!(
+            !session.is_unlocked(),
+            "A sessão deve permanecer bloqueada."
+        );
+
+        assert!(
+            !session.has_session_key(),
+            "Nenhuma chave deve permanecer instalada."
+        );
+    }
+
+    #[test]
+    fn test_vault_session_valid_key_lifecycle() {
+        let session = VaultSession::new();
+
+        let epoch = session.current_epoch();
+
+        let key = Zeroizing::new("valid_session_key_material".to_string());
+
+        assert!(
+            session.try_unlock_with_session_key(epoch, key),
+            "Uma chave associada à época válida deve ser instalada."
+        );
+
+        assert!(session.is_unlocked());
+        assert!(session.has_session_key());
+
+        session.lock();
+
+        assert!(!session.is_unlocked());
+
+        assert!(
+            !session.has_session_key(),
+            "O bloqueio deve remover a chave da sessão."
+        );
+    }
+
+    #[test]
+    fn test_vault_session_test_helper_invalidates_previous_epoch() {
+        let session = VaultSession::new();
+
+        let old_epoch = session.current_epoch();
+
+        session.set_unlocked(false);
+
+        assert!(
+            !session.try_unlock(old_epoch),
+            "A alteração do estado deve invalidar a época anterior."
+        );
+    }
+
+    #[test]
+    fn test_vault_session_lock_clears_session_key() {
+        let session = VaultSession::new();
+
+        let epoch = session.current_epoch();
+
+        let key = Zeroizing::new("temporary_session_key_material".to_string());
+
+        assert!(session.try_unlock_with_session_key(epoch, key));
+
+        assert!(session.has_session_key());
+
+        session.lock();
+
+        assert!(!session.has_session_key());
+        assert!(!session.is_unlocked());
+    }
+}
+```
+
+---
+
+### Arquivo 25: `lib.rs`
+- **Caminho:** `src-tauri/src/lib.rs`
+- **Tipo / Camada:** Backend Core
+- **Responsabilidade:** Registro oficial de plugins Tauri, gerenciamento de estado gerenciado (LocalDatabase, VaultSession) e exportação dos comandos IPC (save_user_profile, get_user_profile).
+- **Dependências Internas:** Nenhuma (componente base ou folha)
+- **Relacionamento na ABA 3:** Fronteira de inicialização do backend Tauri.
+
+```rust
+use std::error::Error;
+use std::fmt::Display;
+use std::io;
+use tauri::Manager;
+
+// ----------------------------------------------------------------------
+// Módulos
+// ----------------------------------------------------------------------
+
+pub mod commands;
+pub mod modules;
+pub mod platform;
+pub mod shared;
+pub mod storage;
+
+#[cfg(test)]
+mod tests;
+
+// ----------------------------------------------------------------------
+// Configuração das edições
+// ----------------------------------------------------------------------
+
+const COCKPIT_IDENTIFIER: &str = "br.aspp.devos.cockpit";
+
+// ----------------------------------------------------------------------
+// Tratamento de erros de inicialização
+// ----------------------------------------------------------------------
+
+fn startup_error(context: &str, error: impl Display) -> io::Error {
+    io::Error::other(format!("{context}: {error}"))
+}
+
+// ----------------------------------------------------------------------
+// Registro dos comandos
+// ----------------------------------------------------------------------
+
+/// Mantém os comandos comuns em um único lugar.
+///
+/// Os comandos específicos da edição são adicionados pelo chamador.
+macro_rules! app_invoke_handler {
+    ($($edition_command:path),* $(,)?) => {
+        tauri::generate_handler![
+            commands::get_device_status,
+            commands::get_vault_status,
+            commands::init_master_password,
+            commands::unlock_vault,
+            commands::lock_vault,
+            commands::get_user_profile,
+            commands::save_user_profile,
+            commands::import_legacy_profile,
+            commands::generate_seed_and_preview,
+            commands::reveal_pending_mnemonic,
+            commands::cancel_pending_creation,
+            commands::confirm_and_save_wallets,
+            commands::list_stored_wallets,
+            commands::export_authorized_secret,
+            commands::export_vault_backup,
+            commands::restore_vault_backup,
+            commands::fetch_wallet_balance,
+            commands::batch_fetch_wallet_balances,
+            commands::generate_document,
+            commands::preview_document,
+            commands::export_previewed_document,
+            commands::get_ipfs_daemon_status,
+            commands::execute_storage_proof,
+            commands::ipfs_upload_file,
+            commands::ipfs_download_file,
+            commands::ipfs_pin_cid,
+            commands::ipfs_unpin_cid,
+            commands::ipfs_verify_cid_custody,
+            commands::ipfs_verify_all_pins,
+            commands::ipfs_query_providers,
+            commands::ipfs_list_managed_pins,
+            commands::ipfs_start_daemon,
+            commands::ipfs_stop_daemon,
+            commands::ipfs_restart_daemon
+            $(, $edition_command)*
+        ]
+    };
+}
+
+// ----------------------------------------------------------------------
+// Compatibilidade gráfica Linux
+// ----------------------------------------------------------------------
+
+/// Define os padrões gráficos necessários apenas quando o ambiente
+/// ainda não tiver fornecido valores.
+///
+/// IMPORTANTE:
+/// Esta função deve ser chamada pelo ponto de entrada do processo,
+/// antes da criação de threads e da inicialização do runtime Tauri.
+#[cfg(target_os = "linux")]
+fn configure_linux_environment() {
+    let set_gdk_default = std::env::var_os("GDK_BACKEND").is_none();
+
+    // SAFETY:
+    // run() chama esta função antes de criar o Builder Tauri.
+    // O ponto de entrada do aplicativo deve invocar run() antes de
+    // iniciar qualquer thread que possa acessar o ambiente do processo.
+    unsafe {
+        if set_gdk_default {
+            std::env::set_var("GDK_BACKEND", "x11");
+        }
+    }
+}
+
+// ----------------------------------------------------------------------
+// Entrada principal do aplicativo
+// ----------------------------------------------------------------------
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    #[cfg(target_os = "linux")]
+    configure_linux_environment();
+
+    let context = tauri::generate_context!();
+    let is_cockpit = context.config().identifier == COCKPIT_IDENTIFIER;
+    let edition = match modules::documents::ApplicationEdition::try_from_bundle_identifier(
+        &context.config().identifier,
+    ) {
+        Ok(ed) => ed,
+        Err(err) => {
+            log::error!("[Startup] Falha crítica de segurança: {err}");
+            panic!("[Startup] Falha crítica de segurança: {err}");
+        }
+    };
+
+    let builder = tauri::Builder::default().setup(move |app| {
+        #[cfg(debug_assertions)]
+        {
+            app.handle().plugin(
+                tauri_plugin_log::Builder::default()
+                    .level(log::LevelFilter::Info)
+                    .build(),
+            )?;
+        }
+
+        // 0. Inicializar imutavelmente a edição do módulo de documentos no boot
+        modules::documents::initialize_application_edition(edition).map_err(|error| {
+            log::error!(
+                "[Startup] Falha crítica ao inicializar a edição de documentos da aplicação: {}",
+                error
+            );
+            startup_error(
+                "Falha crítica ao inicializar a edição de documentos da aplicação",
+                error,
+            )
+        })?;
+
+        // 1. Resolver diretórios de dados nativos
+        let app_handle = app.handle();
+        let app_data_dir = app_handle.path().app_data_dir().map_err(|error| {
+            log::error!(
+                "[Startup] Falha ao resolver o diretório de dados: {}",
+                error
+            );
+            startup_error("Falha ao resolver o diretório de dados", error)
+        })?;
+
+        // 2. Inicializar banco do cofre (devos_vault.sqlite) com migrações centralizadas
+        let vault_dir = app_data_dir.join("devos_vault");
+        let vault_db = storage::LocalDatabase::new(vault_dir);
+        storage::MigrationManager::run_migrations(&vault_db).map_err(|error| {
+            log::error!("[Startup] Falha nas migrações do cofre: {}", error);
+            startup_error("Falha nas migrações do cofre", error)
+        })?;
+
+        if !app.manage(vault_db) {
+            let error = startup_error(
+                "Falha ao registrar o banco do cofre",
+                "o estado LocalDatabase já estava registrado",
+            );
+            log::error!("[Startup] {}", error);
+            return Err(Box::new(error) as Box<dyn Error>);
+        }
+
+        if !app.manage(modules::vault::VaultSession::new()) {
+            let error = startup_error(
+                "Falha ao registrar a sessão do cofre",
+                "o estado VaultSession já estava registrado",
+            );
+            log::error!("[Startup] {}", error);
+            return Err(Box::new(error) as Box<dyn Error>);
+        }
+
+        // 3. Inicializar banco do Cadastro Imobiliário (real_estate.sqlite) exclusivamente na edição Cockpit
+        if is_cockpit {
+            let real_estate_dir = app_data_dir.join("real_estate");
+            let real_estate_db = storage::RealEstateDatabase::new(real_estate_dir);
+            storage::RealEstateMigrationManager::run_migrations(&real_estate_db).map_err(
+                |error| {
+                    log::error!("[Startup] Falha nas migrações imobiliárias: {}", error);
+                    startup_error("Falha nas migrações do cadastro imobiliário", error)
+                },
+            )?;
+
+            if !app.manage(real_estate_db) {
+                let error = startup_error(
+                    "Falha ao registrar o banco imobiliário",
+                    "o estado RealEstateDatabase já estava registrado",
+                );
+                log::error!("[Startup] {}", error);
+                return Err(Box::new(error) as Box<dyn Error>);
+            }
+        }
+
+        Ok(())
+    });
+
+    let builder = if is_cockpit {
+        builder.invoke_handler(app_invoke_handler!(
+            commands::get_real_estate_stats,
+            commands::preview_real_estate_import,
+            commands::execute_real_estate_import,
+            commands::list_import_batches,
+            commands::list_audit_findings,
+            commands::list_properties,
+            commands::select_spreadsheet_file,
+        ))
+    } else {
+        builder.invoke_handler(app_invoke_handler!())
+    };
+
+    builder
+        .run(context)
+        .expect("Falha ao executar o aplicativo Tauri do DevOS Desktop");
+}
+```
+
+---
+
+### Arquivo 26: `invoke.ts`
+- **Caminho:** `src/platform/tauri/core/invoke.ts`
+- **Tipo / Camada:** Platform IPC
+- **Responsabilidade:** Cliente core de IPC Tauri. Executa @tauri-apps/api/core invoke com tratamento estruturado de erros e barreira de segurança fail-closed.
+- **Dependências Internas:** Nenhuma (componente base ou folha)
+- **Relacionamento na ABA 3:** Utilizado por IdentityBridge para invocar os comandos nativos.
+
+```typescript
+import { invoke, isTauri } from '@tauri-apps/api/core';
+
+import { TauriErrorMapper } from './tauri-errors';
+import { IpcError } from '../contracts/ipc-errors';
+
+/**
+ * ASPPIBRA DevOS — Native IPC Invoker (Tauri v2).
+ *
+ * Centraliza as chamadas ao backend Rust, a verificação do ambiente
+ * de execução, o timeout de espera e a normalização de erros IPC.
+ *
+ * A sanitização das mensagens de erro é responsabilidade do
+ * TauriErrorMapper.
+ */
+
+/**
+ * Timeout padrão de espera por uma resposta IPC (30 segundos).
+ *
+ * Operações potencialmente demoradas devem configurar um limite
+ * específico quando forem integradas ao wrapper.
+ */
+const DEFAULT_TIMEOUT_MS = 30_000;
+
+/**
+ * Opções opcionais de execução para uma chamada IPC.
+ */
+export interface InvokeNativeOptions {
+  /**
+   * Tempo máximo de espera pela resposta, em milissegundos.
+   *
+   * O timeout não cancela automaticamente a operação no backend Rust.
+   * Deve ser um número finito maior que zero.
+   *
+   * Se omitido, utiliza DEFAULT_TIMEOUT_MS.
+   */
+  timeoutMs?: number;
+}
+
+/**
+ * Erro específico para chamadas IPC que excederam o limite de espera.
+ *
+ * O comando nativo pode continuar em execução após este erro.
+ * Portanto, o timeout não deve ser interpretado como confirmação
+ * de que a operação foi cancelada.
+ */
+export class NativeIpcTimeoutError extends Error {
+  readonly command: string;
+
+  readonly timeoutMs: number;
+
+  constructor(command: string, timeoutMs: number) {
+    super(
+      `[Rust Core IPC Error] (${command}): ` +
+        `A chamada excedeu o limite de ${timeoutMs} ms. ` +
+        'A operação nativa pode continuar em execução; ' +
+        'o timeout não cancela o comando Rust.'
+    );
+    this.name = 'NativeIpcTimeoutError';
+    this.command = command;
+    this.timeoutMs = timeoutMs;
+  }
+}
+
+/**
+ * Verifica se o código está executando em um ambiente Tauri.
+ *
+ * O nome é mantido por compatibilidade com os consumidores existentes.
+ * A verificação utiliza isTauri(), que identifica o runtime Tauri,
+ * sem determinar isoladamente o sistema operacional.
+ */
+export function isTauriDesktop(): boolean {
+  return isTauri();
+}
+
+/**
+ * Valida o limite de espera configurado.
+ */
+function validateTimeout(timeoutMs: number): void {
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    throw new RangeError('timeoutMs deve ser um número finito maior que zero.');
+  }
+}
+
+/**
+ * Executa uma chamada IPC com limite de espera.
+ *
+ * Importante:
+ * Promise.race encerra a espera do frontend quando o limite expira,
+ * mas não cancela automaticamente a invocação já enviada ao backend.
+ */
+async function invokeWithTimeout<T>(
+  cmd: string,
+  args: Record<string, unknown>,
+  timeoutMs: number
+): Promise<T> {
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutHandle = setTimeout(() => {
+      reject(new NativeIpcTimeoutError(cmd, timeoutMs));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([invoke<T>(cmd, args), timeoutPromise]);
+  } finally {
+    if (timeoutHandle !== undefined) {
+      clearTimeout(timeoutHandle);
+    }
+  }
+}
+
+/**
+ * Invoca um comando nativo Rust pelo IPC do Tauri v2.
+ *
+ * @param cmd Nome registrado do comando nativo.
+ * @param args Argumentos nomeados do comando.
+ * @param options Opções opcionais, incluindo timeoutMs.
+ *
+ * @returns A resposta do comando, tipada conforme T.
+ *
+ * @throws Error Se o ambiente Tauri não estiver disponível.
+ * @throws NativeIpcTimeoutError Se o tempo limite for excedido.
+ * @throws Error Se a invocação nativa falhar.
+ *
+ * Observação:
+ * O parâmetro genérico T fornece tipagem estática, mas não valida
+ * a estrutura do retorno em tempo de execução.
+ */
+export async function invokeNative<T>(
+  cmd: string,
+  args: Record<string, unknown> = {},
+  options: InvokeNativeOptions = {}
+): Promise<T> {
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  validateTimeout(timeoutMs);
+
+  if (!isTauriDesktop()) {
+    throw new Error(
+      `Ambiente não suportado: O comando nativo '${cmd}' exige ` +
+        'execução dentro do aplicativo Desktop DevOS (Tauri v2).'
+    );
+  }
+
+  try {
+    return await invokeWithTimeout<T>(cmd, args, timeoutMs);
+  } catch (err: unknown) {
+    /**
+     * Preserva o tipo específico para que os consumidores possam
+     * distinguir timeout de falhas IPC convencionais.
+     */
+    if (err instanceof NativeIpcTimeoutError) {
+      throw err;
+    }
+
+    const normalized = TauriErrorMapper.normalize(err, cmd);
+    const technicalMessage = `[Rust Core IPC Error] (${cmd}): ${normalized.technicalMessage}`;
+    throw new IpcError(
+      technicalMessage,
+      normalized.code,
+      cmd,
+      normalized.userMessage
+    );
+  }
+}
+```
+
+---
+
+### Arquivo 27: `Cargo.toml`
+- **Caminho:** `src-tauri/Cargo.toml`
+- **Tipo / Camada:** Configuration
+- **Responsabilidade:** Manifesto de dependências do backend Rust (Tauri v2, aes-gcm, zeroize, rusqlite, url 2.5, etc.).
+- **Dependências Internas:** Nenhuma (componente base ou folha)
+- **Relacionamento na ABA 3:** Declaração formal dos crates utilizados pela arquitetura de persistência e validação.
+
+```toml
+[package]
+name = "app"
+version = "1.0.0"
+description = "ASPPIBRA DevOS Desktop — Native Core com Cofre Criptográfico e Infraestrutura DePIN"
+edition = "2024"
+rust-version = "1.92"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.7.1", features = [] }
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive", "rc"] }
+log = "0.4"
+tauri = { version = "2.12.1", features = [] }
+tauri-plugin-log = "2"
+bip39 = { version = "2.1", features = ["rand"] }
+bip32 = { version = "0.5", features = ["secp256k1"] }
+tiny-keccak = { version = "2.0", features = ["keccak"] }
+aes-gcm = "0.10"
+argon2 = "0.5"
+rand = "0.8"
+hex = "0.4"
+base64 = "0.22"
+zeroize = { version = "1.8", features = ["derive"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "multipart", "stream"] }
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "2.0"
+k256 = { version = "0.13", features = ["ecdsa"] }
+tokio = { version = "1", features = ["sync", "macros", "fs", "io-util", "net"] }
+tokio-util = { version = "0.7", features = ["io"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
+calamine = "0.37"
+sha2 = "0.10"
+uuid = { version = "1", features = ["v4"] }
+typst = "0.15"
+typst-as-lib = "0.17"
+typst-pdf = "0.15"
+typst-svg = "0.15"
+dirs = "6"
+open = "5"
+rust_decimal = { version = "1.36", features = ["serde-with-float", "serde-with-str"] }
+rust_decimal_macros = "1.36"
+url = "2.5"
+```
+
+---
+
+### Arquivo 28: `account-socials.spec.ts`
 - **Caminho:** `src/test/account-socials.spec.ts`
 - **Tipo / Camada:** Tests
-- **Responsabilidade:** Suíte de testes unitários para a aba Redes Sociais: 9 testes cobrindo aceitação de URLs HTTPS válidas, rejeição de HTTP simples, esquemas maliciosos, portas arbitrárias, credenciais embutidas, URLs longas (>2048), rejeição de não-strings em runtime e normalização de espaços.
+- **Responsabilidade:** Suíte de testes unitários para a aba Redes Sociais: 10 testes cobrindo aceitação de URLs HTTPS válidas, rejeição de HTTP simples, esquemas maliciosos, portas arbitrárias, credenciais embutidas, URLs longas em bytes UTF-8 (>2048), rejeição de não-strings em runtime e normalização de espaços.
 - **Dependências Internas:** `src/sections/account/account-socials.tsx`
 - **Relacionamento na ABA 3:** Garante a integridade funcional da validação de redes sociais no frontend.
 
@@ -4031,6 +7384,16 @@ describe('AccountSocials — Validação e Normalização de Presença Digital',
     expect(values.linkedin).toBe('https://www.linkedin.com/in/sandro-dev');
   });
 
+  it('deve contabilizar o tamanho em bytes UTF-8 para caracteres multibyte', () => {
+    // 1000 caracteres de emoji (4 bytes cada = 4000 bytes > 2048)
+    const multibyteOversized = {
+      linkedin: `https://www.linkedin.com/in/${'🌐'.repeat(600)}`,
+    };
+
+    const { errors } = normalizeSocialLinks(multibyteOversized);
+    expect(errors.linkedin).toContain('ultrapassa o tamanho permitido');
+  });
+
   it('ALLOWED_HOSTS deve conter domínios legítimos de cada plataforma', () => {
     expect(ALLOWED_HOSTS.linkedin).toContain('linkedin.com');
     expect(ALLOWED_HOSTS.twitter).toContain('x.com');
@@ -4043,7 +7406,7 @@ describe('AccountSocials — Validação e Normalização de Presença Digital',
 
 ---
 
-### Arquivo 21: `identity-bridge.spec.ts`
+### Arquivo 29: `identity-bridge.spec.ts`
 - **Caminho:** `src/test/identity-bridge.spec.ts`
 - **Tipo / Camada:** Tests
 - **Responsabilidade:** Suíte de testes unitários para a ponte nativa e gerenciamento de estado: 22 testes cobrindo IPC, serialização, validação documental e mapeamento bidirecional de socialLinks.
@@ -4682,15 +8045,17 @@ flowchart TD
     V --> S["useAccountFacade()<br/>(src/sections/account/use-account.ts)"]
     V --> C["AccountSocials<br/>(src/sections/account/account-socials.tsx)"]
     C --> F["FormProvider + Field.Text<br/>(src/shared/components/hook-form)"]
-    C --> N["normalizeSocialLinks()<br/>(Validação HTTPS, Domínios e Limite 2048)"]
+    C --> N["normalizeSocialLinks()<br/>(Validação HTTPS, Domínios e Limite 2048 bytes)"]
     C -->|onSave(links)| S
     S -->|updateProfile({ socialLinks })| B["IdentityBridge.saveUserProfile()<br/>(src/platform/tauri/identity/identity-bridge.ts)"]
     B -->|Tauri IPC: save_user_profile| Cmd["identity_commands.rs<br/>(src-tauri/src/commands/identity_commands.rs)"]
     Cmd --> Svc["IdentityService::save_profile()<br/>(src-tauri/src/modules/identity/service.rs)"]
-    Svc --> San["Sanitização Rust<br/>(HTTPS estrito + limite de caracteres)"]
+    Svc --> San["sanitize_social_url() (Rust)<br/>(url::Url + Allowlist + Bloqueio de Portas/Credenciais)"]
     Svc --> Crypto["VaultCrypto::encrypt()<br/>(AES-256-GCM com chave de sessão do cofre)"]
-    Crypto --> DB[("devos_vault.sqlite<br/>(Tabela profile_records criptografada)")]
-    DB -.->|Leitura decifrada get_user_profile| Svc
+    Crypto --> Repo["IdentityRepository::save_profile_record()<br/>(src-tauri/src/modules/identity/repository.rs)"]
+    Repo --> DB[("devos_vault.sqlite<br/>(Tabela profile_records criptografada)")]
+    DB -.->|Leitura decifrada get_profile_record| Repo
+    Repo -.-> Svc
     Svc -.-> Cmd
     Cmd -.-> B
     B -.-> S
@@ -4705,7 +8070,7 @@ flowchart TD
 2. **Renderização da View:** `AccountSocialsPage` renderiza `AccountSocialsView`.
 3. **Conexão com a Store Reativa:** `AccountSocialsView` executa o hook `useAccountFacade()`.
 4. **Consulta Nativa Segura:** Se a store ainda não carregou o perfil, `use-account.ts` dispara `IdentityBridge.getUserProfile()` via Tauri IPC.
-5. **Descriptografia no Backend:** O comando `get_user_profile` aciona `IdentityService::get_profile()`. O serviço busca o registro cifrado na tabela `profile_records` de `devos_vault.sqlite`, decifra o envelope com `VaultCrypto::decrypt` (AES-256-GCM) utilizando a chave mestra em memória da sessão ativa do cofre, e desserializa o DTO `UserProfileDto`.
+5. **Descriptografia no Backend:** O comando `get_user_profile` aciona `IdentityService::get_profile()`. O repositório `IdentityRepository::get_profile_record()` busca o registro cifrado na tabela `profile_records` de `devos_vault.sqlite`. O serviço decifra o envelope com `VaultCrypto::decrypt` (AES-256-GCM) utilizando a chave mestra em memória da sessão ativa do cofre (`VaultSession`), e desserializa o DTO `UserProfileDto`.
 6. **Mapeamento de Tipos:** O bridge retorna `UserProfile` para o frontend. A função `userProfileToAccountData()` mapeia `profile.socialLinks` para o estado `UserAccountData.socialLinks`.
 7. **Hidratação do Formulário:** `AccountSocials` recebe `socialLinks` e a função `createDefaultValues()` inicializa os campos (LinkedIn, Twitter, Facebook, Instagram) de forma controlada.
 8. **Sincronização com Dirty Fields:** Se novos dados chegarem do cofre enquanto o usuário edita a tela, `reset(createDefaultValues(...), { keepDirtyValues: true })` preserva as alterações digitadas sem sobrescrevê-las.
@@ -4714,7 +8079,7 @@ flowchart TD
 
 ## 6. FLUXO DE GRAVAÇÃO DOS DADOS (SALVAMENTO NO COFRE)
 
-1. **Submissão do Formulário:** O usuário altera suas redes sociais e clica no botão 'Salvar alterações'.
+1. **Submissão do Formulário:** O usuário altera suas redes sociais e clica no botão 'Salvar Redes'.
 2. **Normalização Frontend:** `AccountSocials.onSubmit` intercepta a chamada e submete os campos brutos para `normalizeSocialLinks()`.
 3. **Validações de Segurança Frontend:**
    - Campos vazios são normalizados para string vazia (presença opcional).
@@ -4722,32 +8087,60 @@ flowchart TD
    - Exigência estrita do protocolo `https://` (rejeita `http://`, `javascript:`, `data:`).
    - Rejeição de URLs com credenciais embutidas (`https://user:pass@...`) e portas customizadas (`https://...:8080`).
    - Validação de hostname contra a allowlist de domínios legítimos de cada plataforma (`linkedin.com`, `x.com`, `twitter.com`, `facebook.com`, `fb.com`, `instagram.com`).
-   - Limite de 2048 caracteres por URL.
+   - Limite estrito de 2048 bytes UTF-8 via `new TextEncoder().encode(v).byteLength`.
 4. **Disparo do Callback:** Havendo sucesso na validação, o objeto `SocialFormValues` normalizado é repassado para `onSave()`.
 5. **Atualização do Perfil:** `AccountSocialsView` invoca `updateProfile({ socialLinks: links })` da facade.
 6. **Conversão para Payload IPC:** `accountDataToSavePayload()` incorpora `socialLinks` no `SaveUserProfilePayload` com controle de revisão otimista (`expectedRevision`).
 7. **Envio via IPC:** `IdentityBridge.saveUserProfile()` encaminha o payload para o comando nativo `save_user_profile`.
 8. **Validação Defensiva no Backend Rust:**
    - O comando Rust verifica se a sessão do cofre está desbloqueada (`session.is_unlocked()`). Se bloqueado, retorna fail-closed (`IdentityError::VaultLocked`).
-   - `IdentityService::sanitize_and_validate()` sanitiza cada URL de rede social com verificação de HTTPS e limite de 2048 caracteres.
+   - `sanitize_social_url()` processa cada URL via `url::Url`: parse real, exigência de scheme `https`, rejeição de credenciais embutidas (`username` / `password`), rejeição de portas personalizadas (`port()`), verificação de allowlist estrita de hostnames (`allowed_hosts`), e limite de 2048 bytes UTF-8.
    - Links vazios tornam-se `None`.
-9. **Criptografia AES-256-GCM:** O payload completo `UserProfileDto` é serializado em JSON e cifrado com a chave da sessão ativa (`VaultCrypto::encrypt`).
-10. **Gravação Transacional SQLite:** O registro é persistido transacionalmente na tabela `profile_records` de `devos_vault.sqlite`. A revisão é incrementada atomicamente.
+9. **Criptografia AES-256-GCM:** O payload completo `UserProfileDto` é serializado em JSON, encapsulado em `Zeroizing<Vec<u8>>` para limpeza de memória, e cifrado com a chave da sessão ativa (`VaultCrypto::encrypt`).
+10. **Gravação Transacional SQLite:** O repositório `IdentityRepository::save_profile_record()` persiste o envelope transacionalmente na tabela `profile_records` de `devos_vault.sqlite`. A revisão é verificada contra concorrência otimista e incrementada atomicamente.
 11. **Notificação Reativa:** O perfil salvo retorna ao frontend, a store reativa `use-account.ts` atualiza todos os componentes inscritos e exibe toast de sucesso.
 
 ---
 
-## 7. ANÁLISE DE INTEGRAÇÃO E PENDÊNCIAS
+## 7. COMPROVAÇÃO DE TESTES AUTOMATIZADOS
 
-### A. Integrações Existentes
-- **Frontend -> Tauri IPC:** Plenamente integrado via `IdentityBridge` e `identity-contracts.ts`.
-- **Tauri IPC -> Backend Rust:** Comandos nativos registrados e ativos em `src-tauri/src/commands/identity_commands.rs`.
-- **Backend Rust -> Vault SQLite:** Criptografia AES-256-GCM implementada com suporte a transações e controle de revisão concorrente.
-- **Ciclo de Vida Reativo:** O formulário sincroniza com o estado do cofre, alerta sobre alterações pendentes (`hasUnsavedChanges`) e limpa campos vazios sem poluir o banco.
+### A. Testes Frontend (Vitest)
+```text
+ ✓ src/test/account-socials.spec.ts (10 tests) 30ms
+   ✓ AccountSocials — Validação e Normalização de Presença Digital (10)
+     ✓ deve aceitar URLs válidas de cada plataforma correspondente com HTTPS
+     ✓ deve permitir campos vazios como padrão opcional sem injetar dados institucionais
+     ✓ deve rejeitar URLs sem protocolo HTTPS (como HTTP puro ou javascript:)
+     ✓ deve rejeitar domínios cruzados ou falsos (phishing / spoofing)
+     ✓ deve rejeitar URLs com credenciais embutidas ou portas não convencionais
+     ✓ deve rejeitar URLs com tamanho maior que 2.048 caracteres
+     ✓ deve rejeitar valores que não sejam strings em tempo de execução
+     ✓ deve normalizar espaços ao redor da URL
+     ✓ deve contabilizar o tamanho em bytes UTF-8 para caracteres multibyte
+     ✓ ALLOWED_HOSTS deve conter domínios legítimos de cada plataforma
 
-### B. Integrações Ausentes
-- **Nenhuma integração ausente.** A persistência real foi totalmente conectada entre a view de frontend e a base de dados criptografada do DevOS.
+ ✓ src/test/identity-bridge.spec.ts (22 tests) 49ms
+   ✓ IdentityBridge — Tauri Native Identity & Vault IPC (22)
+     ✓ userProfileToAccountData e accountDataToSavePayload devem mapear socialLinks bidirecionalmente
+     [... 21 demais testes de integridade e IPC aprovados ...]
 
-### C. Pendências Identificadas
-- Nenhuma pendência impeditiva para homologação em produção.
-- Todas as suítes de testes unitários e de integração estão 100% aprovadas.
+Test Files  2 passed (2)
+     Tests  32 passed (32)
+```
+
+### B. Testes Backend Nativo (Rust Cargo Test)
+```text
+running 10 tests
+test modules::identity::models::tests::test_cnpj_numeric_validation ... ok
+test modules::identity::models::tests::test_cnpj_alphanumeric_validation ... ok
+test modules::identity::models::tests::test_cpf_validation ... ok
+test modules::identity::models::tests::test_date_validation_leap_year_and_future ... ok
+test modules::identity::models::tests::test_completeness_scores_reach_exact_100 ... ok
+test modules::identity::service::tests::test_normalize_username_canonical ... ok
+test modules::identity::service::tests::test_social_url_validation_security ... ok
+test modules::identity::service::tests::test_save_and_get_profile ... ok
+test modules::identity::service::tests::test_optimistic_concurrency_lock ... ok
+test modules::identity::service::tests::test_preserve_inactive_fields_on_person_type_switch ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 210 filtered out; finished in 18.92s
+```
