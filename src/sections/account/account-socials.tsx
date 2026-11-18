@@ -18,7 +18,9 @@ export type SocialField = 'facebook' | 'instagram' | 'linkedin' | 'twitter';
 
 export type SocialLinks = Partial<Record<SocialField, string>>;
 
-export type SaveSocialLinks = (links: SocialLinks) => Promise<void> | void;
+export type SocialFormValues = Record<SocialField, string>;
+
+export type SaveSocialLinks = (links: SocialFormValues) => Promise<void> | void;
 
 type Props = {
   socialLinks?: SocialLinks;
@@ -34,7 +36,7 @@ type SocialFieldConfig = {
 
 // ----------------------------------------------------------------------
 
-export const SOCIAL_FIELDS: SocialFieldConfig[] = [
+export const SOCIAL_FIELDS = [
   {
     name: 'linkedin',
     label: 'LinkedIn',
@@ -59,7 +61,9 @@ export const SOCIAL_FIELDS: SocialFieldConfig[] = [
     icon: 'eva:facebook-fill',
     color: '#1877F2',
   },
-];
+] as const satisfies readonly SocialFieldConfig[];
+
+// ----------------------------------------------------------------------
 
 export const ALLOWED_HOSTS: Record<SocialField, readonly string[]> = {
   facebook: ['facebook.com', 'www.facebook.com', 'm.facebook.com', 'fb.com', 'www.fb.com'],
@@ -72,29 +76,52 @@ export const MAX_URL_LENGTH = 2048;
 
 // ----------------------------------------------------------------------
 
-export function createDefaultValues(socialLinks?: SocialLinks): SocialLinks {
+function safeString(value: unknown): string {
+  return typeof value === 'string' ? value : '';
+}
+
+// ----------------------------------------------------------------------
+
+export function createDefaultValues(socialLinks?: SocialLinks): SocialFormValues {
   return {
-    facebook: socialLinks?.facebook ?? '',
-    instagram: socialLinks?.instagram ?? '',
-    linkedin: socialLinks?.linkedin ?? '',
-    twitter: socialLinks?.twitter ?? '',
+    facebook: safeString(socialLinks?.facebook),
+    instagram: safeString(socialLinks?.instagram),
+    linkedin: safeString(socialLinks?.linkedin),
+    twitter: safeString(socialLinks?.twitter),
   };
 }
 
 // ----------------------------------------------------------------------
 
 export function normalizeSocialLinks(
-  input: SocialLinks
+  input: Partial<Record<SocialField, unknown>>
 ): {
-  values: SocialLinks;
+  values: SocialFormValues;
   errors: Partial<Record<SocialField, string>>;
 } {
-  const values: SocialLinks = {};
+  const values: SocialFormValues = {
+    facebook: '',
+    instagram: '',
+    linkedin: '',
+    twitter: '',
+  };
   const errors: Partial<Record<SocialField, string>> = {};
 
   for (const field of SOCIAL_FIELDS) {
     const { name } = field;
-    const rawValue = input[name]?.trim() ?? '';
+    const candidate = input[name];
+
+    if (candidate === undefined || candidate === null) {
+      values[name] = '';
+      continue;
+    }
+
+    if (typeof candidate !== 'string') {
+      errors[name] = 'O valor informado deve ser um texto válido.';
+      continue;
+    }
+
+    const rawValue = candidate.trim();
 
     // Campos opcionais podem permanecer vazios
     if (!rawValue) {
@@ -125,7 +152,7 @@ export function normalizeSocialLinks(
       continue;
     }
 
-    values[name] = parsedUrl.toString();
+    values[name] = parsedUrl.href;
   }
 
   return { values, errors };
@@ -134,7 +161,7 @@ export function normalizeSocialLinks(
 // ----------------------------------------------------------------------
 
 export function AccountSocials({ socialLinks, onSave }: Props) {
-  const methods = useForm<SocialLinks>({
+  const methods = useForm<SocialFormValues>({
     defaultValues: createDefaultValues(socialLinks),
     mode: 'onBlur',
   });
@@ -144,7 +171,7 @@ export function AccountSocials({ socialLinks, onSave }: Props) {
     reset,
     clearErrors,
     setError,
-    formState: { isSubmitting },
+    formState: { isSubmitting, dirtyFields },
   } = methods;
 
   const facebook = socialLinks?.facebook;
@@ -152,7 +179,9 @@ export function AccountSocials({ socialLinks, onSave }: Props) {
   const linkedin = socialLinks?.linkedin;
   const twitter = socialLinks?.twitter;
 
-  // Sincroniza os valores quando as propriedades externas mudarem
+  const hasUnsavedChanges = Object.keys(dirtyFields).length > 0;
+
+  // Sincroniza os valores quando as propriedades externas mudarem, preservando campos modificados
   useEffect(() => {
     reset(
       createDefaultValues({
@@ -160,7 +189,10 @@ export function AccountSocials({ socialLinks, onSave }: Props) {
         instagram,
         linkedin,
         twitter,
-      })
+      }),
+      {
+        keepDirtyValues: true,
+      }
     );
   }, [reset, facebook, instagram, linkedin, twitter]);
 
@@ -217,6 +249,12 @@ export function AccountSocials({ socialLinks, onSave }: Props) {
           </Alert>
         )}
 
+        {hasUnsavedChanges && (
+          <Alert severity="info" sx={{ mb: 3 }}>
+            Existem alterações ainda não salvas no formulário.
+          </Alert>
+        )}
+
         <Stack spacing={3}>
           {SOCIAL_FIELDS.map((field) => (
             <Field.Text
@@ -224,6 +262,7 @@ export function AccountSocials({ socialLinks, onSave }: Props) {
               name={field.name}
               label={field.label}
               type="url"
+              autoComplete="url"
               slotProps={{
                 input: {
                   startAdornment: (
