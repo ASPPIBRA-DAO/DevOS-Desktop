@@ -112,6 +112,28 @@ fn parse_non_empty_path(raw_path: String, purpose: &'static str) -> Result<PathB
     Ok(PathBuf::from(raw_path))
 }
 
+/// Calcula o hash SHA-256 de um arquivo de forma streaming através de chunks de 64 KiB,
+/// evitando carregar arquivos grandes inteiramente na memória RAM.
+fn compute_file_sha256(path: &std::path::Path) -> Result<String, String> {
+    use sha2::{Digest, Sha256};
+    use std::fs::File;
+    use std::io::Read;
+
+    let mut file = File::open(path).map_err(|e| format!("Falha ao abrir arquivo: {}", e))?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0u8; 65536];
+    loop {
+        let n = file
+            .read(&mut buffer)
+            .map_err(|e| format!("Falha na leitura do arquivo: {}", e))?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&buffer[..n]);
+    }
+    Ok(hex::encode(hasher.finalize()))
+}
+
 /// Verifica a senha mestre contra o cabeçalho V2 (ou V1 legado).
 fn verify_vault_password(db: &LocalDatabase, master_password: &str) -> Result<bool, String> {
     if let Some(h2) = db.get_header_v2().map_err(|e| e.to_string())? {
@@ -351,10 +373,12 @@ pub fn export_authorized_secret(
             })
             .map_err(|e| format!("Falha na decifragem do segredo V2: {}", e))?;
 
-        let plaintext = String::from_utf8(decrypted_bytes.to_vec())
-            .map_err(|_| "O conteúdo decifrado não possui codificação UTF-8 válida.".to_string())?;
+        let plaintext =
+            Zeroizing::new(String::from_utf8(decrypted_bytes.to_vec()).map_err(|_| {
+                "O conteúdo decifrado não possui codificação UTF-8 válida.".to_string()
+            })?);
 
-        return Ok(plaintext);
+        return Ok((*plaintext).clone());
     }
 
     // 2. Fallback para segredo V1 (se ainda não migrado)
@@ -366,10 +390,12 @@ pub fn export_authorized_secret(
     let decrypted = VaultCrypto::decrypt(&master_password, &secret_v1.envelope)
         .map_err(|_| "Falha ao decifrar envelope V1.".to_string())?;
 
-    let plaintext = String::from_utf8(decrypted)
-        .map_err(|_| "O conteúdo decifrado não possui codificação UTF-8 válida.".to_string())?;
+    let plaintext =
+        Zeroizing::new(String::from_utf8(decrypted).map_err(|_| {
+            "O conteúdo decifrado não possui codificação UTF-8 válida.".to_string()
+        })?);
 
-    Ok(plaintext)
+    Ok((*plaintext).clone())
 }
 
 // ----------------------------------------------------------------------
@@ -418,15 +444,8 @@ pub fn export_vault_backup(
         )
     })?;
 
-    // 2. Calcula SHA-256 do snapshot SQLite exportado e autentica o manifesto via AEAD (DEVOS/BACKUP/V2)
-    use sha2::{Digest, Sha256};
-    let exported_bytes = std::fs::read(&destination).map_err(|e| {
-        format!(
-            "Falha ao ler arquivo exportado para verificação de integridade: {}",
-            e
-        )
-    })?;
-    let sqlite_sha256 = hex::encode(Sha256::digest(&exported_bytes));
+    // 2. Calcula SHA-256 do snapshot SQLite exportado de forma streaming e autentica o manifesto via AEAD (DEVOS/BACKUP/V2)
+    let sqlite_sha256 = compute_file_sha256(&destination)?;
 
     let now_ts = chrono::Utc::now().timestamp();
     let manifest_bytes = serde_json::to_vec(&serde_json::json!({
@@ -475,14 +494,44 @@ pub fn restore_vault_backup(
     validate_master_password_size(&master_password)?;
 
     let source = parse_non_empty_path(source_path, "origem do backup")?;
+    if !source.exists() {
+        return Err(format!(
+            "Arquivo de backup não encontrado: {}",
+            source.display()
+        ));
+    }
 
-    // Valida integridade do manifesto autenticado e do hash SHA-256 do arquivo se presente (formato V2)
+    // 1. Inspeciona o arquivo SQLite de backup para verificar se possui cabeçalho V2
+    let temp_conn = rusqlite::Connection::open_with_flags(
+        &source,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )
+    .map_err(|e| format!("Falha ao inspecionar integridade do backup: {}", e))?;
+
+    let has_v2_table: bool = temp_conn
+        .query_row(
+            "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='vault_header_v2'",
+            [],
+            |r| r.get::<_, i64>(0),
+        )
+        .map(|c| c > 0)
+        .unwrap_or(false);
+
     let manifest_path = source.with_extension("manifest.json");
-    if manifest_path.exists() {
-        use sha2::{Digest, Sha256};
-        let source_bytes =
-            std::fs::read(&source).map_err(|e| format!("Falha ao ler arquivo de backup: {}", e))?;
-        let computed_sha256 = hex::encode(Sha256::digest(&source_bytes));
+
+    if has_v2_table || manifest_path.exists() {
+        // V2 backup: manifesto autenticado é OBRIGATÓRIO (VLT-004)
+        if !manifest_path.exists() {
+            return Err(
+                "Restauração de backup V2 cancelada: manifesto criptográfico '.manifest.json' obrigatório não encontrado."
+                    .to_string(),
+            );
+        }
+
+        let computed_sha256 = compute_file_sha256(&source)?;
+        let source_file_len = std::fs::metadata(&source)
+            .map_err(|e| format!("Falha ao obter metadados do backup: {}", e))?
+            .len();
 
         let manifest_json = std::fs::read_to_string(&manifest_path)
             .map_err(|e| format!("Falha ao ler manifesto do backup: {}", e))?;
@@ -507,75 +556,128 @@ pub fn restore_vault_backup(
                 return Err("Formato de manifesto corrompido ou ilegível.".to_string());
             };
 
-        // Desembrulha a DEK do snapshot e autentica o manifesto AEAD
-        let temp_conn = rusqlite::Connection::open_with_flags(
-            &source,
-            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
-        )
-        .map_err(|e| format!("Falha ao inspecionar integridade do backup: {}", e))?;
+        let wrapped_dek_json: String = temp_conn
+            .query_row(
+                "SELECT wrapped_dek FROM vault_header_v2 WHERE id = 1",
+                [],
+                |r| r.get(0),
+            )
+            .map_err(|e| format!("Cabeçalho V2 não encontrado no backup: {}", e))?;
 
-        let header_query: Result<String, _> = temp_conn.query_row(
-            "SELECT wrapped_dek FROM vault_header_v2 WHERE id = 1",
-            [],
-            |r| r.get(0),
-        );
+        let wrapped_dek: crate::modules::vault::encryption::WrappedDekEnvelope =
+            serde_json::from_str(&wrapped_dek_json)
+                .map_err(|e| format!("Cabeçalho V2 no backup corrompido: {}", e))?;
 
-        if let Ok(wrapped_dek_json) = header_query {
-            let wrapped_dek: crate::modules::vault::encryption::WrappedDekEnvelope =
-                serde_json::from_str(&wrapped_dek_json)
-                    .map_err(|e| format!("Cabeçalho V2 no backup corrompido: {}", e))?;
-            let h2 = crate::modules::vault::access_control::VaultHeaderV2 {
-                version: 2,
-                wrapped_dek,
-                created_at: String::new(),
-            };
-            let source_dek = h2.unlock(&master_password, "devos-desktop").map_err(|_| {
-                "Senha mestre incorreta para validação do manifesto de backup.".to_string()
-            })?;
+        let h2 = crate::modules::vault::access_control::VaultHeaderV2 {
+            version: 2,
+            wrapped_dek,
+            created_at: String::new(),
+        };
 
-            let manifest_payload =
-                VaultCrypto::unseal_backup_payload(&source_dek, manifest_ts, &env).map_err(
-                    |e| format!("Falha na autenticação simétrica do manifesto AEAD: {}", e),
-                )?;
+        let source_dek = h2.unlock(&master_password, "devos-desktop").map_err(|_| {
+            "Senha mestre incorreta para validação do manifesto de backup.".to_string()
+        })?;
 
-            let manifest_val: serde_json::Value = serde_json::from_slice(&manifest_payload)
-                .map_err(|e| format!("Payload corrompido no manifesto de backup: {}", e))?;
+        let manifest_payload =
+            VaultCrypto::unseal_backup_payload(&source_dek, manifest_ts, &env)
+                .map_err(|e| format!("Falha na autenticação simétrica do manifesto AEAD: {}", e))?;
 
-            if let Some(expected_sha256) =
-                manifest_val.get("sqlite_sha256").and_then(|v| v.as_str())
-            {
-                if expected_sha256 != computed_sha256 {
-                    return Err(
-                        "Falha de integridade: o hash SHA-256 do arquivo SQLite não confere com o manifesto autenticado."
-                            .to_string(),
-                    );
-                }
-            }
-            if let Some(expected_bytes) = manifest_val.get("file_bytes").and_then(|v| v.as_u64()) {
-                if expected_bytes != source_bytes.len() as u64 {
-                    return Err(
-                        "Falha de integridade: o tamanho do arquivo SQLite não confere com o manifesto autenticado."
-                            .to_string(),
-                    );
-                }
-            }
+        let manifest_val: serde_json::Value = serde_json::from_slice(&manifest_payload)
+            .map_err(|e| format!("Payload corrompido no manifesto de backup: {}", e))?;
+
+        let expected_sha256 = manifest_val
+            .get("sqlite_sha256")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| "Manifesto inválido: campo 'sqlite_sha256' ausente.".to_string())?;
+
+        if expected_sha256 != computed_sha256 {
+            return Err(
+                "Falha de integridade: o hash SHA-256 do arquivo SQLite não confere com o manifesto autenticado."
+                    .to_string(),
+            );
+        }
+
+        let expected_bytes = manifest_val
+            .get("file_bytes")
+            .and_then(|v| v.as_u64())
+            .ok_or_else(|| "Manifesto inválido: campo 'file_bytes' ausente.".to_string())?;
+
+        if expected_bytes != source_file_len {
+            return Err(
+                "Falha de integridade: o tamanho do arquivo SQLite não confere com o manifesto autenticado."
+                    .to_string(),
+            );
         }
     }
 
-    if let Ok(is_valid) = verify_vault_password(&db, &master_password) {
-        if !is_valid {
-            return Err("Senha mestre incorreta. Restauração de backup cancelada.".to_string());
-        }
+    // 2. Valida a senha contra o cofre atual antes de qualquer alteração
+    let is_valid = verify_vault_password(&db, &master_password)?;
+    if !is_valid {
+        return Err("Senha mestre incorreta. Restauração de backup cancelada.".to_string());
     }
 
-    // Bloqueia a sessão antes de qualquer substituição do armazenamento (Fail-Closed).
+    // 3. Bloqueia a sessão antes de qualquer substituição do armazenamento (Fail-Closed).
     session.lock();
 
+    // 4. Executa a restauração no banco de dados local
     db.restore_backup(&source).map_err(|error| {
         map_storage_error(
             "Falha ao restaurar o backup",
             error,
             "VAULT_STORAGE_ERR: Não foi possível restaurar o backup do cofre.",
+        )
+    })?;
+
+    Ok(true)
+}
+
+// ----------------------------------------------------------------------
+// Rotação de senha mestre do cofre
+// ----------------------------------------------------------------------
+
+#[tauri::command]
+pub fn rotate_vault_password(
+    db: State<'_, LocalDatabase>,
+    session: State<'_, VaultSession>,
+    current_password: String,
+    new_password: String,
+) -> Result<bool, String> {
+    let current_password = Zeroizing::new(current_password);
+    let new_password = Zeroizing::new(new_password);
+
+    validate_master_password_size(&current_password)?;
+    validate_setup_password(&new_password)?;
+
+    let epoch_at_start = session.current_epoch();
+
+    let _op_guard = session
+        .acquire_operation()
+        .map_err(|_| "Acesso negado: o cofre precisa estar desbloqueado.".to_string())?;
+
+    if session.current_epoch() != epoch_at_start {
+        return Err("Acesso negado: o cofre precisa estar desbloqueado.".to_string());
+    }
+
+    let header_v2 = db
+        .get_header_v2()
+        .map_err(|e| {
+            map_storage_error(
+                "Falha ao ler cabeçalho V2",
+                e,
+                "VAULT_STORAGE_ERR: Falha ao ler o cabeçalho do cofre.",
+            )
+        })?
+        .ok_or_else(|| "Cofre V2 não inicializado ou migrado.".to_string())?;
+
+    let rotated_header = header_v2
+        .rotate_password(&current_password, &new_password, "devos-desktop")
+        .map_err(|_| "Senha mestre atual incorreta.".to_string())?;
+
+    db.rotate_vault_password_v2(&rotated_header).map_err(|e| {
+        map_storage_error(
+            "Falha ao persistir a rotação da senha mestre",
+            e,
+            "VAULT_STORAGE_ERR: Falha ao atualizar a senha mestre no armazenamento seguro.",
         )
     })?;
 

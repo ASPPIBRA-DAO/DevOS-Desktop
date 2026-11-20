@@ -129,7 +129,8 @@ impl KdfProfile {
     pub fn validate_and_decode(
         env: &WrappedDekEnvelope,
     ) -> Result<([u8; 16], [u8; 12], Vec<u8>), VaultCryptoError> {
-        if env.kdf_profile != Self::PROFILE_NAME
+        if env.version != ENVELOPE_VERSION_V2
+            || env.kdf_profile != Self::PROFILE_NAME
             || env.kdf_algorithm != Self::ALGORITHM
             || env.kdf_version != Self::VERSION
             || env.memory_kib != Self::MEMORY_KIB
@@ -510,15 +511,17 @@ impl VaultCrypto {
         let cipher =
             Aes256Gcm::new_from_slice(kek).map_err(|_| VaultCryptoError::DecryptionFailed)?;
 
-        let decrypted = cipher
-            .decrypt(
-                Nonce::from_slice(&nonce),
-                Payload {
-                    msg: &ciphertext,
-                    aad: &aad,
-                },
-            )
-            .map_err(|_| VaultCryptoError::DecryptionFailed)?;
+        let decrypted = Zeroizing::new(
+            cipher
+                .decrypt(
+                    Nonce::from_slice(&nonce),
+                    Payload {
+                        msg: &ciphertext,
+                        aad: &aad,
+                    },
+                )
+                .map_err(|_| VaultCryptoError::DecryptionFailed)?,
+        );
 
         if decrypted.len() != 32 {
             return Err(VaultCryptoError::DecryptionFailed);

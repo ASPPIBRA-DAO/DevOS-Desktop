@@ -1,15 +1,15 @@
 //! Módulos responsáveis pelo controle de acesso e pelas operações
 //! criptográficas da aplicação.
-//!
-//! Os módulos permanecem públicos e suas reexportações preservam
-//! o acesso simplificado aos itens públicos utilizado pelos
-//! consumidores existentes.
 
 pub mod access_control;
 pub mod encryption;
 
-// Mantém a API pública existente do controle de acesso.
-pub use self::access_control::*;
+// Fachada pública com exportações explícitas (sem wildcard)
+pub use self::access_control::{
+    AccessControlError, VaultHeader, VaultHeaderV2, VaultOperationGuard, VaultSession, VaultStatus,
+};
 
-// Mantém a API pública existente de criptografia.
-pub use self::encryption::*;
+pub use self::encryption::{
+    AadDomain, AeadEnvelope, ENVELOPE_VERSION_V2, EncryptedEnvelope, KdfProfile, Subkeys,
+    VaultCrypto, VaultCryptoError, WalletTargetTag, WrappedDekEnvelope,
+};

@@ -58,6 +58,7 @@ macro_rules! app_invoke_handler {
             commands::init_master_password,
             commands::unlock_vault,
             commands::lock_vault,
+            commands::rotate_vault_password,
             commands::get_user_profile,
             commands::save_user_profile,
             commands::import_legacy_profile,

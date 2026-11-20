@@ -838,7 +838,7 @@ mod tests {
         crate::storage::MigrationManager::run_migrations(&db).unwrap();
 
         let session = VaultSession::new();
-        session.set_session_key_for_test("test_master_key_12345678");
+        session.set_dek_for_test(&[0x42u8; 32]);
 
         (db, session, TestDirGuard(dir))
     }
