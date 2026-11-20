@@ -1,0 +1,157 @@
+{
+  "project": "ASPPIBRA DAO — DevOS Desktop",
+  "tab": "ABA 1 — Perfil Geral",
+  "route": "/user/account",
+  "extraction_date": "2026-11-18",
+  "components": [
+    {
+      "name": "AccountGeneralPage",
+      "path": "src/pages/user/account/general.tsx",
+      "type": "Page"
+    },
+    {
+      "name": "AccountGeneralView",
+      "path": "src/sections/account/view/account-general-view.tsx",
+      "type": "View"
+    },
+    {
+      "name": "AccountLayout",
+      "path": "src/sections/account/account-layout.tsx",
+      "type": "Layout"
+    },
+    {
+      "name": "AccountGeneral",
+      "path": "src/sections/account/account-general.tsx",
+      "type": "Component"
+    },
+    {
+      "name": "FormProvider",
+      "path": "src/shared/components/hook-form/form-provider.tsx",
+      "type": "Component"
+    },
+    {
+      "name": "RHFTextField",
+      "path": "src/shared/components/hook-form/rhf-text-field.tsx",
+      "type": "Component"
+    },
+    {
+      "name": "RHFSelect",
+      "path": "src/shared/components/hook-form/rhf-select.tsx",
+      "type": "Component"
+    },
+    {
+      "name": "RHFSwitch",
+      "path": "src/shared/components/hook-form/rhf-switch.tsx",
+      "type": "Component"
+    },
+    {
+      "name": "Iconify",
+      "path": "src/shared/components/iconify/iconify.tsx",
+      "type": "Component"
+    },
+    {
+      "name": "CustomBreadcrumbs",
+      "path": "src/shared/components/custom-breadcrumbs/custom-breadcrumbs.tsx",
+      "type": "Component"
+    },
+    {
+      "name": "RouterLink",
+      "path": "src/app/router/components/router-link.tsx",
+      "type": "Component"
+    },
+    {
+      "name": "ProfileCover",
+      "path": "src/sections/user/profile-cover.tsx",
+      "type": "Component"
+    }
+  ],
+  "hooks_and_stores": [
+    {
+      "name": "useAccountFacade",
+      "path": "src/sections/account/use-account.ts",
+      "type": "Hook Facade"
+    },
+    {
+      "name": "accountStore",
+      "path": "src/sections/account/use-account.ts",
+      "type": "Reactive Store (useSyncExternalStore)"
+    }
+  ],
+  "services_and_bridges": [
+    {
+      "name": "IdentityBridge",
+      "path": "src/platform/tauri/identity/identity-bridge.ts",
+      "type": "Bridge"
+    },
+    {
+      "name": "IdentityService",
+      "path": "src-tauri/src/modules/identity/service.rs",
+      "type": "Backend Service"
+    },
+    {
+      "name": "IdentityRepository",
+      "path": "src-tauri/src/modules/identity/repository.rs",
+      "type": "Backend Repository"
+    }
+  ],
+  "backend_modules": [
+    {
+      "name": "models.rs",
+      "path": "src-tauri/src/modules/identity/models.rs",
+      "type": "Rust Models"
+    },
+    {
+      "name": "service.rs",
+      "path": "src-tauri/src/modules/identity/service.rs",
+      "type": "Rust Service"
+    },
+    {
+      "name": "repository.rs",
+      "path": "src-tauri/src/modules/identity/repository.rs",
+      "type": "Rust Repository"
+    },
+    {
+      "name": "identity_commands.rs",
+      "path": "src-tauri/src/commands/identity_commands.rs",
+      "type": "Rust Commands"
+    },
+    {
+      "name": "local_database.rs",
+      "path": "src-tauri/src/storage/local_database.rs",
+      "type": "Database Connection"
+    },
+    {
+      "name": "migrations.rs",
+      "path": "src-tauri/src/storage/migrations.rs",
+      "type": "Database Migrations"
+    },
+    {
+      "name": "encryption.rs",
+      "path": "src-tauri/src/modules/vault/encryption.rs",
+      "type": "Cryptography"
+    },
+    {
+      "name": "access_control.rs",
+      "path": "src-tauri/src/modules/vault/access_control.rs",
+      "type": "Security / Session"
+    }
+  ],
+  "persistence": {
+    "database": "SQLite (devos_vault.sqlite)",
+    "table": "profile_records",
+    "encryption": "AES-256-GCM com Nonce de 96-bits",
+    "concurrency_control": "Optimistic Locking com campo revision"
+  },
+  "functional_status": {
+    "personal_data_pf": "IMPLEMENTADA E CONECTADA",
+    "company_data_pj": "IMPLEMENTADA E CONECTADA",
+    "address_data": "IMPLEMENTADA E CONECTADA",
+    "professional_data": "IMPLEMENTADA E CONECTADA",
+    "completeness_score": "IMPLEMENTADA E CONECTADA",
+    "public_privacy_switch": "IMPLEMENTADA E CONECTADA",
+    "vault_encryption": "IMPLEMENTADA E CONECTADA",
+    "concurrency_lock": "IMPLEMENTADA E CONECTADA",
+    "legacy_migration": "IMPLEMENTADA E CONECTADA",
+    "photo_and_cover_upload": "MOCK / SIMULAÇÃO (blob URL volátil)"
+  }
+}
