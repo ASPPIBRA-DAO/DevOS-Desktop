@@ -8,8 +8,13 @@ use std::time::Duration;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
-use crate::modules::vault::access_control::{VaultHeader, VaultStatus};
-use crate::modules::vault::encryption::{EncryptedEnvelope, VaultCryptoError};
+use crate::modules::vault::access_control::{
+    AccessControlError, VaultHeader, VaultHeaderV2, VaultStatus,
+};
+use crate::modules::vault::encryption::{
+    AadDomain, AeadEnvelope, EncryptedEnvelope, Subkeys, VaultCrypto, VaultCryptoError,
+    WalletTargetTag, WrappedDekEnvelope,
+};
 
 // ----------------------------------------------------------------------
 // Erros de armazenamento
@@ -28,6 +33,9 @@ pub enum StorageError {
 
     #[error("Vault error: {0}")]
     Vault(#[from] VaultCryptoError),
+
+    #[error("Access control error: {0}")]
+    AccessControl(#[from] AccessControlError),
 
     #[error("Vault not found: {0}")]
     NotFound(String),
@@ -72,6 +80,87 @@ pub struct StoredSecret {
     pub target: String,
     pub envelope: EncryptedEnvelope,
     pub created_at: String,
+}
+
+/// Registro criptografado do cofre V2 (envelope AEAD com AAD canônico e subchaves HKDF)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StoredSecretV2 {
+    pub vault_id: String,
+    pub target: String,
+    pub envelope: AeadEnvelope,
+    pub created_at: String,
+}
+
+/// Registro da operação de criação de carteiras para idempotência e rastreabilidade em lote.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WalletCreationOp {
+    pub creation_id: String,
+    pub target: String,
+    pub account_branch: u32,
+    pub wallet_count: usize,
+    pub network_id: String,
+    pub intent_hash: String,
+    pub created_at: String,
+}
+
+/// Calcula o hash SHA-256 canônico de intenção da operação de carteira (ADR-001 §7.3).
+/// Utiliza serialização binária canônica com comprimentos explícitos para prevenir ataques de colisão.
+/// Dados civis sensíveis (CPF/CNPJ/Nome) são excluídos expressamente do hash para impedir ataques de dicionário,
+/// mantendo a segregação estrita entre custódia de carteiras e o domínio Identity.
+pub fn compute_wallet_creation_intent_hash(
+    target: &str,
+    account_branch: u32,
+    wallet_count: usize,
+    network_id: &str,
+    label: &str,
+    client_reference: Option<&str>,
+) -> String {
+    use sha2::{Digest, Sha256};
+    let mut hasher = Sha256::new();
+
+    let domain = b"DEVOS/INTENT/V2";
+    hasher.update((domain.len() as u32).to_be_bytes());
+    hasher.update(domain);
+
+    hasher.update((target.len() as u32).to_be_bytes());
+    hasher.update(target.as_bytes());
+
+    hasher.update(account_branch.to_be_bytes());
+
+    hasher.update((wallet_count as u64).to_be_bytes());
+
+    hasher.update((network_id.len() as u32).to_be_bytes());
+    hasher.update(network_id.as_bytes());
+
+    hasher.update((label.len() as u32).to_be_bytes());
+    hasher.update(label.as_bytes());
+
+    if let Some(reference) = client_reference {
+        hasher.update(1u8.to_be_bytes());
+        hasher.update((reference.len() as u32).to_be_bytes());
+        hasher.update(reference.as_bytes());
+    } else {
+        hasher.update(0u8.to_be_bytes());
+    }
+
+    hex::encode(hasher.finalize())
+}
+
+/// Dados da nova carteira a ser persistida em wallets_v2.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NewWalletData {
+    pub target: String,
+    pub custody_type: String,
+    pub user_name: String,
+    pub label: String,
+    pub derivation_path: String,
+    pub network: String,
+    pub address: String,
+    pub status: String,
+    pub kyc_status: String,
+    pub seed_words_count: usize,
+    pub vault_id: Option<String>,
+    pub client_doc: Option<String>,
 }
 
 // ----------------------------------------------------------------------
@@ -306,32 +395,59 @@ impl LocalDatabase {
         }
 
         let header_table_count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'vault_header'",
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('vault_header', 'vault_header_v2')",
             [],
             |row| row.get(0),
         )?;
 
         if header_table_count == 0 {
             return Err(StorageError::InvalidData(
-                "O arquivo de backup não contém a tabela vault_header.".to_string(),
+                "O arquivo de backup não contém a tabela de cabeçalho do cofre (vault_header ou vault_header_v2).".to_string(),
             ));
         }
 
-        // Confirma que a tabela possui as colunas esperadas
-        let _statement = conn
-            .prepare("SELECT id, version, canary_envelope, created_at FROM vault_header LIMIT 0")?;
-
-        // Quando existe um cabeçalho, confirma que o envelope pode ser desserializado
-        let envelope_json: Option<String> = conn
+        let has_v2: bool = conn
             .query_row(
-                "SELECT canary_envelope FROM vault_header WHERE id = 1",
+                "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'vault_header_v2')",
                 [],
                 |row| row.get(0),
             )
-            .optional()?;
+            .unwrap_or(false);
 
-        if let Some(json) = envelope_json {
-            let _: EncryptedEnvelope = serde_json::from_str(&json)?;
+        if has_v2 {
+            let _statement = conn.prepare(
+                "SELECT id, version, wrapped_dek, created_at FROM vault_header_v2 LIMIT 0",
+            )?;
+
+            let row_v2: Option<String> = conn
+                .query_row(
+                    "SELECT wrapped_dek FROM vault_header_v2 WHERE id = 1",
+                    [],
+                    |r| r.get(0),
+                )
+                .optional()?;
+
+            if let Some(wrapped_dek_json) = row_v2 {
+                let _: WrappedDekEnvelope = serde_json::from_str(&wrapped_dek_json)?;
+            }
+        } else {
+            // Confirma que a tabela possui as colunas esperadas
+            let _statement = conn.prepare(
+                "SELECT id, version, canary_envelope, created_at FROM vault_header LIMIT 0",
+            )?;
+
+            // Quando existe um cabeçalho, confirma que o envelope pode ser desserializado
+            let envelope_json: Option<String> = conn
+                .query_row(
+                    "SELECT canary_envelope FROM vault_header WHERE id = 1",
+                    [],
+                    |row| row.get(0),
+                )
+                .optional()?;
+
+            if let Some(json) = envelope_json {
+                let _: EncryptedEnvelope = serde_json::from_str(&json)?;
+            }
         }
 
         Ok(())
@@ -444,16 +560,131 @@ impl LocalDatabase {
     }
 
     // ------------------------------------------------------------------
+    // Cabeçalho do cofre V2 (KEK / DEK)
+    // ------------------------------------------------------------------
+
+    /// Retorna o cabeçalho V2 persistido do cofre (se existir)
+    pub fn get_header_v2(&self) -> Result<Option<VaultHeaderV2>, StorageError> {
+        let conn = self.get_connection()?;
+        let mut stmt = conn
+            .prepare("SELECT version, wrapped_dek, created_at FROM vault_header_v2 WHERE id = 1")?;
+
+        let header = stmt
+            .query_row([], |row| {
+                let version: u32 = row.get(0)?;
+                let wrapped_dek_json: String = row.get(1)?;
+                let created_at: String = row.get(2)?;
+
+                let wrapped_dek: WrappedDekEnvelope = serde_json::from_str(&wrapped_dek_json)
+                    .map_err(|e| {
+                        rusqlite::Error::FromSqlConversionFailure(
+                            1,
+                            rusqlite::types::Type::Text,
+                            Box::new(e),
+                        )
+                    })?;
+
+                Ok(VaultHeaderV2 {
+                    version,
+                    wrapped_dek,
+                    created_at,
+                })
+            })
+            .optional()?;
+
+        Ok(header)
+    }
+
+    /// Inicializa o cabeçalho V2 do cofre com atomicidade comprovada (TransactionBehavior::Immediate).
+    /// Rejeita concorrentemente qualquer tentativa duplicada e impede sobrescrita do cabeçalho existente.
+    pub fn initialize_vault_v2_if_absent(
+        &self,
+        header: &VaultHeaderV2,
+    ) -> Result<(), StorageError> {
+        let mut conn = self.get_connection()?;
+        let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+
+        let existing: Option<u32> = tx
+            .query_row("SELECT id FROM vault_header_v2 WHERE id = 1", [], |row| {
+                row.get(0)
+            })
+            .optional()?;
+
+        if existing.is_some() {
+            return Err(StorageError::AlreadyInitialized);
+        }
+
+        let wrapped_dek_json = serde_json::to_string(&header.wrapped_dek)?;
+
+        tx.execute(
+            "INSERT INTO vault_header_v2 (id, version, wrapped_dek, created_at)
+             VALUES (1, ?1, ?2, ?3)",
+            params![header.version, wrapped_dek_json, header.created_at],
+        )?;
+
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Salva o cabeçalho V2 do cofre
+    pub fn save_header_v2(&self, header: &VaultHeaderV2) -> Result<(), StorageError> {
+        self.initialize_vault_v2_if_absent(header)
+    }
+
+    /// Atualiza atomicamente a chave embrulhada (wrapped DEK) na rotação de senha V2
+    pub fn rotate_vault_password_v2(&self, new_header: &VaultHeaderV2) -> Result<(), StorageError> {
+        let mut conn = self.get_connection()?;
+        let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+
+        let wrapped_dek_json = serde_json::to_string(&new_header.wrapped_dek)?;
+
+        let rows_affected = tx.execute(
+            "UPDATE vault_header_v2 SET wrapped_dek = ?1, created_at = ?2 WHERE id = 1",
+            params![wrapped_dek_json, new_header.created_at],
+        )?;
+
+        if rows_affected == 0 {
+            return Err(StorageError::NotFound(
+                "Cabeçalho V2 não encontrado para rotação de senha.".to_string(),
+            ));
+        }
+
+        tx.commit()?;
+        Ok(())
+    }
+
+    // ------------------------------------------------------------------
     // Carteiras
     // ------------------------------------------------------------------
 
-    /// Lista todas as carteiras armazenadas na base SQLite
+    /// Lista todas as carteiras armazenadas na base SQLite (prioriza wallets_v2)
     pub fn list_wallets(&self) -> Result<Vec<StoredWallet>, StorageError> {
         let conn = self.get_connection()?;
-        let mut stmt = conn.prepare(
-            "SELECT id, target, custody_type, user_name, label, derivation_path, network, address, status, kyc_status, seed_words_count, created_at, vault_id, client_doc FROM wallets ORDER BY id ASC"
-        )?;
 
+        let v2_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'wallets_v2'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
+
+        let use_v2 = if v2_count > 0 {
+            let count: i64 = conn
+                .query_row("SELECT COUNT(*) FROM wallets_v2", [], |row| row.get(0))
+                .unwrap_or(0);
+            count > 0
+        } else {
+            false
+        };
+
+        let sql = if use_v2 {
+            "SELECT id, target, custody_type, user_name, label, derivation_path, network, address, status, kyc_status, seed_words_count, created_at, vault_id, client_doc FROM wallets_v2 ORDER BY id ASC"
+        } else {
+            "SELECT id, target, custody_type, user_name, label, derivation_path, network, address, status, kyc_status, seed_words_count, created_at, vault_id, client_doc FROM wallets ORDER BY id ASC"
+        };
+
+        let mut stmt = conn.prepare(sql)?;
         let wallet_iter = stmt.query_map([], |row| {
             Ok(StoredWallet {
                 id: row.get(0)?,
@@ -478,6 +709,132 @@ impl LocalDatabase {
             wallets.push(w?);
         }
         Ok(wallets)
+    }
+
+    /// Salva atomicamente o segredo cifrado (envelope V2), a operação de lote e as carteiras em wallets_v2.
+    pub fn save_wallets_and_secret_atomic(
+        &self,
+        secret: StoredSecretV2,
+        op: WalletCreationOp,
+        wallets: &[NewWalletData],
+    ) -> Result<Vec<StoredWallet>, StorageError> {
+        let mut conn = self.get_connection()?;
+        let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+
+        // 1. Verificação antecipada de idempotência estrita (Fail-Fast)
+        let existing_op: Option<(String, u32, i64, String, String)> = tx
+            .query_row(
+                "SELECT target, account_branch, wallet_count, network_id, intent_hash FROM wallet_creation_operations WHERE creation_id = ?1",
+                params![op.creation_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
+            )
+            .optional()?;
+
+        if let Some((
+            stored_target,
+            stored_branch,
+            stored_count,
+            stored_network,
+            stored_intent_hash,
+        )) = existing_op
+        {
+            let wallet_count_i64 = i64::try_from(op.wallet_count).map_err(|_| {
+                StorageError::InvalidData(
+                    "Quantidade de carteiras inválida para o SQLite.".to_string(),
+                )
+            })?;
+
+            if stored_target == op.target
+                && stored_branch == op.account_branch
+                && stored_count == wallet_count_i64
+                && stored_network == op.network_id
+                && stored_intent_hash == op.intent_hash
+            {
+                // Idempotência comprovada: a operação idêntica já foi processada.
+                // Não reinsere o segredo nem duplica carteiras.
+                drop(tx);
+                return self.list_wallets();
+            } else {
+                return Err(StorageError::InvalidData(format!(
+                    "Violação de idempotência: A operação creation_id '{}' já foi registrada com intenção ou parâmetros distintos.",
+                    op.creation_id
+                )));
+            }
+        }
+
+        let envelope_json = serde_json::to_string(&secret.envelope)?;
+
+        // 2. Grava ou atualiza o envelope cifrado em vault_secrets
+        tx.execute(
+            "INSERT INTO vault_secrets (vault_id, target, envelope, created_at)
+             VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT(vault_id) DO UPDATE SET
+                target = excluded.target,
+                envelope = excluded.envelope,
+                created_at = excluded.created_at",
+            params![
+                secret.vault_id,
+                secret.target,
+                envelope_json,
+                secret.created_at
+            ],
+        )?;
+
+        // 3. Grava a operação de criação do lote (idempotência)
+        let wallet_count_i64 = i64::try_from(op.wallet_count).map_err(|_| {
+            StorageError::InvalidData("Quantidade de carteiras inválida para o SQLite.".to_string())
+        })?;
+
+        tx.execute(
+            "INSERT INTO wallet_creation_operations (creation_id, target, account_branch, wallet_count, network_id, intent_hash, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![
+                op.creation_id,
+                op.target,
+                op.account_branch,
+                wallet_count_i64,
+                op.network_id,
+                op.intent_hash,
+                op.created_at
+            ],
+        )?;
+
+        // 4. Insere todas as carteiras em wallets_v2
+        {
+            let mut stmt = tx.prepare(
+                "INSERT INTO wallets_v2 (creation_id, target, custody_type, user_name, label, derivation_path, network, address, status, kyc_status, seed_words_count, created_at, vault_id, client_doc)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+            )?;
+
+            for w in wallets {
+                let seed_words_count = i64::try_from(w.seed_words_count).map_err(|_| {
+                    StorageError::InvalidData(
+                        "A quantidade de palavras excede o intervalo suportado pelo SQLite."
+                            .to_string(),
+                    )
+                })?;
+
+                stmt.execute(params![
+                    op.creation_id,
+                    w.target,
+                    w.custody_type,
+                    w.user_name,
+                    w.label,
+                    w.derivation_path,
+                    w.network,
+                    w.address,
+                    w.status,
+                    w.kyc_status,
+                    seed_words_count,
+                    op.created_at,
+                    w.vault_id,
+                    w.client_doc
+                ])?;
+            }
+        }
+
+        tx.commit()?;
+        self.list_wallets()
     }
 
     /// Insere uma lista de carteiras dentro de uma transação atômica
@@ -596,6 +953,42 @@ impl LocalDatabase {
         Ok(secret)
     }
 
+    /// Busca o envelope secreto V2 (AeadEnvelope) correspondente a um vault_id
+    pub fn get_secret_v2_by_vault_id(
+        &self,
+        vault_id: &str,
+    ) -> Result<Option<StoredSecretV2>, StorageError> {
+        let conn = self.get_connection()?;
+        let mut stmt = conn.prepare(
+            "SELECT vault_id, target, envelope, created_at FROM vault_secrets WHERE vault_id = ?1",
+        )?;
+
+        let secret = stmt
+            .query_row(params![vault_id], |row| {
+                let v_id: String = row.get(0)?;
+                let target: String = row.get(1)?;
+                let env_json: String = row.get(2)?;
+                let created_at: String = row.get(3)?;
+                let envelope: AeadEnvelope = serde_json::from_str(&env_json).map_err(|e| {
+                    rusqlite::Error::FromSqlConversionFailure(
+                        2,
+                        rusqlite::types::Type::Text,
+                        Box::new(e),
+                    )
+                })?;
+
+                Ok(StoredSecretV2 {
+                    vault_id: v_id,
+                    target,
+                    envelope,
+                    created_at,
+                })
+            })
+            .optional()?;
+
+        Ok(secret)
+    }
+
     // ------------------------------------------------------------------
     // Status operacional
     // ------------------------------------------------------------------
@@ -604,23 +997,50 @@ impl LocalDatabase {
     pub fn get_status(&self, is_unlocked: bool) -> Result<VaultStatus, StorageError> {
         let conn = self.get_connection()?;
 
-        let is_initialized: bool = conn
+        let is_initialized_v2: bool = conn
             .query_row(
-                "SELECT EXISTS(SELECT 1 FROM vault_header WHERE id = 1)",
+                "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'vault_header_v2') AND EXISTS(SELECT 1 FROM vault_header_v2 WHERE id = 1)",
                 [],
                 |row| row.get(0),
             )
             .unwrap_or(false);
 
-        let (dao_count, client_count): (i64, i64) = conn
+        let is_initialized_v1: bool = conn
             .query_row(
-                "SELECT \
-                    COALESCE(SUM(CASE WHEN target = 'DAO' THEN 1 ELSE 0 END), 0), \
-                    COALESCE(SUM(CASE WHEN target = 'CLIENT' THEN 1 ELSE 0 END), 0) \
-                 FROM wallets",
+                "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'vault_header') AND EXISTS(SELECT 1 FROM vault_header WHERE id = 1)",
                 [],
-                |row| Ok((row.get(0)?, row.get(1)?)),
+                |row| row.get(0),
             )
+            .unwrap_or(false);
+
+        let is_initialized = is_initialized_v2 || is_initialized_v1;
+
+        let has_wallets_v2: bool = conn
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'wallets_v2')",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap_or(false);
+
+        let wallets_query = if has_wallets_v2 {
+            "SELECT \
+                COALESCE(SUM(CASE WHEN target = 'DAO' THEN 1 ELSE 0 END), 0), \
+                COALESCE(SUM(CASE WHEN target = 'CLIENT' THEN 1 ELSE 0 END), 0) \
+             FROM ( \
+                 SELECT target FROM wallets_v2 \
+                 UNION ALL \
+                 SELECT target FROM wallets WHERE NOT EXISTS (SELECT 1 FROM wallets_v2) \
+             )"
+        } else {
+            "SELECT \
+                COALESCE(SUM(CASE WHEN target = 'DAO' THEN 1 ELSE 0 END), 0), \
+                COALESCE(SUM(CASE WHEN target = 'CLIENT' THEN 1 ELSE 0 END), 0) \
+             FROM wallets"
+        };
+
+        let (dao_count, client_count): (i64, i64) = conn
+            .query_row(wallets_query, [], |row| Ok((row.get(0)?, row.get(1)?)))
             .unwrap_or((0, 0));
 
         let dao_wallets_count = usize::try_from(dao_count).map_err(|_| {
@@ -637,6 +1057,192 @@ impl LocalDatabase {
             dao_wallets_count,
             client_wallets_count,
         })
+    }
+
+    // ------------------------------------------------------------------
+    // Migração Criptográfica V1 -> V2 (KEK / DEK)
+    // ------------------------------------------------------------------
+
+    /// Executa a migração criptográfica atômica de V1 para V2:
+    /// - Decifra envelopes V1 usando a senha mestre
+    /// - Gera DEK de 256 bits e empacota em WrappedDekEnvelope via KEK derivada com Argon2id
+    /// - Recifra os segredos com a subchave DEVOS/WALLETS/V2 e AAD canônico
+    /// - Recifra o perfil de identidade civil (se presente) com DEVOS/IDENTITY/V2 e AAD canônico
+    /// - Migra carteiras para wallets_v2 vinculadas a uma operação de migração sintética
+    /// - Persiste vault_header_v2 com TransactionBehavior::Immediate
+    pub fn migrate_v1_to_v2(&self, master_password: &str) -> Result<bool, StorageError> {
+        let mut conn = self.get_connection()?;
+        let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+
+        // Se já existe header V2, a migração criptográfica já foi efetuada
+        let has_v2: bool = tx
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'vault_header_v2') AND EXISTS(SELECT 1 FROM vault_header_v2 WHERE id = 1)",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap_or(false);
+
+        if has_v2 {
+            return Ok(false);
+        }
+
+        // Se não existe header V1, não há base legada para migrar
+        let v1_data: Option<(u32, String, String)> = tx
+            .query_row(
+                "SELECT version, canary_envelope, created_at FROM vault_header WHERE id = 1",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .optional()?;
+
+        let (_v1_version, v1_canary_json, _v1_created_at) = match v1_data {
+            Some(data) => data,
+            None => return Ok(false),
+        };
+
+        let v1_canary: EncryptedEnvelope = serde_json::from_str(&v1_canary_json)?;
+        let v1_header = VaultHeader {
+            version: 1,
+            canary_envelope: v1_canary,
+            created_at: _v1_created_at,
+        };
+
+        if !v1_header.verify_password(master_password) {
+            return Err(StorageError::AccessControl(
+                AccessControlError::InvalidPassword,
+            ));
+        }
+
+        // 1. Gera DEK de 256 bits, deriva subchaves e gera o novo cabeçalho V2
+        let (header_v2, dek) = VaultHeaderV2::init(master_password, "devos-desktop")?;
+        let wallets_key = Subkeys::derive_wallets_key(&dek);
+        let identity_key = Subkeys::derive_identity_key(&dek);
+
+        // 2. Decifra e recifra todos os registros em vault_secrets
+        {
+            let mut select_stmt =
+                tx.prepare("SELECT vault_id, target, envelope FROM vault_secrets")?;
+            let secrets_iter = select_stmt.query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                ))
+            })?;
+
+            let mut migrated_secrets = Vec::new();
+            for s in secrets_iter {
+                let (vault_id, target, env_json) = s?;
+                if let Ok(v1_env) = serde_json::from_str::<EncryptedEnvelope>(&env_json) {
+                    if v1_env.version == 1 {
+                        let plaintext = VaultCrypto::decrypt(master_password, &v1_env)?;
+                        let target_tag = if target.eq_ignore_ascii_case("DAO") {
+                            WalletTargetTag::Dao
+                        } else {
+                            WalletTargetTag::Client
+                        };
+                        let aad = AadDomain::WalletMnemonic {
+                            vault_id: &vault_id,
+                            target: target_tag,
+                        }
+                        .to_canonical_bytes();
+                        let new_aead =
+                            VaultCrypto::encrypt_with_aead(&wallets_key, &plaintext, &aad)?;
+                        migrated_secrets.push((vault_id, serde_json::to_string(&new_aead)?));
+                    }
+                }
+            }
+            drop(select_stmt);
+
+            let mut update_stmt =
+                tx.prepare("UPDATE vault_secrets SET envelope = ?1 WHERE vault_id = ?2")?;
+            for (v_id, new_json) in migrated_secrets {
+                update_stmt.execute(params![new_json, v_id])?;
+            }
+        }
+
+        // 3. Decifra e recifra user_profiles (se a tabela e registro existirem)
+        {
+            let profile_exists: bool = tx
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'user_profiles')",
+                    [],
+                    |row| row.get(0),
+                )
+                .unwrap_or(false);
+
+            if profile_exists {
+                let profile_env_json: Option<String> = tx
+                    .query_row(
+                        "SELECT encrypted_envelope FROM user_profiles WHERE id = 1",
+                        [],
+                        |row| row.get(0),
+                    )
+                    .optional()?;
+
+                if let Some(json) = profile_env_json {
+                    if let Ok(v1_env) = serde_json::from_str::<EncryptedEnvelope>(&json) {
+                        if v1_env.version == 1 {
+                            let plaintext = VaultCrypto::decrypt(master_password, &v1_env)?;
+                            let aad = AadDomain::UserProfile {
+                                profile_id: 1,
+                                vault_instance_id: "default",
+                            }
+                            .to_canonical_bytes();
+                            let new_aead =
+                                VaultCrypto::encrypt_with_aead(&identity_key, &plaintext, &aad)?;
+                            let new_json = serde_json::to_string(&new_aead)?;
+                            tx.execute(
+                                "UPDATE user_profiles SET encrypted_envelope = ?1 WHERE id = 1",
+                                params![new_json],
+                            )?;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 4. Migra carteiras de wallets para wallets_v2 (se wallets_v2 estiver vazia e houver carteiras em wallets)
+        {
+            let v2_has_records: bool = tx
+                .query_row("SELECT COUNT(*) FROM wallets_v2", [], |row| {
+                    row.get::<_, i64>(0)
+                })
+                .unwrap_or(0)
+                > 0;
+
+            let v1_count: i64 = tx
+                .query_row("SELECT COUNT(*) FROM wallets", [], |row| row.get(0))
+                .unwrap_or(0);
+
+            if !v2_has_records && v1_count > 0 {
+                let creation_id = "v1-legacy-migration";
+                tx.execute(
+                    "INSERT INTO wallet_creation_operations (creation_id, target, account_branch, wallet_count, network_id, intent_hash, created_at)
+                     VALUES (?1, 'DAO', 0, ?2, 'legacy', 'v1_synthetic_migration', datetime('now'))",
+                    params![creation_id, v1_count],
+                )?;
+
+                tx.execute(
+                    "INSERT INTO wallets_v2 (creation_id, target, custody_type, user_name, label, derivation_path, network, address, status, kyc_status, seed_words_count, created_at, vault_id, client_doc)
+                     SELECT ?1, target, custody_type, user_name, label, derivation_path, network, address, status, kyc_status, seed_words_count, created_at, vault_id, client_doc
+                     FROM wallets ORDER BY id ASC",
+                    params![creation_id],
+                )?;
+            }
+        }
+
+        // 5. Salva vault_header_v2
+        let wrapped_dek_json = serde_json::to_string(&header_v2.wrapped_dek)?;
+        tx.execute(
+            "INSERT INTO vault_header_v2 (id, version, wrapped_dek, created_at)
+             VALUES (1, ?1, ?2, ?3)",
+            params![header_v2.version, wrapped_dek_json, header_v2.created_at],
+        )?;
+
+        tx.commit()?;
+        Ok(true)
     }
 
     // ------------------------------------------------------------------
@@ -1230,6 +1836,421 @@ mod tests {
             result.is_err(),
             "O banco ativo não pode ser o destino do próprio backup."
         );
+
+        let _ = std::fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn test_migration_4_creates_v2_tables_and_unique_indexes() {
+        let test_dir =
+            std::env::temp_dir().join(format!("devos_mig4_test_{}", rand::random::<u64>()));
+        let db = LocalDatabase::new(test_dir.clone());
+
+        crate::storage::migrations::MigrationManager::run_migrations(&db)
+            .expect("Migrações devem executar com sucesso");
+
+        let conn = db.get_connection().unwrap();
+
+        // Confirma existência das tabelas V2
+        let table_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('vault_header_v2', 'wallet_creation_operations', 'wallets_v2')",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(table_count, 3);
+
+        // Confirma existência do índice único em vault_secrets
+        let idx_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'idx_vault_secrets_target'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(idx_count, 1);
+
+        let _ = std::fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn test_atomic_save_wallets_and_secret_v2() {
+        let test_dir =
+            std::env::temp_dir().join(format!("devos_v2_atomic_{}", rand::random::<u64>()));
+        let db = LocalDatabase::new(test_dir.clone());
+        crate::storage::migrations::MigrationManager::run_migrations(&db).unwrap();
+
+        let master_pwd = "AtomicSavePassword2026!";
+        let (header_v2, dek) = VaultHeaderV2::init(master_pwd, "devos-desktop").unwrap();
+        db.save_header_v2(&header_v2).unwrap();
+
+        let wallets_key = Subkeys::derive_wallets_key(&dek);
+        let vault_id = "dao_vault_v2_test";
+        let target = "DAO";
+        let aad = AadDomain::WalletMnemonic {
+            vault_id,
+            target: WalletTargetTag::Dao,
+        }
+        .to_canonical_bytes();
+
+        let mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+        let aead_env =
+            VaultCrypto::encrypt_with_aead(&wallets_key, mnemonic.as_bytes(), &aad).unwrap();
+
+        let secret = StoredSecretV2 {
+            vault_id: vault_id.to_string(),
+            target: target.to_string(),
+            envelope: aead_env,
+            created_at: "2026-11-20 12:00:00".to_string(),
+        };
+
+        let creation_id = "op_batch_001";
+        let op = WalletCreationOp {
+            creation_id: creation_id.to_string(),
+            target: target.to_string(),
+            account_branch: 0,
+            wallet_count: 2,
+            network_id: "arbitrum-one".to_string(),
+            intent_hash: "test_intent_hash_001".to_string(),
+            created_at: "2026-11-20 12:00:00".to_string(),
+        };
+
+        let wallets = vec![
+            NewWalletData {
+                target: target.to_string(),
+                custody_type: "CUSTODIAL_LOCAL".to_string(),
+                user_name: "ASPPIBRA DAO".to_string(),
+                label: "Conta 0".to_string(),
+                derivation_path: "m/44'/60'/0'/0/0".to_string(),
+                network: "Arbitrum One".to_string(),
+                address: "0x1111111111111111111111111111111111111111".to_string(),
+                status: "ACTIVE".to_string(),
+                kyc_status: "UNVERIFIED".to_string(),
+                seed_words_count: 12,
+                vault_id: Some(vault_id.to_string()),
+                client_doc: None,
+            },
+            NewWalletData {
+                target: target.to_string(),
+                custody_type: "CUSTODIAL_LOCAL".to_string(),
+                user_name: "ASPPIBRA DAO".to_string(),
+                label: "Conta 1".to_string(),
+                derivation_path: "m/44'/60'/0'/0/1".to_string(),
+                network: "Arbitrum One".to_string(),
+                address: "0x2222222222222222222222222222222222222222".to_string(),
+                status: "ACTIVE".to_string(),
+                kyc_status: "UNVERIFIED".to_string(),
+                seed_words_count: 12,
+                vault_id: Some(vault_id.to_string()),
+                client_doc: None,
+            },
+        ];
+
+        let saved = db
+            .save_wallets_and_secret_atomic(secret, op, &wallets)
+            .expect("Gravação atômica deve ter sucesso");
+        assert_eq!(saved.len(), 2);
+        assert_eq!(saved[0].derivation_path, "m/44'/60'/0'/0/0");
+        assert_eq!(saved[1].derivation_path, "m/44'/60'/0'/0/1");
+
+        // Recupera o segredo e decifra com a DEK
+        let retrieved_secret = db
+            .get_secret_v2_by_vault_id(vault_id)
+            .unwrap()
+            .expect("Segredo V2 deve existir");
+        let decrypted_bytes =
+            VaultCrypto::decrypt_with_aead(&wallets_key, &retrieved_secret.envelope, &aad)
+                .expect("Decifragem deve ter sucesso");
+        assert_eq!(
+            String::from_utf8(decrypted_bytes.to_vec()).unwrap(),
+            mnemonic
+        );
+
+        let _ = std::fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn test_v1_to_v2_cryptographic_migration() {
+        let test_dir =
+            std::env::temp_dir().join(format!("devos_mig_v1_v2_{}", rand::random::<u64>()));
+        let db = LocalDatabase::new(test_dir.clone());
+        crate::storage::migrations::MigrationManager::run_migrations(&db).unwrap();
+
+        let master_password = "LegacyMasterPassword123!";
+
+        // 1. Cria cabeçalho V1 e segredo V1
+        let v1_header = VaultHeader::new(master_password).unwrap();
+        db.save_header(&v1_header).unwrap();
+
+        let mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+        let v1_envelope = VaultCrypto::encrypt(master_password, mnemonic.as_bytes()).unwrap();
+
+        let v1_secret = StoredSecret {
+            vault_id: "legacy_dao_vault".to_string(),
+            target: "DAO".to_string(),
+            envelope: v1_envelope,
+            created_at: "2026-10-01 00:00:00".to_string(),
+        };
+        db.save_secret(v1_secret).unwrap();
+
+        let v1_wallet = StoredWallet {
+            id: 1,
+            target: "DAO".to_string(),
+            custody_type: "CUSTODIAL_LOCAL".to_string(),
+            user: "ASPPIBRA DAO".to_string(),
+            label: "Caixa Legado".to_string(),
+            derivation_path: "m/44'/60'/0'/0/0".to_string(),
+            network: "Arbitrum One".to_string(),
+            address: "0x1111111111111111111111111111111111111111".to_string(),
+            status: "ACTIVE".to_string(),
+            kyc_status: "UNVERIFIED".to_string(),
+            seed_words_count: 12,
+            created_at: "2026-10-01 00:00:00".to_string(),
+            vault_id: Some("legacy_dao_vault".to_string()),
+            client_doc: None,
+        };
+        db.append_wallets(&[v1_wallet]).unwrap();
+
+        // 2. Executa a migração V1 -> V2
+        let migrated = db
+            .migrate_v1_to_v2(master_password)
+            .expect("Migração deve ter sucesso");
+        assert!(migrated, "A migração deve ter sido aplicada");
+
+        // Segunda execução deve ser no-op idempotente
+        let second_run = db.migrate_v1_to_v2(master_password).unwrap();
+        assert!(!second_run, "Segunda migração deve ser no-op");
+
+        // 3. Valida cabeçalho V2
+        let header_v2 = db.get_header_v2().unwrap().expect("Header V2 deve existir");
+        let unlocked_dek = header_v2
+            .unlock(master_password, "devos-desktop")
+            .expect("Desbloqueio com KEK/DEK");
+        let wallets_key = Subkeys::derive_wallets_key(&unlocked_dek);
+
+        // 4. Valida decifragem do segredo recifrado em V2
+        let v2_secret = db
+            .get_secret_v2_by_vault_id("legacy_dao_vault")
+            .unwrap()
+            .expect("Segredo migrado deve existir");
+        assert_eq!(v2_secret.envelope.version, 2);
+
+        let aad = AadDomain::WalletMnemonic {
+            vault_id: "legacy_dao_vault",
+            target: WalletTargetTag::Dao,
+        }
+        .to_canonical_bytes();
+        let decrypted =
+            VaultCrypto::decrypt_with_aead(&wallets_key, &v2_secret.envelope, &aad).unwrap();
+        assert_eq!(String::from_utf8(decrypted.to_vec()).unwrap(), mnemonic);
+
+        // 5. Valida que carteiras aparecem através de list_wallets (migradas para wallets_v2)
+        let wallets = db.list_wallets().unwrap();
+        assert_eq!(wallets.len(), 1);
+        assert_eq!(
+            wallets[0].address,
+            "0x1111111111111111111111111111111111111111"
+        );
+
+        let _ = std::fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn test_v2_vault_password_rotation_in_db() {
+        let test_dir = std::env::temp_dir().join(format!("devos_v2_rot_{}", rand::random::<u64>()));
+        let db = LocalDatabase::new(test_dir.clone());
+        crate::storage::migrations::MigrationManager::run_migrations(&db).unwrap();
+
+        let old_pwd = "OldMasterPassword123!";
+        let new_pwd = "NewRotatedPassword456!";
+
+        let (header_v2, dek) = VaultHeaderV2::init(old_pwd, "devos-desktop").unwrap();
+        db.save_header_v2(&header_v2).unwrap();
+
+        // Rotação de senha O(1)
+        let rotated_header = header_v2
+            .rotate_password(old_pwd, new_pwd, "devos-desktop")
+            .unwrap();
+        db.rotate_vault_password_v2(&rotated_header).unwrap();
+
+        // Recarrega do banco e confirma
+        let reloaded = db.get_header_v2().unwrap().unwrap();
+        assert!(reloaded.unlock(old_pwd, "devos-desktop").is_err());
+
+        let recovered_dek = reloaded.unlock(new_pwd, "devos-desktop").unwrap();
+        assert_eq!(*recovered_dek, *dek);
+
+        let _ = std::fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn test_atomic_save_wallets_and_secret_v2_true_idempotency() {
+        let test_dir =
+            std::env::temp_dir().join(format!("devos_v2_idempotency_{}", rand::random::<u64>()));
+        let db = LocalDatabase::new(test_dir.clone());
+        crate::storage::migrations::MigrationManager::run_migrations(&db).unwrap();
+
+        let dummy_envelope = crate::modules::vault::encryption::AeadEnvelope {
+            version: 2,
+            cipher: "AES-256-GCM".to_string(),
+            nonce_hex: "0102030405060708090a0b0c".to_string(),
+            ciphertext_hex: "aabbccdd11223344556677889900aabbccddeeff".to_string(),
+        };
+
+        let secret = StoredSecretV2 {
+            vault_id: "test_vault_id".to_string(),
+            target: "DAO".to_string(),
+            envelope: dummy_envelope.clone(),
+            created_at: "2026-11-20 12:00:00".to_string(),
+        };
+
+        let intent_hash = compute_wallet_creation_intent_hash(
+            "DAO",
+            0,
+            1,
+            "arbitrum_one",
+            "Test Wallet",
+            Some("ref_test_user_001"),
+        );
+
+        let op = WalletCreationOp {
+            creation_id: "op_test_123".to_string(),
+            target: "DAO".to_string(),
+            account_branch: 0,
+            wallet_count: 1,
+            network_id: "arbitrum_one".to_string(),
+            intent_hash: intent_hash.clone(),
+            created_at: "2026-11-20 12:00:00".to_string(),
+        };
+
+        let wallets = vec![NewWalletData {
+            target: "DAO".to_string(),
+            custody_type: "CUSTODIAL_LOCAL".to_string(),
+            user_name: "Test User".to_string(),
+            label: "Test Wallet".to_string(),
+            derivation_path: "m/44'/60'/0'/0/0".to_string(),
+            network: "arbitrum_one".to_string(),
+            address: "0x1234567890123456789012345678901234567890".to_string(),
+            status: "ACTIVE".to_string(),
+            kyc_status: "UNVERIFIED".to_string(),
+            seed_words_count: 12,
+            vault_id: Some("test_vault_id".to_string()),
+            client_doc: None,
+        }];
+
+        // 1. Primeira execução: deve persistir normalmente
+        let saved1 = db
+            .save_wallets_and_secret_atomic(secret.clone(), op.clone(), &wallets)
+            .expect("Primeira gravação deve ter sucesso");
+        assert_eq!(saved1.len(), 1);
+
+        // 2. Segunda execução idêntica: idempotência verdadeira (no-op, não duplica)
+        let saved2 = db
+            .save_wallets_and_secret_atomic(secret.clone(), op.clone(), &wallets)
+            .expect("Execução repetida idêntica deve ter sucesso idempotente");
+        assert_eq!(saved2.len(), 1);
+
+        // 3. Terceira execução com creation_id idêntico mas parâmetros conflitantes: deve falhar
+        let conflicting_op = WalletCreationOp {
+            creation_id: "op_test_123".to_string(),
+            target: "DAO".to_string(),
+            account_branch: 1, // modificado!
+            wallet_count: 1,
+            network_id: "arbitrum_one".to_string(),
+            intent_hash: "conflicting_hash_divergent".to_string(),
+            created_at: "2026-11-20 12:00:00".to_string(),
+        };
+
+        let err = db
+            .save_wallets_and_secret_atomic(secret, conflicting_op, &wallets)
+            .unwrap_err();
+        match err {
+            StorageError::InvalidData(msg) => {
+                assert!(msg.contains("Violação de idempotência"));
+            }
+            other => panic!("Esperado StorageError::InvalidData, recebido {:?}", other),
+        }
+
+        let _ = std::fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn test_wallets_v2_custody_type_check_constraint() {
+        let test_dir =
+            std::env::temp_dir().join(format!("devos_v2_constraint_{}", rand::random::<u64>()));
+        let db = LocalDatabase::new(test_dir.clone());
+        crate::storage::migrations::MigrationManager::run_migrations(&db).unwrap();
+
+        let conn = db.get_connection().unwrap();
+
+        // Insere uma operação de referência
+        conn.execute(
+            "INSERT INTO wallet_creation_operations (creation_id, target, account_branch, wallet_count, network_id, intent_hash, created_at)
+             VALUES ('op_c1', 'DAO', 0, 1, 'net1', 'intent_test_1', '2026-11-20')",
+            [],
+        )
+        .unwrap();
+
+        // 1. CUSTODIAL_LOCAL sem vault_id deve FALHAR
+        let res1 = conn.execute(
+            "INSERT INTO wallets_v2 (creation_id, target, custody_type, user_name, label, derivation_path, network, address, status, kyc_status, seed_words_count, created_at, vault_id)
+             VALUES ('op_c1', 'DAO', 'CUSTODIAL_LOCAL', 'U1', 'L1', 'm/0', 'net', '0x1', 'ACTIVE', 'UNVERIFIED', 12, '2026-11-20', NULL)",
+            [],
+        );
+        assert!(
+            res1.is_err(),
+            "CUSTODIAL_LOCAL com vault_id NULL deve ser rejeitado"
+        );
+
+        // 2. CUSTODIAL_LOCAL com seed_words_count inválido (ex: 15) deve FALHAR
+        let res2 = conn.execute(
+            "INSERT INTO wallets_v2 (creation_id, target, custody_type, user_name, label, derivation_path, network, address, status, kyc_status, seed_words_count, created_at, vault_id)
+             VALUES ('op_c1', 'DAO', 'CUSTODIAL_LOCAL', 'U1', 'L1', 'm/1', 'net', '0x2', 'ACTIVE', 'UNVERIFIED', 15, '2026-11-20', 'vault1')",
+            [],
+        );
+        assert!(
+            res2.is_err(),
+            "CUSTODIAL_LOCAL com seed_words_count = 15 deve ser rejeitado"
+        );
+
+        // 3. WATCH_ONLY com vault_id preenchido deve FALHAR
+        let res3 = conn.execute(
+            "INSERT INTO wallets_v2 (creation_id, target, custody_type, user_name, label, derivation_path, network, address, status, kyc_status, seed_words_count, created_at, vault_id)
+             VALUES ('op_c1', 'DAO', 'WATCH_ONLY', 'U1', 'L1', 'm/2', 'net', '0x3', 'ACTIVE', 'UNVERIFIED', 0, '2026-11-20', 'vault1')",
+            [],
+        );
+        assert!(
+            res3.is_err(),
+            "WATCH_ONLY com vault_id preenchido deve ser rejeitado"
+        );
+
+        // 4. WATCH_ONLY com seed_words_count != 0 deve FALHAR
+        let res4 = conn.execute(
+            "INSERT INTO wallets_v2 (creation_id, target, custody_type, user_name, label, derivation_path, network, address, status, kyc_status, seed_words_count, created_at, vault_id)
+             VALUES ('op_c1', 'DAO', 'WATCH_ONLY', 'U1', 'L1', 'm/3', 'net', '0x4', 'ACTIVE', 'UNVERIFIED', 12, '2026-11-20', NULL)",
+            [],
+        );
+        assert!(
+            res4.is_err(),
+            "WATCH_ONLY com seed_words_count != 0 deve ser rejeitado"
+        );
+
+        // 5. CUSTODIAL_LOCAL válido deve ter SUCESSO
+        let res5 = conn.execute(
+            "INSERT INTO wallets_v2 (creation_id, target, custody_type, user_name, label, derivation_path, network, address, status, kyc_status, seed_words_count, created_at, vault_id)
+             VALUES ('op_c1', 'DAO', 'CUSTODIAL_LOCAL', 'U1', 'L1', 'm/4', 'net', '0x5', 'ACTIVE', 'UNVERIFIED', 12, '2026-11-20', 'vault1')",
+            [],
+        );
+        assert!(res5.is_ok(), "CUSTODIAL_LOCAL válido deve ser aceito");
+
+        // 6. WATCH_ONLY válido deve ter SUCESSO
+        let res6 = conn.execute(
+            "INSERT INTO wallets_v2 (creation_id, target, custody_type, user_name, label, derivation_path, network, address, status, kyc_status, seed_words_count, created_at, vault_id)
+             VALUES ('op_c1', 'DAO', 'WATCH_ONLY', 'U1', 'L1', 'm/5', 'net', '0x6', 'ACTIVE', 'UNVERIFIED', 0, '2026-11-20', NULL)",
+            [],
+        );
+        assert!(res6.is_ok(), "WATCH_ONLY válido deve ser aceito");
 
         let _ = std::fs::remove_dir_all(test_dir);
     }

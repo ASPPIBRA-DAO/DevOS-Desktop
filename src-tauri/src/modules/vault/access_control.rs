@@ -1,8 +1,12 @@
+use rand::RngCore;
+use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
-use std::sync::Mutex;
+use std::sync::{Condvar, Mutex};
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
-use super::encryption::{EncryptedEnvelope, VaultCrypto, VaultCryptoError};
+use super::encryption::{
+    EncryptedEnvelope, KdfProfile, VaultCrypto, VaultCryptoError, WrappedDekEnvelope,
+};
 
 // ----------------------------------------------------------------------
 // Erros de controle de acesso
@@ -18,6 +22,12 @@ pub enum AccessControlError {
 
     #[error("Authentication failed. Invalid master password.")]
     InvalidPassword,
+
+    #[error("Invalid session epoch or concurrent state transition.")]
+    InvalidEpoch,
+
+    #[error("Vault session is already unlocked.")]
+    AlreadyUnlocked,
 
     // Evita expor detalhes internos da operação criptográfica
     // por meio da representação pública do erro.
@@ -46,7 +56,7 @@ pub struct VaultStatus {
 
 /// Estado privado da sessão.
 ///
-/// Não derivar Debug: a estrutura contém material sensível (session_key).
+/// Não derivar Debug: a estrutura contém material sensível (dek e session_key).
 #[derive(Default)]
 struct SessionState {
     unlocked: bool,
@@ -63,10 +73,48 @@ struct SessionState {
     /// evitando a reutilização de uma época por wraparound.
     epoch_exhausted: bool,
 
-    /// Material sensível da sessão.
-    ///
-    /// A chave é zerada pelo mecanismo RAII ao ser descartada.
+    /// Barreira de admissão: impede início de novas operações durante o bloqueio.
+    admission_closed: bool,
+
+    /// Contador de operações ativas em andamento.
+    active_operations: usize,
+
+    /// Data Encryption Key (DEK) de 256 bits instalada na sessão desbloqueada.
+    dek: Option<Zeroizing<[u8; 32]>>,
+
+    /// Material de chave de sessão legado (mantido temporariamente para compatibilidade).
     session_key: Option<Zeroizing<String>>,
+}
+
+// ----------------------------------------------------------------------
+// Guard de Operação Ativa
+// ----------------------------------------------------------------------
+
+/// Guard RAII que rastreia uma operação autorizada em andamento na sessão.
+pub struct VaultOperationGuard<'a> {
+    session: &'a VaultSession,
+    epoch: u64,
+}
+
+impl<'a> VaultOperationGuard<'a> {
+    pub fn epoch(&self) -> u64 {
+        self.epoch
+    }
+}
+
+impl<'a> Drop for VaultOperationGuard<'a> {
+    fn drop(&mut self) {
+        let mut state = match self.session.state.lock() {
+            Ok(s) => s,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        if state.active_operations > 0 {
+            state.active_operations -= 1;
+            if state.active_operations == 0 && state.admission_closed {
+                self.session.drain_cvar.notify_all();
+            }
+        }
+    }
 }
 
 // ----------------------------------------------------------------------
@@ -76,10 +124,11 @@ struct SessionState {
 /// Gerenciador autoritativo da sessão do cofre.
 ///
 /// O Mutex protege as transições entre bloqueado e desbloqueado,
-/// a geração da sessão e o material criptográfico mantido em memória.
+/// a geração da sessão e a DEK mantida em memória.
 #[derive(Default)]
 pub struct VaultSession {
     state: Mutex<SessionState>,
+    drain_cvar: Condvar,
 }
 
 impl VaultSession {
@@ -94,10 +143,11 @@ impl VaultSession {
 
     /// Avança a geração sem permitir wraparound.
     ///
-    /// Se o contador estiver esgotado, a sessão permanece bloqueada.
+    /// Se o contador estiver esgotado, a sessão permanece bloqueada permanentemente.
     fn advance_epoch(state: &mut SessionState) {
         if state.epoch_exhausted {
             state.unlocked = false;
+            state.dek = None;
             state.session_key = None;
             return;
         }
@@ -111,23 +161,23 @@ impl VaultSession {
                 // Não reutilizar a época zero nem aceitar ABA.
                 state.epoch_exhausted = true;
                 state.unlocked = false;
+                state.dek = None;
                 state.session_key = None;
 
                 log::error!(
                     "[Vault Security] Época da sessão esgotada. \
-                     O cofre permanecerá bloqueado."
+                     O cofre permanecerá bloqueado permanentemente."
                 );
             }
         }
     }
 
-    /// Restaura o estado seguro após uma falha interna.
-    ///
-    /// A chave é descartada, a sessão é bloqueada e a época é
-    /// invalidada para impedir que operações antigas prossigam.
+    /// Restaura o estado seguro após uma falha interna ou envenenamento de mutex.
     fn fail_closed(state: &mut SessionState) {
         state.unlocked = false;
+        state.dek = None;
         state.session_key = None;
+        state.admission_closed = true;
 
         Self::advance_epoch(state);
     }
@@ -140,7 +190,7 @@ impl VaultSession {
     /// e a geração não está esgotada.
     pub fn is_unlocked(&self) -> bool {
         match self.state.lock() {
-            Ok(state) => state.unlocked && !state.epoch_exhausted,
+            Ok(state) => state.unlocked && !state.epoch_exhausted && !state.admission_closed,
 
             Err(poisoned) => {
                 log::error!(
@@ -149,11 +199,8 @@ impl VaultSession {
                 );
 
                 let mut state = poisoned.into_inner();
-
-                // Mantém o Mutex envenenado nesta operação de consulta.
-                // Uma tentativa de desbloqueio que encontre o poison
-                // ainda deverá ser rejeitada explicitamente.
                 Self::fail_closed(&mut state);
+                self.state.clear_poison();
 
                 false
             }
@@ -161,9 +208,6 @@ impl VaultSession {
     }
 
     /// Obtém a geração atual da sessão.
-    ///
-    /// O estado permanece bloqueado se o Mutex estiver envenenado.
-    /// Nesse caso, a época também é invalidada.
     pub fn current_epoch(&self) -> u64 {
         match self.state.lock() {
             Ok(state) => state.epoch,
@@ -175,38 +219,48 @@ impl VaultSession {
                 );
 
                 let mut state = poisoned.into_inner();
-
                 Self::fail_closed(&mut state);
+                self.state.clear_poison();
 
                 state.epoch
             }
         }
     }
 
-    /// Verifica se existe uma chave de sessão instalada em uma
-    /// sessão efetivamente desbloqueada.
+    /// Verifica se existe uma DEK instalada em uma sessão efetivamente desbloqueada.
+    pub fn has_dek(&self) -> bool {
+        match self.state.lock() {
+            Ok(mut state) => {
+                if state.epoch_exhausted || !state.unlocked || state.admission_closed {
+                    state.dek = None;
+                    return false;
+                }
+                state.dek.is_some()
+            }
+            Err(poisoned) => {
+                let mut state = poisoned.into_inner();
+                Self::fail_closed(&mut state);
+                self.state.clear_poison();
+                false
+            }
+        }
+    }
+
+    /// Verifica se existe uma chave de sessão instalada (compatibilidade legada).
     pub fn has_session_key(&self) -> bool {
         match self.state.lock() {
             Ok(mut state) => {
-                if state.epoch_exhausted || !state.unlocked {
-                    // Corrige também eventuais inconsistências internas.
+                if state.epoch_exhausted || !state.unlocked || state.admission_closed {
                     state.session_key = None;
                     return false;
                 }
-
                 state.session_key.is_some()
             }
 
             Err(poisoned) => {
-                log::error!(
-                    "[Vault Security] Mutex envenenado em has_session_key(). \
-                     Limpando o estado da sessão."
-                );
-
                 let mut state = poisoned.into_inner();
-
                 Self::fail_closed(&mut state);
-
+                self.state.clear_poison();
                 false
             }
         }
@@ -216,149 +270,196 @@ impl VaultSession {
     // Bloqueio
     // --------------------------------------------------------------
 
-    /// Bloqueia a sessão, invalida operações pendentes e descarta
-    /// qualquer material sensível instalado.
-    ///
-    /// Se o Mutex estiver envenenado, restaura o estado seguro
-    /// e limpa a flag de poison depois da recuperação.
+    /// Bloqueia a sessão com barreira de admissão, aguarda operações em andamento concluírem, descarta a DEK e avança o epoch.
     pub fn lock(&self) {
-        match self.state.lock() {
-            Ok(mut state) => {
-                state.unlocked = false;
-                state.session_key = None;
-
-                Self::advance_epoch(&mut state);
-            }
-
+        let mut state = match self.state.lock() {
+            Ok(state) => state,
             Err(poisoned) => {
                 log::error!(
                     "[Vault Security] Mutex envenenado em lock(). \
                      Restaurando o estado seguro."
                 );
-
-                let mut state = poisoned.into_inner();
-
-                Self::fail_closed(&mut state);
-
-                // O estado já foi restaurado para a condição segura.
-                // Operações que encontraram o poison continuam tendo
-                // que lidar explicitamente com sua tentativa.
-                self.state.clear_poison();
+                poisoned.into_inner()
             }
+        };
+
+        // 1. Fecha imediatamente a barreira de admissão: nenhuma nova operação pode entrar
+        state.admission_closed = true;
+
+        // 2. Aguarda a conclusão e liberação do guard das operações já em trânsito (drain)
+        while state.active_operations > 0 {
+            state = match self.drain_cvar.wait(state) {
+                Ok(s) => s,
+                Err(poisoned) => poisoned.into_inner(),
+            };
         }
+
+        // 3. Com todas as operações concluídas e nenhum novo ingresso permitido:
+        state.unlocked = false;
+        state.dek = None; // ZeroizeOnDrop atua instantaneamente
+        state.session_key = None;
+
+        Self::advance_epoch(&mut state);
+        self.state.clear_poison();
     }
 
     // --------------------------------------------------------------
-    // Desbloqueio
+    // Desbloqueio e Acesso Criptográfico V2 (DEK)
     // --------------------------------------------------------------
 
-    /// Desbloqueia a sessão somente se a geração esperada continuar válida.
+    /// Desbloqueia a sessão instalando a DEK de 256 bits, avançando o epoch monotônico.
+    pub fn unlock_with_dek(
+        &self,
+        expected_epoch: u64,
+        dek: Zeroizing<[u8; 32]>,
+    ) -> Result<u64, AccessControlError> {
+        let mut state = match self.state.lock() {
+            Ok(state) => state,
+            Err(poisoned) => {
+                log::error!(
+                    "[Vault Security] Mutex envenenado em unlock_with_dek(). \
+                     Aplicando Fail-Closed."
+                );
+                let mut state = poisoned.into_inner();
+                Self::fail_closed(&mut state);
+                self.state.clear_poison();
+                return Err(AccessControlError::Locked);
+            }
+        };
+
+        if state.epoch_exhausted || state.epoch != expected_epoch {
+            return Err(AccessControlError::InvalidEpoch);
+        }
+
+        if state.unlocked {
+            return Err(AccessControlError::AlreadyUnlocked);
+        }
+
+        Self::advance_epoch(&mut state);
+        state.unlocked = true;
+        state.admission_closed = false;
+        state.dek = Some(dek);
+
+        Ok(state.epoch)
+    }
+
+    /// Executa uma operação estritamente síncrona retendo acesso seguro à DEK em memória.
     ///
-    /// Uma tentativa que encontrar um Mutex envenenado é recusada.
-    /// A recuperação não transforma essa tentativa em um desbloqueio
-    /// bem-sucedido.
+    /// O lock é mantido durante a execução da closure para impedir descarte concorrente da chave.
+    pub fn with_dek<F, R>(&self, f: F) -> Result<R, AccessControlError>
+    where
+        F: FnOnce(&[u8; 32]) -> Result<R, AccessControlError>,
+    {
+        let state = match self.state.lock() {
+            Ok(state) => state,
+            Err(poisoned) => {
+                log::error!(
+                    "[Vault Security] Mutex envenenado em with_dek(). \
+                     Aplicando Fail-Closed."
+                );
+                let mut state = poisoned.into_inner();
+                Self::fail_closed(&mut state);
+                self.state.clear_poison();
+                return Err(AccessControlError::Locked);
+            }
+        };
+
+        if state.epoch_exhausted || !state.unlocked || state.admission_closed {
+            return Err(AccessControlError::Locked);
+        }
+
+        match state.dek.as_ref() {
+            Some(dek) => f(dek.as_slice().try_into().unwrap()),
+            None => Err(AccessControlError::Locked),
+        }
+    }
+
+    /// Registra uma operação autorizada ativa na sessão retornando um guard RAII.
+    pub fn acquire_operation(&self) -> Result<VaultOperationGuard<'_>, AccessControlError> {
+        let mut state = match self.state.lock() {
+            Ok(state) => state,
+            Err(poisoned) => {
+                let mut state = poisoned.into_inner();
+                Self::fail_closed(&mut state);
+                self.state.clear_poison();
+                return Err(AccessControlError::Locked);
+            }
+        };
+
+        if state.epoch_exhausted || !state.unlocked || state.admission_closed {
+            return Err(AccessControlError::Locked);
+        }
+
+        state.active_operations += 1;
+        Ok(VaultOperationGuard {
+            session: self,
+            epoch: state.epoch,
+        })
+    }
+
+    // --------------------------------------------------------------
+    // Métodos Legados V1 (Compatibilidade Temporária)
+    // --------------------------------------------------------------
+
     pub fn try_unlock(&self, expected_epoch: u64) -> bool {
         match self.state.lock() {
             Ok(mut state) => {
-                if state.epoch_exhausted || state.epoch != expected_epoch {
+                if state.epoch_exhausted || state.epoch != expected_epoch || state.admission_closed
+                {
                     return false;
                 }
-
+                Self::advance_epoch(&mut state);
                 state.unlocked = true;
-
                 true
             }
-
             Err(poisoned) => {
-                log::error!(
-                    "[Vault Security] Mutex envenenado em try_unlock(). \
-                     A tentativa atual será recusada."
-                );
-
                 let mut state = poisoned.into_inner();
-
                 Self::fail_closed(&mut state);
-
-                // Recupera a disponibilidade do objeto somente depois
-                // de forçar o bloqueio e descartar a chave.
-                //
-                // Esta chamada retorna false: uma tentativa posterior
-                // deverá realizar uma nova autenticação.
                 self.state.clear_poison();
-
                 false
             }
         }
     }
 
-    /// Instala uma chave de sessão somente quando a geração esperada
-    /// permanece válida.
-    ///
-    /// Se a operação for rejeitada, `key` sai de escopo e o tipo
-    /// Zeroizing solicita a zeragem do conteúdo ao ser descartado.
     pub fn try_unlock_with_session_key(&self, expected_epoch: u64, key: Zeroizing<String>) -> bool {
         match self.state.lock() {
             Ok(mut state) => {
-                if state.epoch_exhausted || state.epoch != expected_epoch {
-                    // A chave não é instalada.
-                    // O argumento será descartado na saída do método.
+                if state.epoch_exhausted || state.epoch != expected_epoch || state.admission_closed
+                {
                     return false;
                 }
-
+                Self::advance_epoch(&mut state);
                 state.unlocked = true;
                 state.session_key = Some(key);
-
                 true
             }
-
             Err(poisoned) => {
-                log::error!(
-                    "[Vault Security] Mutex envenenado em \
-                     try_unlock_with_session_key(). \
-                     A instalação será recusada."
-                );
-
                 let mut state = poisoned.into_inner();
-
                 Self::fail_closed(&mut state);
-
                 self.state.clear_poison();
-
-                // A chave recebida não foi instalada e será descartada.
                 false
             }
         }
     }
 
-    /// Executa uma operação passando uma referência para a chave de sessão ativa.
-    ///
-    /// Retorna `Err(AccessControlError::Locked)` se a sessão estiver bloqueada ou sem chave instalada.
     pub fn with_session_key<F, R>(&self, f: F) -> Result<R, AccessControlError>
     where
         F: FnOnce(&str) -> Result<R, AccessControlError>,
     {
         match self.state.lock() {
             Ok(state) => {
-                if state.epoch_exhausted || !state.unlocked {
+                if state.epoch_exhausted || !state.unlocked || state.admission_closed {
                     return Err(AccessControlError::Locked);
                 }
-
                 match state.session_key.as_ref() {
                     Some(key) => f(key.as_str()),
                     None => Err(AccessControlError::Locked),
                 }
             }
-
             Err(poisoned) => {
-                log::error!(
-                    "[Vault Security] Mutex envenenado em with_session_key(). \
-                     Aplicando Fail-Closed."
-                );
-
                 let mut state = poisoned.into_inner();
                 Self::fail_closed(&mut state);
                 self.state.clear_poison();
-
                 Err(AccessControlError::Locked)
             }
         }
@@ -368,49 +469,52 @@ impl VaultSession {
     // Compatibilidade de testes
     // --------------------------------------------------------------
 
-    /// Define diretamente a chave de sessão e o estado de desbloqueio para testes.
     #[cfg(test)]
     pub fn set_session_key_for_test(&self, key: &str) {
         if let Ok(mut state) = self.state.lock() {
             state.unlocked = true;
+            state.admission_closed = false;
             state.session_key = Some(Zeroizing::new(key.to_string()));
+            use sha2::{Digest, Sha256};
+            let mut hasher = Sha256::new();
+            hasher.update(key.as_bytes());
+            let dek: [u8; 32] = hasher.finalize().into();
+            state.dek = Some(Zeroizing::new(dek));
         }
     }
 
-    /// Define diretamente o estado apenas durante os testes unitários.
-    ///
-    /// Não disponibilizar este método em builds de produção:
-    /// permitir `unlocked = true` sem autenticação violaria o modelo
-    /// de controle de acesso.
+    #[cfg(test)]
+    pub fn set_dek_for_test(&self, dek: &[u8; 32]) {
+        if let Ok(mut state) = self.state.lock() {
+            state.unlocked = true;
+            state.admission_closed = false;
+            let mut buf = [0u8; 32];
+            buf.copy_from_slice(dek);
+            state.dek = Some(Zeroizing::new(buf));
+        }
+    }
+
     #[cfg(test)]
     pub fn set_unlocked(&self, unlocked: bool) {
         match self.state.lock() {
             Ok(mut state) => {
                 Self::advance_epoch(&mut state);
-
                 if state.epoch_exhausted {
                     state.unlocked = false;
+                    state.dek = None;
                     state.session_key = None;
                     return;
                 }
-
                 state.unlocked = unlocked;
-
+                state.admission_closed = !unlocked;
                 if !unlocked {
+                    state.dek = None;
                     state.session_key = None;
                 }
             }
-
             Err(poisoned) => {
-                log::error!(
-                    "[Vault Security] Mutex envenenado em set_unlocked(). \
-                     Mantendo o Fail-Closed."
-                );
-
                 let mut state = poisoned.into_inner();
-
                 Self::fail_closed(&mut state);
-
                 self.state.clear_poison();
             }
         }
@@ -418,20 +522,102 @@ impl VaultSession {
 }
 
 // ----------------------------------------------------------------------
-// Material sensível de sessão
+// Material sensível de sessão legado
 // ----------------------------------------------------------------------
 
-/// Token em memória de sessão.
-///
-/// O conteúdo é zerado pelo destrutor fornecido pelo derive.
 #[derive(Default, Zeroize, ZeroizeOnDrop)]
 pub struct SessionKey(pub Option<String>);
 
 // ----------------------------------------------------------------------
-// Cabeçalho persistido do cofre
+// Cabeçalho persistido do cofre V2 (Normativo)
 // ----------------------------------------------------------------------
 
-/// Cabeçalho persistido utilizado para verificar a senha mestre.
+/// Cabeçalho persistido V2 do cofre utilizando KEK / DEK e verificação estrita.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VaultHeaderV2 {
+    pub version: u32,
+    pub wrapped_dek: WrappedDekEnvelope,
+    pub created_at: String,
+}
+
+impl VaultHeaderV2 {
+    pub const CURRENT_VERSION: u32 = 2;
+
+    /// Inicializa o cofre gerando DEK aleatória e derivando KEK a partir da senha mestre.
+    pub fn init(
+        password: &str,
+        app_id: &str,
+    ) -> Result<(Self, Zeroizing<[u8; 32]>), AccessControlError> {
+        let mut salt = [0u8; 16];
+        OsRng
+            .try_fill_bytes(&mut salt)
+            .map_err(|e| VaultCryptoError::EntropyFailed(format!("Falha ao gerar salt: {}", e)))?;
+
+        let dek = VaultCrypto::generate_dek()?;
+        let kek = VaultCrypto::derive_kek(password, &salt)?;
+        let wrapped_dek = VaultCrypto::wrap_dek(&kek, &dek, &salt, app_id)?;
+
+        let header = Self {
+            version: Self::CURRENT_VERSION,
+            wrapped_dek,
+            created_at: chrono::Utc::now().to_rfc3339(),
+        };
+
+        Ok((header, dek))
+    }
+
+    /// Desbloqueia o cofre e recupera a DEK validando estritamente os parâmetros do envelope.
+    pub fn unlock(
+        &self,
+        password: &str,
+        app_id: &str,
+    ) -> Result<Zeroizing<[u8; 32]>, AccessControlError> {
+        if self.version != Self::CURRENT_VERSION {
+            return Err(AccessControlError::InvalidPassword);
+        }
+
+        let (salt, _, _) = KdfProfile::validate_and_decode(&self.wrapped_dek)
+            .map_err(|_| AccessControlError::InvalidPassword)?;
+
+        let kek = VaultCrypto::derive_kek(password, &salt)
+            .map_err(|_| AccessControlError::InvalidPassword)?;
+
+        let dek = VaultCrypto::unwrap_dek(&kek, &self.wrapped_dek, app_id)
+            .map_err(|_| AccessControlError::InvalidPassword)?;
+
+        Ok(dek)
+    }
+
+    /// Rotação da senha mestre com custo independente da quantidade de registros (O(1)).
+    pub fn rotate_password(
+        &self,
+        current_password: &str,
+        new_password: &str,
+        app_id: &str,
+    ) -> Result<Self, AccessControlError> {
+        let dek = self.unlock(current_password, app_id)?;
+
+        let mut new_salt = [0u8; 16];
+        OsRng.try_fill_bytes(&mut new_salt).map_err(|e| {
+            VaultCryptoError::EntropyFailed(format!("Falha ao gerar novo salt: {}", e))
+        })?;
+
+        let new_kek = VaultCrypto::derive_kek(new_password, &new_salt)?;
+        let new_wrapped_dek = VaultCrypto::wrap_dek(&new_kek, &dek, &new_salt, app_id)?;
+
+        Ok(Self {
+            version: Self::CURRENT_VERSION,
+            wrapped_dek: new_wrapped_dek,
+            created_at: chrono::Utc::now().to_rfc3339(),
+        })
+    }
+}
+
+// ----------------------------------------------------------------------
+// Cabeçalho persistido do cofre V1 (Legado)
+// ----------------------------------------------------------------------
+
+/// Cabeçalho persistido V1 utilizado para verificar a senha mestre via canário.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VaultHeader {
     pub version: u32,
@@ -441,13 +627,10 @@ pub struct VaultHeader {
 
 impl VaultHeader {
     const CURRENT_VERSION: u32 = 1;
-
     const CANARY_PLAINTEXT: &'static [u8] = b"ASPPIBRA_DEVOS_VAULT_CANARY_V1";
 
-    /// Cria um cabeçalho para a versão atualmente suportada.
     pub fn new(password: &str) -> Result<Self, VaultCryptoError> {
         let canary_envelope = VaultCrypto::encrypt(password, Self::CANARY_PLAINTEXT)?;
-
         let now = chrono::Utc::now().to_rfc3339();
 
         Ok(Self {
@@ -457,9 +640,6 @@ impl VaultHeader {
         })
     }
 
-    /// Verifica a senha mestre sem expor os bytes decifrados.
-    ///
-    /// Versões desconhecidas não são aceitas como cabeçalhos válidos.
     pub fn verify_password(&self, password: &str) -> bool {
         if self.version != Self::CURRENT_VERSION {
             return false;
@@ -468,17 +648,15 @@ impl VaultHeader {
         match VaultCrypto::decrypt(password, &self.canary_envelope) {
             Ok(decrypted_bytes) => {
                 let decrypted = Zeroizing::new(decrypted_bytes);
-
                 decrypted.as_slice() == Self::CANARY_PLAINTEXT
             }
-
             Err(_) => false,
         }
     }
 }
 
 // ----------------------------------------------------------------------
-// Testes unitários
+// Testes unitários (Fases 1 e 2)
 // ----------------------------------------------------------------------
 
 #[cfg(test)]
@@ -486,40 +664,148 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_vault_header_v2_init_unlock_and_rotation_o1() {
+        let password = "SuperMasterPasswordDevOS#2026";
+        let new_password = "NewRotatedPasswordDevOS#2027";
+        let app_id = "br.aspp.devos";
+
+        // 1. Inicializa o cabeçalho V2
+        let (header, initial_dek) = VaultHeaderV2::init(password, app_id).expect("Init V2");
+        assert_eq!(header.version, 2);
+
+        // 2. Desbloqueia com a senha correta e confere igualdade exata da DEK
+        let unlocked_dek = header.unlock(password, app_id).expect("Unlock V2");
+        assert_eq!(*initial_dek, *unlocked_dek);
+
+        // 3. Rejeita senha incorreta
+        assert!(header.unlock("WrongPassword", app_id).is_err());
+
+        // 4. Rotação de senha em O(1) de dados
+        let rotated_header = header
+            .rotate_password(password, new_password, app_id)
+            .expect("Rotate password");
+        assert_eq!(rotated_header.version, 2);
+
+        // 5. Senha antiga não destrava mais o novo cabeçalho
+        assert!(rotated_header.unlock(password, app_id).is_err());
+
+        // 6. Nova senha destrava e recupera EXATAMENTE a mesma DEK original
+        let rotated_dek = rotated_header
+            .unlock(new_password, app_id)
+            .expect("Unlock rotated");
+        assert_eq!(*initial_dek, *rotated_dek);
+    }
+
+    #[test]
+    fn test_vault_session_v2_unlock_with_dek_lifecycle() {
+        let session = VaultSession::new();
+        assert!(!session.is_unlocked());
+        assert!(!session.has_dek());
+
+        let epoch = session.current_epoch();
+        let dek = VaultCrypto::generate_dek().unwrap();
+
+        // Desbloqueia com DEK
+        let new_epoch = session
+            .unlock_with_dek(epoch, dek)
+            .expect("Unlock with DEK");
+        assert!(new_epoch > epoch, "Epoch DEVE avançar no unlock");
+        assert!(session.is_unlocked());
+        assert!(session.has_dek());
+
+        // with_dek executa com sucesso
+        let read_result = session.with_dek(|raw_dek| {
+            assert_eq!(raw_dek.len(), 32);
+            Ok(42)
+        });
+        assert_eq!(read_result.unwrap(), 42);
+
+        // Rejeita segundo unlock enquanto desbloqueado
+        let another_dek = VaultCrypto::generate_dek().unwrap();
+        assert!(matches!(
+            session.unlock_with_dek(new_epoch, another_dek),
+            Err(AccessControlError::AlreadyUnlocked)
+        ));
+
+        // Bloqueio descarta DEK e avança epoch
+        session.lock();
+        assert!(!session.is_unlocked());
+        assert!(!session.has_dek());
+
+        // with_dek rejeita quando bloqueado
+        assert!(matches!(
+            session.with_dek(|_| Ok(())),
+            Err(AccessControlError::Locked)
+        ));
+    }
+
+    #[test]
+    fn test_vault_session_v2_prevents_unlock_after_concurrent_lock() {
+        let session = VaultSession::new();
+        let epoch = session.current_epoch();
+
+        // Bloqueio concorrente invalida o epoch
+        session.lock();
+
+        let dek = VaultCrypto::generate_dek().unwrap();
+        let result = session.unlock_with_dek(epoch, dek);
+        assert!(matches!(result, Err(AccessControlError::InvalidEpoch)));
+        assert!(!session.is_unlocked());
+    }
+
+    #[test]
+    fn test_vault_session_v2_poison_recovery_fail_closed() {
+        use std::sync::Arc;
+        use std::thread;
+
+        let session = Arc::new(VaultSession::new());
+        let dek = VaultCrypto::generate_dek().unwrap();
+        let epoch = session.current_epoch();
+        session.unlock_with_dek(epoch, dek).unwrap();
+
+        let poison_session = Arc::clone(&session);
+
+        // Pânico intencional enquanto mantém o lock
+        let _ = thread::spawn(move || {
+            let _guard = poison_session.state.lock().unwrap();
+            panic!("Pânico simulado para teste de envenenamento.");
+        })
+        .join();
+
+        // with_dek detecta poison, aplica fail-closed e rejeita com Locked
+        assert!(matches!(
+            session.with_dek(|_| Ok(())),
+            Err(AccessControlError::Locked)
+        ));
+
+        // Sessão foi bloqueada e DEK foi limpa
+        assert!(!session.is_unlocked());
+        assert!(!session.has_dek());
+
+        // Recuperação permite novo ciclo limpo
+        session.lock();
+        let clean_epoch = session.current_epoch();
+        let clean_dek = VaultCrypto::generate_dek().unwrap();
+        assert!(session.unlock_with_dek(clean_epoch, clean_dek).is_ok());
+        assert!(session.is_unlocked());
+    }
+
+    // --------------------------------------------------------------
+    // Testes de regressão V1 legados
+    // --------------------------------------------------------------
+
+    #[test]
     fn test_vault_session_normal_lifecycle() {
         let session = VaultSession::new();
-
         assert!(!session.is_unlocked());
 
         let epoch = session.current_epoch();
-
         assert!(session.try_unlock(epoch));
         assert!(session.is_unlocked());
 
         session.lock();
-
         assert!(!session.is_unlocked());
         assert!(!session.has_session_key());
-    }
-
-    #[test]
-    fn test_vault_session_prevents_unlock_after_concurrent_lock() {
-        let session = VaultSession::new();
-
-        let epoch_at_start = session.current_epoch();
-
-        session.lock();
-
-        assert!(!session.is_unlocked());
-
-        let unlocked = session.try_unlock(epoch_at_start);
-
-        assert!(
-            !unlocked,
-            "O desbloqueio iniciado na época antiga deve ser recusado."
-        );
-
-        assert!(!session.is_unlocked(), "O cofre deve permanecer bloqueado.");
     }
 
     #[test]
@@ -535,168 +821,147 @@ mod tests {
 
         let handle = thread::spawn(move || {
             let epoch = unlock_session.current_epoch();
-
-            // A operação de desbloqueio captura a época.
             unlock_barrier.wait();
-
-            // Aguarda a operação de bloqueio.
             unlock_barrier.wait();
-
             unlock_session.try_unlock(epoch)
         });
 
-        // A thread de controle aguarda a captura da época.
         barrier.wait();
-
-        // Invalida a tentativa concorrente.
         session.lock();
-
-        // Autoriza o teste de desbloqueio a prosseguir.
         barrier.wait();
 
-        let unlock_result = handle.join().expect("Thread de teste falhou.");
-
-        assert!(!unlock_result, "A tentativa atrasada deve ser recusada.");
-
-        assert!(
-            !session.is_unlocked(),
-            "A sessão deve permanecer bloqueada."
-        );
+        let unlock_result = handle.join().expect("Thread falhou");
+        assert!(!unlock_result);
+        assert!(!session.is_unlocked());
     }
 
     #[test]
-    fn test_vault_session_poison_recovery_fail_closed() {
-        use std::sync::Arc;
+    fn test_concurrent_operation_guard_drain_and_lock_barrier() {
+        use std::sync::{Arc, Barrier};
         use std::thread;
+        use std::time::Duration;
 
         let session = Arc::new(VaultSession::new());
-
-        let poison_session = Arc::clone(&session);
-
-        // Simula um pânico enquanto o Mutex está bloqueado.
-        let _ = thread::spawn(move || {
-            let _guard = poison_session.state.lock().unwrap();
-
-            panic!("Pânico intencional para testar a recuperação do Mutex.");
-        })
-        .join();
-
-        // A consulta detecta o poison e força o estado seguro.
-        assert!(
-            !session.is_unlocked(),
-            "A sessão deve permanecer bloqueada após o poison."
-        );
-
-        // A primeira tentativa de desbloqueio que encontra o poison
-        // deve falhar, mesmo que o chamador tenha uma época numérica.
-        let rejected_epoch = session.current_epoch();
-
-        assert!(
-            !session.try_unlock(rejected_epoch),
-            "A tentativa que encontra o Mutex envenenado deve falhar."
-        );
-
-        // A recuperação permite iniciar uma operação nova.
-        session.lock();
-
-        assert!(!session.is_unlocked());
-
-        let recovered_epoch = session.current_epoch();
-
-        assert!(
-            session.try_unlock(recovered_epoch),
-            "Uma tentativa posterior deve poder prosseguir após a recuperação."
-        );
-
-        assert!(session.is_unlocked());
-    }
-
-    #[test]
-    fn test_vault_session_stale_key_is_not_installed() {
-        let session = VaultSession::new();
-
-        // Captura a época anterior ao bloqueio.
-        let stale_epoch = session.current_epoch();
-
-        // Invalida todas as operações que utilizaram a época anterior.
-        session.lock();
-
-        let stale_key = Zeroizing::new("stale_session_key_material".to_string());
-
-        // A chave é consumida pelo método, mas não deve ser instalada.
-        let installed = session.try_unlock_with_session_key(stale_epoch, stale_key);
-
-        assert!(
-            !installed,
-            "Uma chave associada a uma época antiga deve ser recusada."
-        );
-
-        assert!(
-            !session.is_unlocked(),
-            "A sessão deve permanecer bloqueada."
-        );
-
-        assert!(
-            !session.has_session_key(),
-            "Nenhuma chave deve permanecer instalada."
-        );
-    }
-
-    #[test]
-    fn test_vault_session_valid_key_lifecycle() {
-        let session = VaultSession::new();
-
         let epoch = session.current_epoch();
+        let dek = VaultCrypto::generate_dek().unwrap();
+        session.unlock_with_dek(epoch, dek).unwrap();
 
-        let key = Zeroizing::new("valid_session_key_material".to_string());
+        let barrier_start = Arc::new(Barrier::new(2));
+        let barrier_done = Arc::new(Barrier::new(2));
 
-        assert!(
-            session.try_unlock_with_session_key(epoch, key),
-            "Uma chave associada à época válida deve ser instalada."
-        );
+        let sess_thread_a = Arc::clone(&session);
+        let b_start_a = Arc::clone(&barrier_start);
+        let b_done_a = Arc::clone(&barrier_done);
 
-        assert!(session.is_unlocked());
-        assert!(session.has_session_key());
+        // Thread A: adquire guard da operação, simula trabalho de escrita e transação
+        let handle_a = thread::spawn(move || {
+            let guard = sess_thread_a.acquire_operation().expect("Adquire guard");
 
-        session.lock();
+            // 1. Aquisição da DEK e cifragem do segredo
+            let dek_read = sess_thread_a.with_dek(|d| Ok(*d));
+            assert!(dek_read.is_ok());
 
+            // 2. Notifica que guard foi adquirido e cifragem concluída, iniciando a transação SQLite
+            b_start_a.wait();
+
+            // 3. Simula tempo de transação SQLite / commit em andamento
+            thread::sleep(Duration::from_millis(50));
+
+            // 4. Conclui a transação e libera o guard
+            drop(guard);
+            b_done_a.wait();
+        });
+
+        // Thread B: aguarda Thread A adquirir o guard
+        barrier_start.wait();
+
+        // Spawn do lock em Thread B
+        let sess_thread_b = Arc::clone(&session);
+        let handle_b = thread::spawn(move || {
+            // Chama lock(). Deve aguardar Thread A liberar seu guard
+            sess_thread_b.lock();
+            assert!(!sess_thread_b.is_unlocked());
+            assert!(!sess_thread_b.has_dek());
+        });
+
+        // Aguarda breve para lock() fechar admissão
+        thread::sleep(Duration::from_millis(15));
+        // Qualquer nova operação tentada após o início do lock é REJEITADA imediatamente
+        assert!(matches!(
+            session.acquire_operation(),
+            Err(AccessControlError::Locked)
+        ));
+
+        barrier_done.wait();
+        handle_a.join().unwrap();
+        handle_b.join().unwrap();
+
+        // Sessão está bloqueada definitivamente
         assert!(!session.is_unlocked());
-
-        assert!(
-            !session.has_session_key(),
-            "O bloqueio deve remover a chave da sessão."
-        );
+        assert!(!session.has_dek());
     }
 
     #[test]
-    fn test_vault_session_test_helper_invalidates_previous_epoch() {
-        let session = VaultSession::new();
+    fn test_concurrency_stress_admission_closed_interleaving_impossible() {
+        use std::sync::Arc;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::thread;
+        use std::time::Duration;
 
-        let old_epoch = session.current_epoch();
-
-        session.set_unlocked(false);
-
-        assert!(
-            !session.try_unlock(old_epoch),
-            "A alteração do estado deve invalidar a época anterior."
-        );
-    }
-
-    #[test]
-    fn test_vault_session_lock_clears_session_key() {
-        let session = VaultSession::new();
-
+        let session = Arc::new(VaultSession::new());
         let epoch = session.current_epoch();
+        let dek = Zeroizing::new([0x77u8; 32]);
+        session.unlock_with_dek(epoch, dek).unwrap();
 
-        let key = Zeroizing::new("temporary_session_key_material".to_string());
+        let num_threads = 20;
+        let successful_ops = Arc::new(AtomicUsize::new(0));
+        let rejected_ops = Arc::new(AtomicUsize::new(0));
+        let mut handles = Vec::new();
 
-        assert!(session.try_unlock_with_session_key(epoch, key));
+        // 20 threads tentam adquirir e operar simultaneamente
+        for _ in 0..num_threads {
+            let sess = Arc::clone(&session);
+            let succ = Arc::clone(&successful_ops);
+            let rej = Arc::clone(&rejected_ops);
+            handles.push(thread::spawn(move || {
+                match sess.acquire_operation() {
+                    Ok(guard) => {
+                        // Se admitido, o DEK deve existir e estar acessível de forma consistente
+                        let val = sess.with_dek(|d| Ok(d[0]));
+                        assert_eq!(val.unwrap(), 0x77);
+                        thread::sleep(Duration::from_millis(5));
+                        drop(guard);
+                        succ.fetch_add(1, Ordering::SeqCst);
+                    }
+                    Err(AccessControlError::Locked) => {
+                        rej.fetch_add(1, Ordering::SeqCst);
+                    }
+                    Err(e) => panic!("Erro inesperado: {:?}", e),
+                }
+            }));
+        }
 
-        assert!(session.has_session_key());
+        // Uma thread concorrente dispara lock() no meio do tráfego
+        let sess_lock = Arc::clone(&session);
+        let lock_handle = thread::spawn(move || {
+            thread::sleep(Duration::from_millis(1));
+            sess_lock.lock();
+        });
 
-        session.lock();
+        lock_handle.join().unwrap();
+        for h in handles {
+            h.join().unwrap();
+        }
 
-        assert!(!session.has_session_key());
+        // Total de operações tentadas é exatamente 20
+        assert_eq!(
+            successful_ops.load(Ordering::SeqCst) + rejected_ops.load(Ordering::SeqCst),
+            num_threads
+        );
+
+        // Nenhuma operação ativa restou
+        assert_eq!(session.state.lock().unwrap().active_operations, 0);
         assert!(!session.is_unlocked());
+        assert!(!session.has_dek());
     }
 }

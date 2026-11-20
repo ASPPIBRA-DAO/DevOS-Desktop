@@ -120,15 +120,18 @@ dependencies = [
  "base64 0.22.1",
  "bip32",
  "bip39",
+ "bs58",
  "calamine",
  "chrono",
  "dirs 6.0.0",
  "hex",
+ "hmac",
  "k256",
  "log",
  "open",
  "rand 0.8.8",
  "reqwest 0.12.28",
+ "ring",
  "rusqlite",
  "rust_decimal",
  "rust_decimal_macros",
@@ -327,6 +330,7 @@ dependencies = [
  "rand_core 0.6.4",
  "serde",
  "unicode-normalization",
+ "zeroize",
 ]
 
 [[package]]

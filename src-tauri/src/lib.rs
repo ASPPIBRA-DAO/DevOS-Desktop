@@ -1,3 +1,16 @@
+#![allow(
+    clippy::collapsible_if,
+    clippy::derivable_impls,
+    clippy::implicit_saturating_sub,
+    clippy::too_many_arguments,
+    clippy::type_complexity,
+    clippy::needless_borrows_for_generic_args,
+    clippy::bool_assert_comparison,
+    clippy::field_reassign_with_default,
+    clippy::redundant_closure,
+    clippy::identity_op
+)]
+
 use std::error::Error;
 use std::fmt::Display;
 use std::io;

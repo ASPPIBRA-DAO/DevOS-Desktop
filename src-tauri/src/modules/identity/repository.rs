@@ -3,13 +3,12 @@
 //! Apenas o envelope criptográfico (AEAD AES-256-GCM) é persistido no banco local.
 //! Nenhum dado pessoal em claro é armazenado em tabelas, colunas ou índices.
 
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{Connection, OptionalExtension, params};
 
-use crate::modules::vault::encryption::EncryptedEnvelope;
 use crate::storage::local_database::StorageError;
 
 pub struct StoredProfileRecord {
-    pub envelope: EncryptedEnvelope,
+    pub raw_envelope: String,
     pub payload_version: u32,
     pub revision: u64,
     pub created_at: String,
@@ -30,21 +29,14 @@ impl IdentityRepository {
                  WHERE id = 1",
                 [],
                 |row| {
-                    let envelope_json: String = row.get(0)?;
+                    let raw_envelope: String = row.get(0)?;
                     let payload_version: u32 = row.get(1)?;
                     let revision: u64 = row.get(2)?;
                     let created_at: String = row.get(3)?;
                     let updated_at: String = row.get(4)?;
 
-                    let envelope: EncryptedEnvelope = serde_json::from_str(&envelope_json)
-                        .map_err(|e| rusqlite::Error::FromSqlConversionFailure(
-                            0,
-                            rusqlite::types::Type::Text,
-                            Box::new(e),
-                        ))?;
-
                     Ok(StoredProfileRecord {
-                        envelope,
+                        raw_envelope,
                         payload_version,
                         revision,
                         created_at,
@@ -60,12 +52,9 @@ impl IdentityRepository {
     /// Salva ou atualiza atomicamente o envelope criptografado com verificação de concorrência otimista.
     pub fn save_profile_record(
         conn: &mut Connection,
-        envelope: &EncryptedEnvelope,
+        envelope_json: &str,
         expected_revision: Option<u64>,
     ) -> Result<u64, StorageError> {
-        let envelope_json = serde_json::to_string(envelope)
-            .map_err(|e| StorageError::InvalidData(format!("Falha na serialização do envelope: {}", e)))?;
-
         let tx = conn.transaction()?;
 
         let current_revision: Option<u64> = tx

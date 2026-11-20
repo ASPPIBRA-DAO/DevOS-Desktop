@@ -1,4 +1,4 @@
-use bip32::{DerivationPath, XPrv};
+use bip32::{ChildNumber, DerivationPath, XPrv};
 use k256::PublicKey;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -28,8 +28,9 @@ pub struct DerivedWalletPreview {
 pub struct DerivationService;
 
 impl DerivationService {
-    /// Deriva a chave estendida privada a partir da seed de 64 bytes e do caminho BIP-44
-    pub fn derive_xprv(seed: &[u8; 64], path_str: &str) -> Result<XPrv, DerivationError> {
+    /// Deriva a chave estendida privada a partir da seed de 64 bytes e do caminho BIP-44.
+    /// Encapsulado como `pub(crate)` para não vazar material criptográfico além da fronteira do módulo.
+    pub(crate) fn derive_xprv(seed: &[u8; 64], path_str: &str) -> Result<XPrv, DerivationError> {
         let path = DerivationPath::from_str(path_str)
             .map_err(|e| DerivationError::InvalidPath(format!("{}: {}", path_str, e)))?;
 
@@ -47,7 +48,8 @@ impl DerivationService {
     }
 
     /// Deriva um lote de carteiras EVM para um ramo de conta e índices especificados.
-    /// Exemplo: `m/44'/60'/{account_branch}'/0/{index}`
+    /// Exemplo: `m/44'/60'/{account_branch}'/0/{index}`.
+    /// Otimizado: deriva o nó pai da conta uma única vez e deriva cada filho a partir dele.
     pub fn derive_batch(
         seed: &[u8; 64],
         account_branch: u32,
@@ -55,11 +57,24 @@ impl DerivationService {
         base_label: &str,
         network: &str,
     ) -> Result<Vec<DerivedWalletPreview>, DerivationError> {
+        let parent_path_str = format!("m/44'/60'/{}'/0", account_branch);
+        let parent_xprv = Self::derive_xprv(seed, &parent_path_str)?;
+
         let mut previews = Vec::with_capacity(count as usize);
 
         for i in 0..count {
-            let path_str = format!("m/44'/60'/{}'/0/{}", account_branch, i);
-            let address = Self::derive_address(seed, &path_str)?;
+            let child_number = ChildNumber::new(i, false)
+                .map_err(|e| DerivationError::Bip32Error(e.to_string()))?;
+            let child_xprv = parent_xprv
+                .derive_child(child_number)
+                .map_err(|e| DerivationError::Bip32Error(e.to_string()))?;
+
+            let pubkey_bytes = child_xprv.public_key().to_bytes();
+            let public_key = PublicKey::from_sec1_bytes(&pubkey_bytes)
+                .map_err(|e| DerivationError::KeyError(e.to_string()))?;
+            let address = public_key_to_address(&public_key);
+
+            let path_str = format!("{}/{}", parent_path_str, i);
             let label = if base_label.trim().is_empty() {
                 format!("Conta #{}", i + 1)
             } else {

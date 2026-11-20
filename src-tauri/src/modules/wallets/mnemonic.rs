@@ -1,5 +1,6 @@
 use bip39::{Language, Mnemonic};
 use serde::{Deserialize, Serialize};
+use zeroize::Zeroizing;
 
 #[derive(Debug, thiserror::Error)]
 pub enum MnemonicError {
@@ -30,15 +31,16 @@ impl MnemonicService {
         Mnemonic::parse_in_normalized(Language::English, phrase).is_ok()
     }
 
-    /// Deriva a seed binária de 64 bytes a partir da frase mnemônica e passphrase opcional
-    pub fn to_seed(phrase: &str, passphrase: &str) -> Result<[u8; 64], MnemonicError> {
+    /// Deriva a seed binária de 64 bytes a partir da frase mnemônica e passphrase opcional,
+    /// garantindo a limpeza segura da memória ao ser descartada (Zeroizing).
+    pub fn to_seed(phrase: &str, passphrase: &str) -> Result<Zeroizing<[u8; 64]>, MnemonicError> {
         let mnemonic = Mnemonic::parse_in_normalized(Language::English, phrase)
             .map_err(|e| MnemonicError::ParseError(e.to_string()))?;
 
         let seed = mnemonic.to_seed(passphrase);
         let mut seed_bytes = [0u8; 64];
         seed_bytes.copy_from_slice(&seed);
-        Ok(seed_bytes)
+        Ok(Zeroizing::new(seed_bytes))
     }
 }
 

@@ -7,17 +7,20 @@ use url::Url;
 use zeroize::Zeroizing;
 
 use super::models::{
+    PERSON_TYPE_PF, PERSON_TYPE_PJ, SaveUserProfileRequest, SocialLinksDto, UserProfileDto,
     calculate_completeness_score, validate_and_normalize_date, validate_cep, validate_cnpj,
-    validate_cpf, SaveUserProfileRequest, SocialLinksDto, UserProfileDto, PERSON_TYPE_PF, PERSON_TYPE_PJ,
+    validate_cpf,
 };
 use super::repository::IdentityRepository;
 use crate::modules::vault::access_control::VaultSession;
-use crate::modules::vault::encryption::VaultCrypto;
+use crate::modules::vault::encryption::{AadDomain, AeadEnvelope, Subkeys, VaultCrypto};
 use crate::storage::local_database::{LocalDatabase, StorageError};
 
 #[derive(Debug, thiserror::Error)]
 pub enum IdentityError {
-    #[error("VAULT_LOCKED: O cofre seguro está bloqueado. Desbloqueie com a senha mestre para acessar os dados.")]
+    #[error(
+        "VAULT_LOCKED: O cofre seguro está bloqueado. Desbloqueie com a senha mestre para acessar os dados."
+    )]
     VaultLocked,
 
     #[error("VALIDATION_ERROR: {0}")]
@@ -51,7 +54,13 @@ pub fn normalize_username(raw: &str) -> String {
     let lower = raw.trim().to_lowercase();
     let sanitized: String = lower
         .chars()
-        .map(|c| if c.is_ascii_alphanumeric() || c == '_' { c } else { '_' })
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect();
     let mut result = String::new();
     let mut last_was_underscore = false;
@@ -133,20 +142,9 @@ pub fn sanitize_social_url(
             "fb.com",
             "www.fb.com",
         ],
-        "instagram" => &[
-            "instagram.com",
-            "www.instagram.com",
-        ],
-        "linkedin" => &[
-            "linkedin.com",
-            "www.linkedin.com",
-        ],
-        "twitter" => &[
-            "x.com",
-            "www.x.com",
-            "twitter.com",
-            "www.twitter.com",
-        ],
+        "instagram" => &["instagram.com", "www.instagram.com"],
+        "linkedin" => &["linkedin.com", "www.linkedin.com"],
+        "twitter" => &["x.com", "www.x.com", "twitter.com", "www.twitter.com"],
         _ => {
             return Err(IdentityError::Validation(
                 "Plataforma de rede social não autorizada.".to_string(),
@@ -199,7 +197,8 @@ impl IdentityService {
                 let norm = normalize_username(u);
                 if norm.len() < 3 || norm.len() > 30 {
                     return Err(IdentityError::Validation(
-                        "O username deve ter entre 3 e 30 caracteres alfanuméricos ou sublinhados.".to_string(),
+                        "O username deve ter entre 3 e 30 caracteres alfanuméricos ou sublinhados."
+                            .to_string(),
                     ));
                 }
                 norm
@@ -213,17 +212,26 @@ impl IdentityService {
         let first_name = if !req.first_name.trim().is_empty() {
             req.first_name.trim().to_string()
         } else {
-            existing_profile.as_ref().map(|p| p.first_name.clone()).unwrap_or_default()
+            existing_profile
+                .as_ref()
+                .map(|p| p.first_name.clone())
+                .unwrap_or_default()
         };
         let last_name = if !req.last_name.trim().is_empty() {
             req.last_name.trim().to_string()
         } else {
-            existing_profile.as_ref().map(|p| p.last_name.clone()).unwrap_or_default()
+            existing_profile
+                .as_ref()
+                .map(|p| p.last_name.clone())
+                .unwrap_or_default()
         };
         let company_name = if !req.company_name.trim().is_empty() {
             req.company_name.trim().to_string()
         } else {
-            existing_profile.as_ref().map(|p| p.company_name.clone()).unwrap_or_default()
+            existing_profile
+                .as_ref()
+                .map(|p| p.company_name.clone())
+                .unwrap_or_default()
         };
 
         let display_name = match &req.display_name {
@@ -280,8 +288,9 @@ impl IdentityService {
                 &req.legal_representative_cpf
             };
             let validated_rep_cpf = if !raw_rep_cpf.trim().is_empty() {
-                validate_cpf(raw_rep_cpf)
-                    .map_err(|e| IdentityError::Validation(format!("CPF do representante inválido: {}", e)))?
+                validate_cpf(raw_rep_cpf).map_err(|e| {
+                    IdentityError::Validation(format!("CPF do representante inválido: {}", e))
+                })?
             } else {
                 String::new()
             };
@@ -289,27 +298,95 @@ impl IdentityService {
             let legal_rep = if !req.legal_representative.trim().is_empty() {
                 req.legal_representative.trim().to_string()
             } else {
-                existing_profile.as_ref().map(|p| p.legal_representative.clone()).unwrap_or_default()
+                existing_profile
+                    .as_ref()
+                    .map(|p| p.legal_representative.clone())
+                    .unwrap_or_default()
             };
 
             // Preservação ou atualização de dados de PF em modo PJ
             let pf_cpf = if !req.cpf.trim().is_empty() {
-                validate_cpf(&req.cpf).unwrap_or_else(|_| existing_profile.as_ref().map(|p| p.cpf.clone()).unwrap_or_default())
+                validate_cpf(&req.cpf).unwrap_or_else(|_| {
+                    existing_profile
+                        .as_ref()
+                        .map(|p| p.cpf.clone())
+                        .unwrap_or_default()
+                })
             } else {
-                existing_profile.as_ref().map(|p| p.cpf.clone()).unwrap_or_default()
+                existing_profile
+                    .as_ref()
+                    .map(|p| p.cpf.clone())
+                    .unwrap_or_default()
             };
-            let pf_rg = if !req.rg.trim().is_empty() { req.rg.trim().to_string() } else { existing_profile.as_ref().map(|p| p.rg.clone()).unwrap_or_default() };
-            let pf_rg_issuer = if !req.rg_issuer.trim().is_empty() { req.rg_issuer.trim().to_string() } else { existing_profile.as_ref().map(|p| p.rg_issuer.clone()).unwrap_or_default() };
-            let pf_cnh = if !req.cnh.trim().is_empty() { req.cnh.trim().to_string() } else { existing_profile.as_ref().map(|p| p.cnh.clone()).unwrap_or_default() };
-            let pf_cnh_cat = if !req.cnh_category.trim().is_empty() { req.cnh_category.trim().to_string() } else { existing_profile.as_ref().map(|p| p.cnh_category.clone()).unwrap_or_default() };
-            let pf_mother = if !req.mother_name.trim().is_empty() { req.mother_name.trim().to_string() } else { existing_profile.as_ref().map(|p| p.mother_name.clone()).unwrap_or_default() };
-            let pf_father = if !req.father_name.trim().is_empty() { req.father_name.trim().to_string() } else { existing_profile.as_ref().map(|p| p.father_name.clone()).unwrap_or_default() };
+            let pf_rg = if !req.rg.trim().is_empty() {
+                req.rg.trim().to_string()
+            } else {
+                existing_profile
+                    .as_ref()
+                    .map(|p| p.rg.clone())
+                    .unwrap_or_default()
+            };
+            let pf_rg_issuer = if !req.rg_issuer.trim().is_empty() {
+                req.rg_issuer.trim().to_string()
+            } else {
+                existing_profile
+                    .as_ref()
+                    .map(|p| p.rg_issuer.clone())
+                    .unwrap_or_default()
+            };
+            let pf_cnh = if !req.cnh.trim().is_empty() {
+                req.cnh.trim().to_string()
+            } else {
+                existing_profile
+                    .as_ref()
+                    .map(|p| p.cnh.clone())
+                    .unwrap_or_default()
+            };
+            let pf_cnh_cat = if !req.cnh_category.trim().is_empty() {
+                req.cnh_category.trim().to_string()
+            } else {
+                existing_profile
+                    .as_ref()
+                    .map(|p| p.cnh_category.clone())
+                    .unwrap_or_default()
+            };
+            let pf_mother = if !req.mother_name.trim().is_empty() {
+                req.mother_name.trim().to_string()
+            } else {
+                existing_profile
+                    .as_ref()
+                    .map(|p| p.mother_name.clone())
+                    .unwrap_or_default()
+            };
+            let pf_father = if !req.father_name.trim().is_empty() {
+                req.father_name.trim().to_string()
+            } else {
+                existing_profile
+                    .as_ref()
+                    .map(|p| p.father_name.clone())
+                    .unwrap_or_default()
+            };
             let pf_birth = if !req.birth_date.trim().is_empty() {
-                validate_and_normalize_date(&req.birth_date).unwrap_or_else(|_| existing_profile.as_ref().map(|p| p.birth_date.clone()).unwrap_or_default())
+                validate_and_normalize_date(&req.birth_date).unwrap_or_else(|_| {
+                    existing_profile
+                        .as_ref()
+                        .map(|p| p.birth_date.clone())
+                        .unwrap_or_default()
+                })
             } else {
-                existing_profile.as_ref().map(|p| p.birth_date.clone()).unwrap_or_default()
+                existing_profile
+                    .as_ref()
+                    .map(|p| p.birth_date.clone())
+                    .unwrap_or_default()
             };
-            let pf_marital = if !req.marital_status.trim().is_empty() { req.marital_status.trim().to_string() } else { existing_profile.as_ref().map(|p| p.marital_status.clone()).unwrap_or_default() };
+            let pf_marital = if !req.marital_status.trim().is_empty() {
+                req.marital_status.trim().to_string()
+            } else {
+                existing_profile
+                    .as_ref()
+                    .map(|p| p.marital_status.clone())
+                    .unwrap_or_default()
+            };
 
             (
                 pf_cpf,
@@ -346,35 +423,104 @@ impl IdentityService {
                 &req.birth_date
             };
             let validated_birth = if !raw_birth.trim().is_empty() {
-                validate_and_normalize_date(raw_birth)
-                    .map_err(|e| IdentityError::Validation(format!("Data de nascimento inválida: {}", e)))?
+                validate_and_normalize_date(raw_birth).map_err(|e| {
+                    IdentityError::Validation(format!("Data de nascimento inválida: {}", e))
+                })?
             } else {
                 String::new()
             };
 
-            let pf_rg = if !req.rg.trim().is_empty() { req.rg.trim().to_string() } else { existing_profile.as_ref().map(|p| p.rg.clone()).unwrap_or_default() };
-            let pf_rg_issuer = if !req.rg_issuer.trim().is_empty() { req.rg_issuer.trim().to_string() } else { existing_profile.as_ref().map(|p| p.rg_issuer.clone()).unwrap_or_default() };
-            let pf_cnh = if !req.cnh.trim().is_empty() { req.cnh.trim().to_string() } else { existing_profile.as_ref().map(|p| p.cnh.clone()).unwrap_or_default() };
-            let pf_cnh_cat = if !req.cnh_category.trim().is_empty() { req.cnh_category.trim().to_string() } else { existing_profile.as_ref().map(|p| p.cnh_category.clone()).unwrap_or_default() };
-            let pf_mother = if !req.mother_name.trim().is_empty() { req.mother_name.trim().to_string() } else { existing_profile.as_ref().map(|p| p.mother_name.clone()).unwrap_or_default() };
-            let pf_father = if !req.father_name.trim().is_empty() { req.father_name.trim().to_string() } else { existing_profile.as_ref().map(|p| p.father_name.clone()).unwrap_or_default() };
-            let pf_marital = if !req.marital_status.trim().is_empty() { req.marital_status.trim().to_string() } else { existing_profile.as_ref().map(|p| p.marital_status.clone()).unwrap_or_default() };
+            let pf_rg = if !req.rg.trim().is_empty() {
+                req.rg.trim().to_string()
+            } else {
+                existing_profile
+                    .as_ref()
+                    .map(|p| p.rg.clone())
+                    .unwrap_or_default()
+            };
+            let pf_rg_issuer = if !req.rg_issuer.trim().is_empty() {
+                req.rg_issuer.trim().to_string()
+            } else {
+                existing_profile
+                    .as_ref()
+                    .map(|p| p.rg_issuer.clone())
+                    .unwrap_or_default()
+            };
+            let pf_cnh = if !req.cnh.trim().is_empty() {
+                req.cnh.trim().to_string()
+            } else {
+                existing_profile
+                    .as_ref()
+                    .map(|p| p.cnh.clone())
+                    .unwrap_or_default()
+            };
+            let pf_cnh_cat = if !req.cnh_category.trim().is_empty() {
+                req.cnh_category.trim().to_string()
+            } else {
+                existing_profile
+                    .as_ref()
+                    .map(|p| p.cnh_category.clone())
+                    .unwrap_or_default()
+            };
+            let pf_mother = if !req.mother_name.trim().is_empty() {
+                req.mother_name.trim().to_string()
+            } else {
+                existing_profile
+                    .as_ref()
+                    .map(|p| p.mother_name.clone())
+                    .unwrap_or_default()
+            };
+            let pf_father = if !req.father_name.trim().is_empty() {
+                req.father_name.trim().to_string()
+            } else {
+                existing_profile
+                    .as_ref()
+                    .map(|p| p.father_name.clone())
+                    .unwrap_or_default()
+            };
+            let pf_marital = if !req.marital_status.trim().is_empty() {
+                req.marital_status.trim().to_string()
+            } else {
+                existing_profile
+                    .as_ref()
+                    .map(|p| p.marital_status.clone())
+                    .unwrap_or_default()
+            };
 
             // Preservação ou atualização de dados PJ em modo PF
             let pj_cnpj = if !req.cnpj.trim().is_empty() {
-                validate_cnpj(&req.cnpj).unwrap_or_else(|_| existing_profile.as_ref().map(|p| p.cnpj.clone()).unwrap_or_default())
+                validate_cnpj(&req.cnpj).unwrap_or_else(|_| {
+                    existing_profile
+                        .as_ref()
+                        .map(|p| p.cnpj.clone())
+                        .unwrap_or_default()
+                })
             } else {
-                existing_profile.as_ref().map(|p| p.cnpj.clone()).unwrap_or_default()
+                existing_profile
+                    .as_ref()
+                    .map(|p| p.cnpj.clone())
+                    .unwrap_or_default()
             };
             let pj_legal_rep = if !req.legal_representative.trim().is_empty() {
                 req.legal_representative.trim().to_string()
             } else {
-                existing_profile.as_ref().map(|p| p.legal_representative.clone()).unwrap_or_default()
+                existing_profile
+                    .as_ref()
+                    .map(|p| p.legal_representative.clone())
+                    .unwrap_or_default()
             };
             let pj_legal_rep_cpf = if !req.legal_representative_cpf.trim().is_empty() {
-                validate_cpf(&req.legal_representative_cpf).unwrap_or_else(|_| existing_profile.as_ref().map(|p| p.legal_representative_cpf.clone()).unwrap_or_default())
+                validate_cpf(&req.legal_representative_cpf).unwrap_or_else(|_| {
+                    existing_profile
+                        .as_ref()
+                        .map(|p| p.legal_representative_cpf.clone())
+                        .unwrap_or_default()
+                })
             } else {
-                existing_profile.as_ref().map(|p| p.legal_representative_cpf.clone()).unwrap_or_default()
+                existing_profile
+                    .as_ref()
+                    .map(|p| p.legal_representative_cpf.clone())
+                    .unwrap_or_default()
             };
 
             (
@@ -420,7 +566,11 @@ impl IdentityService {
             mother_name,
             father_name,
             birth_date,
-            nationality: if req.nationality.trim().is_empty() { "Brasileira".to_string() } else { req.nationality.trim().to_string() },
+            nationality: if req.nationality.trim().is_empty() {
+                "Brasileira".to_string()
+            } else {
+                req.nationality.trim().to_string()
+            },
             marital_status,
             company_name: final_company_name,
             cnpj,
@@ -428,7 +578,11 @@ impl IdentityService {
             legal_representative_cpf,
             email: req.email.trim().to_string(),
             phone_number: req.phone_number.trim().to_string(),
-            country: if req.country.trim().is_empty() { "Brasil".to_string() } else { req.country.trim().to_string() },
+            country: if req.country.trim().is_empty() {
+                "Brasil".to_string()
+            } else {
+                req.country.trim().to_string()
+            },
             zip_code,
             state: req.state.trim().to_string(),
             city: req.city.trim().to_string(),
@@ -463,6 +617,9 @@ impl IdentityService {
         if !session.is_unlocked() {
             return Err(IdentityError::VaultLocked);
         }
+        let _op_guard = session
+            .acquire_operation()
+            .map_err(|_| IdentityError::VaultLocked)?;
 
         let conn = db.get_connection()?;
         let record = match IdentityRepository::get_profile_record(&conn)? {
@@ -470,19 +627,30 @@ impl IdentityService {
             None => return Ok(None),
         };
 
-        // Decifra o envelope com a chave da sessão ativa
+        let aad = AadDomain::UserProfile {
+            profile_id: 1,
+            vault_instance_id: "default",
+        }
+        .to_canonical_bytes();
+
+        // Decifra o envelope com a subchave DEVOS/IDENTITY/V2 através da DEK da sessão
         let decrypted_bytes = session
-            .with_session_key(|key| {
-                VaultCrypto::decrypt(key, &record.envelope).map_err(|_| {
-                    crate::modules::vault::access_control::AccessControlError::Locked
-                })
+            .with_dek(|dek| {
+                let identity_key = Subkeys::derive_identity_key(dek);
+                if let Ok(aead) = serde_json::from_str::<AeadEnvelope>(&record.raw_envelope) {
+                    VaultCrypto::decrypt_with_aead(&identity_key, &aead, &aad).map_err(|e| {
+                        crate::modules::vault::access_control::AccessControlError::Crypto(e)
+                    })
+                } else {
+                    Err(crate::modules::vault::access_control::AccessControlError::Locked)
+                }
             })
             .map_err(|_| IdentityError::Crypto)?;
 
         let decrypted_zero = Zeroizing::new(decrypted_bytes);
 
-        let mut profile: UserProfileDto = serde_json::from_slice(&decrypted_zero)
-            .map_err(|_| IdentityError::Serialization)?;
+        let mut profile: UserProfileDto =
+            serde_json::from_slice(&decrypted_zero).map_err(|_| IdentityError::Serialization)?;
 
         profile.revision = record.revision;
         profile.updated_at = record.updated_at;
@@ -491,7 +659,7 @@ impl IdentityService {
         Ok(Some(profile))
     }
 
-    /// Salva ou atualiza os dados do perfil cifrando-os com a chave de sessão e persistindo no SQLite.
+    /// Salva ou atualiza os dados do perfil cifrando-os com a subchave de identidade e persistindo no SQLite.
     pub fn save_profile(
         db: &LocalDatabase,
         session: &VaultSession,
@@ -500,32 +668,45 @@ impl IdentityService {
         if !session.is_unlocked() {
             return Err(IdentityError::VaultLocked);
         }
+        let _op_guard = session
+            .acquire_operation()
+            .map_err(|_| IdentityError::VaultLocked)?;
 
         let existing = Self::get_profile(db, session)?;
         let expected_revision = req.expected_revision;
         let mut profile = Self::sanitize_and_validate(&req, existing.as_ref())?;
 
-        let payload_json = Zeroizing::new(
-            serde_json::to_vec(&profile).map_err(|_| IdentityError::Serialization)?
-        );
+        let payload_json =
+            Zeroizing::new(serde_json::to_vec(&profile).map_err(|_| IdentityError::Serialization)?);
 
-        // Cifra os dados com a chave do cofre em memória
+        let aad = AadDomain::UserProfile {
+            profile_id: 1,
+            vault_instance_id: "default",
+        }
+        .to_canonical_bytes();
+
+        // Cifra os dados com a subchave DEVOS/IDENTITY/V2
         let envelope = session
-            .with_session_key(|key| {
-                VaultCrypto::encrypt(key, &payload_json).map_err(|_| {
-                    crate::modules::vault::access_control::AccessControlError::Locked
+            .with_dek(|dek| {
+                let identity_key = Subkeys::derive_identity_key(dek);
+                VaultCrypto::encrypt_with_aead(&identity_key, &payload_json, &aad).map_err(|e| {
+                    crate::modules::vault::access_control::AccessControlError::Crypto(e)
                 })
             })
             .map_err(|_| IdentityError::Crypto)?;
 
+        let envelope_json =
+            serde_json::to_string(&envelope).map_err(|_| IdentityError::Serialization)?;
+
         let mut conn = db.get_connection()?;
-        let new_revision = IdentityRepository::save_profile_record(&mut conn, &envelope, expected_revision)?;
+        let new_revision =
+            IdentityRepository::save_profile_record(&mut conn, &envelope_json, expected_revision)?;
 
         profile.revision = new_revision;
         profile.updated_at = chrono::Utc::now().to_rfc3339();
 
         log::info!(
-            "[Identity] Perfil salvo com sucesso no cofre seguro SQLite. Revisão: {}",
+            "[Identity] Perfil salvo com sucesso no cofre seguro SQLite via subchave V2 KEK/DEK. Revisão: {}",
             new_revision
         );
 
@@ -549,7 +730,9 @@ impl IdentityService {
         if let Some(existing) = Self::get_profile(db, session)? {
             // Se o perfil existente já tem revisão >= 1 e campos básicos, preserva
             if existing.revision >= 1 && existing.completeness_score > 0 {
-                log::info!("[Identity] Perfil existente no cofre preservado durante reconciliação legada.");
+                log::info!(
+                    "[Identity] Perfil existente no cofre preservado durante reconciliação legada."
+                );
                 return Ok(existing);
             }
         }
@@ -558,7 +741,11 @@ impl IdentityService {
             .map_err(|_| IdentityError::Validation("Formato JSON legado inválido.".to_string()))?;
 
         let str_field = |name: &str| -> String {
-            value.get(name).and_then(|v| v.as_str()).unwrap_or("").to_string()
+            value
+                .get(name)
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string()
         };
 
         let bool_field = |name: &str, default: bool| -> bool {
@@ -574,10 +761,16 @@ impl IdentityService {
                     PERSON_TYPE_PF.to_string()
                 }
             },
-            username: value.get("username").and_then(|v| v.as_str()).map(|s| s.to_string()),
+            username: value
+                .get("username")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
             first_name: str_field("firstName"),
             last_name: str_field("lastName"),
-            display_name: value.get("displayName").and_then(|v| v.as_str()).map(|s| s.to_string()),
+            display_name: value
+                .get("displayName")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
             cpf: str_field("cpf"),
             rg: str_field("rg"),
             rg_issuer: str_field("rgIssuer"),
@@ -608,8 +801,14 @@ impl IdentityService {
             about: str_field("about"),
             // Por segurança e privacidade estrita, manter falso a menos que explicitado
             is_public: bool_field("isPublic", false),
-            photo_url: value.get("photoURL").and_then(|v| v.as_str()).map(|s| s.to_string()),
-            cover_url: value.get("coverURL").and_then(|v| v.as_str()).map(|s| s.to_string()),
+            photo_url: value
+                .get("photoURL")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
+            cover_url: value
+                .get("coverURL")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
             linked_providers: Vec::new(),
             social_links: None,
             expected_revision: None,
@@ -632,7 +831,8 @@ mod tests {
     }
 
     fn setup_test_vault() -> (LocalDatabase, VaultSession, TestDirGuard) {
-        let dir = std::env::temp_dir().join(format!("devos_identity_test_{}", rand::random::<u32>()));
+        let dir =
+            std::env::temp_dir().join(format!("devos_identity_test_{}", rand::random::<u32>()));
         let _ = std::fs::create_dir_all(&dir);
         let db = LocalDatabase::new(dir.clone());
         crate::storage::MigrationManager::run_migrations(&db).unwrap();
@@ -819,13 +1019,19 @@ mod tests {
 
         let err = IdentityService::save_profile(&db, &session, req2);
         assert!(err.is_err());
-        assert!(matches!(err.unwrap_err(), IdentityError::ConcurrencyConflict(_)));
+        assert!(matches!(
+            err.unwrap_err(),
+            IdentityError::ConcurrencyConflict(_)
+        ));
     }
 
     #[test]
     fn test_normalize_username_canonical() {
         assert_eq!(normalize_username("usuario.teste"), "usuario_teste");
-        assert_eq!(normalize_username("Usuario.De.Teste@123"), "usuario_de_teste_123");
+        assert_eq!(
+            normalize_username("Usuario.De.Teste@123"),
+            "usuario_de_teste_123"
+        );
         assert_eq!(normalize_username("__sandro___souza__"), "sandro_souza");
         assert_eq!(normalize_username(""), "");
     }
@@ -939,7 +1145,7 @@ mod tests {
             first_name: "".to_string(), // Deve preservar "João"
             last_name: "".to_string(),  // Deve preservar "Silva"
             display_name: None,
-            cpf: "".to_string(),        // Deve preservar "529.982.247-25"
+            cpf: "".to_string(), // Deve preservar "529.982.247-25"
             rg: "".to_string(),
             rg_issuer: "".to_string(),
             cnh: "".to_string(),

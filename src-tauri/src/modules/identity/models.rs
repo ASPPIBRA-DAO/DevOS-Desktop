@@ -318,7 +318,9 @@ pub fn validate_cpf(raw: &str) -> Result<String, &'static str> {
     // 1. Rejeita caracteres proibidos antes de normalizar
     for c in trimmed.chars() {
         if !c.is_ascii_digit() && c != '.' && c != '-' && !c.is_whitespace() {
-            return Err("O CPF contém caracteres inválidos. Utilize apenas números e separadores válidos.");
+            return Err(
+                "O CPF contém caracteres inválidos. Utilize apenas números e separadores válidos.",
+            );
         }
     }
 
@@ -387,7 +389,9 @@ pub fn validate_cnpj(raw: &str) -> Result<String, &'static str> {
     // 1. Rejeita caracteres inválidos antes de normalizar
     for c in trimmed.chars() {
         if !c.is_ascii_alphanumeric() && c != '.' && c != '/' && c != '-' && !c.is_whitespace() {
-            return Err("O CNPJ contém caracteres inválidos. Utilize apenas letras, números e separadores válidos.");
+            return Err(
+                "O CNPJ contém caracteres inválidos. Utilize apenas letras, números e separadores válidos.",
+            );
         }
     }
 
@@ -405,7 +409,9 @@ pub fn validate_cnpj(raw: &str) -> Result<String, &'static str> {
     // 3. Os dois últimos caracteres devem ser estritamente dígitos decimais
     let bytes = normalized.as_bytes();
     if !bytes[12].is_ascii_digit() || !bytes[13].is_ascii_digit() {
-        return Err("Os dois últimos caracteres do CNPJ devem ser dígitos verificadores numéricos.");
+        return Err(
+            "Os dois últimos caracteres do CNPJ devem ser dígitos verificadores numéricos.",
+        );
     }
 
     // 4. Rejeita sequências de todos os caracteres idênticos (ex: 00000000000000, AAAAAAAAAAAAAA)
@@ -415,10 +421,7 @@ pub fn validate_cnpj(raw: &str) -> Result<String, &'static str> {
     }
 
     // 5. Converte cada caractere das 12 primeiras posições para o valor numérico oficial (ASCII - 48)
-    let values: Vec<u32> = bytes[0..12]
-        .iter()
-        .map(|&b| (b as u32) - 48)
-        .collect();
+    let values: Vec<u32> = bytes[0..12].iter().map(|&b| (b as u32) - 48).collect();
 
     // 6. Cálculo do 1º Dígito Verificador (pesos: 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2)
     let weights1: [u32; 12] = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
@@ -512,7 +515,11 @@ pub fn validate_and_normalize_date(raw: &str) -> Result<String, &'static str> {
 
     let year = parsed.format("%Y").to_string().parse::<i32>().unwrap_or(0);
     let today = chrono::Utc::now().date_naive();
-    let current_year = today.format("%Y").to_string().parse::<i32>().unwrap_or(2026);
+    let current_year = today
+        .format("%Y")
+        .to_string()
+        .parse::<i32>()
+        .unwrap_or(2026);
 
     if year < 1900 || year > current_year {
         return Err("O ano de nascimento deve ser plausível (entre 1900 e o ano corrente).");
@@ -533,30 +540,74 @@ pub fn calculate_completeness_score(profile: &UserProfileDto) -> u32 {
 
     if profile.person_type == PERSON_TYPE_PJ {
         // Pessoa Jurídica (Total: 100)
-        if !profile.company_name.trim().is_empty() { score += 20; }
-        if !profile.cnpj.trim().is_empty() { score += 20; }
-        if !profile.legal_representative.trim().is_empty() { score += 15; }
-        if !profile.legal_representative_cpf.trim().is_empty() { score += 10; }
-        if !profile.email.trim().is_empty() { score += 10; }
-        if !profile.phone_number.trim().is_empty() { score += 5; }
-        if !profile.zip_code.trim().is_empty() { score += 5; }
-        if !profile.city.trim().is_empty() && !profile.state.trim().is_empty() { score += 5; }
-        if !profile.address.trim().is_empty() { score += 5; }
-        if !profile.occupation.trim().is_empty() { score += 5; }
+        if !profile.company_name.trim().is_empty() {
+            score += 20;
+        }
+        if !profile.cnpj.trim().is_empty() {
+            score += 20;
+        }
+        if !profile.legal_representative.trim().is_empty() {
+            score += 15;
+        }
+        if !profile.legal_representative_cpf.trim().is_empty() {
+            score += 10;
+        }
+        if !profile.email.trim().is_empty() {
+            score += 10;
+        }
+        if !profile.phone_number.trim().is_empty() {
+            score += 5;
+        }
+        if !profile.zip_code.trim().is_empty() {
+            score += 5;
+        }
+        if !profile.city.trim().is_empty() && !profile.state.trim().is_empty() {
+            score += 5;
+        }
+        if !profile.address.trim().is_empty() {
+            score += 5;
+        }
+        if !profile.occupation.trim().is_empty() {
+            score += 5;
+        }
     } else {
         // Pessoa Física (Total: 100)
-        if !profile.first_name.trim().is_empty() { score += 10; }
-        if !profile.last_name.trim().is_empty() { score += 10; }
-        if !profile.cpf.trim().is_empty() { score += 20; }
-        if !profile.birth_date.trim().is_empty() { score += 10; }
-        if !profile.rg.trim().is_empty() || !profile.cnh.trim().is_empty() { score += 10; }
-        if !profile.mother_name.trim().is_empty() { score += 5; }
-        if !profile.email.trim().is_empty() { score += 10; }
-        if !profile.phone_number.trim().is_empty() { score += 5; }
-        if !profile.zip_code.trim().is_empty() { score += 5; }
-        if !profile.city.trim().is_empty() && !profile.state.trim().is_empty() { score += 5; }
-        if !profile.address.trim().is_empty() { score += 5; }
-        if !profile.occupation.trim().is_empty() || !profile.about.trim().is_empty() { score += 5; }
+        if !profile.first_name.trim().is_empty() {
+            score += 10;
+        }
+        if !profile.last_name.trim().is_empty() {
+            score += 10;
+        }
+        if !profile.cpf.trim().is_empty() {
+            score += 20;
+        }
+        if !profile.birth_date.trim().is_empty() {
+            score += 10;
+        }
+        if !profile.rg.trim().is_empty() || !profile.cnh.trim().is_empty() {
+            score += 10;
+        }
+        if !profile.mother_name.trim().is_empty() {
+            score += 5;
+        }
+        if !profile.email.trim().is_empty() {
+            score += 10;
+        }
+        if !profile.phone_number.trim().is_empty() {
+            score += 5;
+        }
+        if !profile.zip_code.trim().is_empty() {
+            score += 5;
+        }
+        if !profile.city.trim().is_empty() && !profile.state.trim().is_empty() {
+            score += 5;
+        }
+        if !profile.address.trim().is_empty() {
+            score += 5;
+        }
+        if !profile.occupation.trim().is_empty() || !profile.about.trim().is_empty() {
+            score += 5;
+        }
     }
 
     score.min(100)
@@ -595,7 +646,10 @@ mod tests {
         let valid_cnpj = "00000000000191";
         assert!(validate_cnpj(valid_cnpj).is_ok());
         assert_eq!(validate_cnpj(valid_cnpj).unwrap(), "00.000.000/0001-91");
-        assert_eq!(validate_cnpj("00.000.000/0001-91").unwrap(), "00.000.000/0001-91");
+        assert_eq!(
+            validate_cnpj("00.000.000/0001-91").unwrap(),
+            "00.000.000/0001-91"
+        );
 
         // CNPJ numérico com dígito errado
         assert!(validate_cnpj("00000000000192").is_err());
@@ -613,7 +667,10 @@ mod tests {
         let valid_alpha = "12ABC34501DE35";
         assert!(validate_cnpj(valid_alpha).is_ok());
         assert_eq!(validate_cnpj(valid_alpha).unwrap(), "12.ABC.345/01DE-35");
-        assert_eq!(validate_cnpj("12.abc.345/01de-35").unwrap(), "12.ABC.345/01DE-35");
+        assert_eq!(
+            validate_cnpj("12.abc.345/01de-35").unwrap(),
+            "12.ABC.345/01DE-35"
+        );
 
         // Alfanumérico com DVs errados
         assert!(validate_cnpj("12ABC34501DE36").is_err());

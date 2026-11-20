@@ -20,7 +20,7 @@ serde = { version = "1.0", features = ["derive", "rc"] }
 log = "0.4"
 tauri = { version = "2.12.1", features = [] }
 tauri-plugin-log = "2"
-bip39 = { version = "2.1", features = ["rand"] }
+bip39 = { version = "2.1", features = ["rand", "zeroize"] }
 bip32 = { version = "0.5", features = ["secp256k1"] }
 tiny-keccak = { version = "2.0", features = ["keccak"] }
 aes-gcm = "0.10"
@@ -48,8 +48,7 @@ open = "5"
 rust_decimal = { version = "1.36", features = ["serde-with-float", "serde-with-str"] }
 rust_decimal_macros = "1.36"
 url = "2.5"
-
-
-
-
+bs58 = "0.5"
+ring = "0.17"
+hmac = "0.12"
 
