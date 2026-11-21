@@ -15,8 +15,6 @@ pub struct StoredProfileRecord {
     pub raw_envelope: String,
     pub payload_version: u32,
     pub revision: u64,
-    #[allow(dead_code)]
-    pub created_at: String,
     pub updated_at: String,
 }
 
@@ -29,7 +27,7 @@ impl IdentityRepository {
     ) -> Result<Option<StoredProfileRecord>, StorageError> {
         let result = conn
             .query_row(
-                "SELECT encrypted_envelope, payload_version, revision, created_at, updated_at
+                "SELECT encrypted_envelope, payload_version, revision, updated_at
                  FROM user_profiles
                  WHERE id = ?1",
                 params![PROFILE_ROW_ID],
@@ -38,8 +36,7 @@ impl IdentityRepository {
                         raw_envelope: row.get(0)?,
                         payload_version: row.get(1)?,
                         revision: row.get(2)?,
-                        created_at: row.get(3)?,
-                        updated_at: row.get(4)?,
+                        updated_at: row.get(3)?,
                     })
                 },
             )

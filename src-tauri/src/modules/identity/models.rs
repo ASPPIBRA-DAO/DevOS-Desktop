@@ -14,10 +14,6 @@ pub const CURRENT_PROFILE_PAYLOAD_VERSION: u32 = 1;
 pub const PERSON_TYPE_PF: &str = "PF";
 pub const PERSON_TYPE_PJ: &str = "PJ";
 
-fn default_person_type() -> String {
-    PERSON_TYPE_PF.to_string()
-}
-
 /// DTO canônico de presenças sociais digitais cifrado no cofre.
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "camelCase")]
@@ -55,10 +51,9 @@ impl Zeroize for SocialLinksDto {
 /// DTO canônico do Perfil do Usuário e Qualificação Civil exposto via Tauri IPC.
 ///
 /// Implementa `Debug` com redação estrita de PII (`[REDACTED_BY_LGPD]`) e trait `Zeroize` para
-/// higienização explícita de memória. O trait `Drop` não é derivado para permitir sintaxe funcional
-/// de atualização (`..Default::default()`) sem violação de regras de movimentação do compilador (E0509).
+/// higienização explícita de memória. Possui `#[serde(default)]` no struct para evolução retrocompatível de schema.
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", default)]
 pub struct UserProfileDto {
     pub person_type: String,
     pub username: String,
@@ -111,7 +106,7 @@ impl fmt::Debug for UserProfileDto {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("UserProfileDto")
             .field("person_type", &self.person_type)
-            .field("username", &self.username)
+            .field("username", &"[REDACTED_BY_LGPD]")
             .field("is_public", &self.is_public)
             .field("completeness_score", &self.completeness_score)
             .field("revision", &self.revision)
@@ -123,6 +118,8 @@ impl fmt::Debug for UserProfileDto {
 
 impl Zeroize for UserProfileDto {
     fn zeroize(&mut self) {
+        self.person_type.zeroize();
+        self.username.zeroize();
         self.first_name.zeroize();
         self.last_name.zeroize();
         self.display_name.zeroize();
@@ -134,6 +131,7 @@ impl Zeroize for UserProfileDto {
         self.mother_name.zeroize();
         self.father_name.zeroize();
         self.birth_date.zeroize();
+        self.nationality.zeroize();
         self.marital_status.zeroize();
         self.company_name.zeroize();
         self.cnpj.zeroize();
@@ -141,6 +139,7 @@ impl Zeroize for UserProfileDto {
         self.legal_representative_cpf.zeroize();
         self.email.zeroize();
         self.phone_number.zeroize();
+        self.country.zeroize();
         self.zip_code.zeroize();
         self.state.zeroize();
         self.city.zeroize();
@@ -152,6 +151,10 @@ impl Zeroize for UserProfileDto {
         self.company.zeroize();
         self.website.zeroize();
         self.about.zeroize();
+        self.is_public.zeroize();
+        self.completeness_score.zeroize();
+        self.revision.zeroize();
+        self.updated_at.zeroize();
         self.photo_url.zeroize();
         self.cover_url.zeroize();
         self.linked_providers.zeroize();
@@ -250,7 +253,7 @@ impl UserProfileDto {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SaveUserProfileRequest {
-    #[serde(default = "default_person_type")]
+    #[serde(default)]
     pub person_type: String,
     #[serde(default)]
     pub username: Option<String>,
@@ -322,10 +325,13 @@ pub struct SaveUserProfileRequest {
     pub photo_url: Option<String>,
     #[serde(default)]
     pub cover_url: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_deserializing)]
     pub linked_providers: Vec<String>,
     #[serde(default)]
     pub social_links: Option<SocialLinksDto>,
+    /// Campos (camelCase) a apagar explicitamente (Direito à Eliminação / LGPD).
+    #[serde(default)]
+    pub clear_fields: Vec<String>,
     pub expected_revision: Option<u64>,
 }
 
@@ -334,6 +340,7 @@ impl fmt::Debug for SaveUserProfileRequest {
         f.debug_struct("SaveUserProfileRequest")
             .field("person_type", &self.person_type)
             .field("is_public", &self.is_public)
+            .field("clear_fields", &self.clear_fields)
             .field("expected_revision", &self.expected_revision)
             .field("pii_data", &"[REDACTED_BY_LGPD]")
             .finish()
@@ -342,6 +349,8 @@ impl fmt::Debug for SaveUserProfileRequest {
 
 impl Zeroize for SaveUserProfileRequest {
     fn zeroize(&mut self) {
+        self.person_type.zeroize();
+        self.username.zeroize();
         self.first_name.zeroize();
         self.last_name.zeroize();
         self.display_name.zeroize();
@@ -353,6 +362,7 @@ impl Zeroize for SaveUserProfileRequest {
         self.mother_name.zeroize();
         self.father_name.zeroize();
         self.birth_date.zeroize();
+        self.nationality.zeroize();
         self.marital_status.zeroize();
         self.company_name.zeroize();
         self.cnpj.zeroize();
@@ -360,6 +370,7 @@ impl Zeroize for SaveUserProfileRequest {
         self.legal_representative_cpf.zeroize();
         self.email.zeroize();
         self.phone_number.zeroize();
+        self.country.zeroize();
         self.zip_code.zeroize();
         self.state.zeroize();
         self.city.zeroize();
@@ -375,13 +386,15 @@ impl Zeroize for SaveUserProfileRequest {
         self.cover_url.zeroize();
         self.linked_providers.zeroize();
         self.social_links.zeroize();
+        self.clear_fields.zeroize();
+        self.expected_revision.zeroize();
     }
 }
 
 impl Default for SaveUserProfileRequest {
     fn default() -> Self {
         Self {
-            person_type: default_person_type(),
+            person_type: String::new(),
             username: None,
             first_name: String::new(),
             last_name: String::new(),
@@ -394,7 +407,7 @@ impl Default for SaveUserProfileRequest {
             mother_name: String::new(),
             father_name: String::new(),
             birth_date: String::new(),
-            nationality: "Brasileira".to_string(),
+            nationality: String::new(),
             marital_status: String::new(),
             company_name: String::new(),
             cnpj: String::new(),
@@ -402,7 +415,7 @@ impl Default for SaveUserProfileRequest {
             legal_representative_cpf: String::new(),
             email: String::new(),
             phone_number: String::new(),
-            country: "Brasil".to_string(),
+            country: String::new(),
             zip_code: String::new(),
             state: String::new(),
             city: String::new(),
@@ -419,6 +432,7 @@ impl Default for SaveUserProfileRequest {
             cover_url: None,
             linked_providers: Vec::new(),
             social_links: None,
+            clear_fields: Vec::new(),
             expected_revision: None,
         }
     }
@@ -428,21 +442,24 @@ impl Default for SaveUserProfileRequest {
 // Rotinas de Validação de Documentos Oficiais Brasileiros & Sanitização
 // ----------------------------------------------------------------------
 
-/// Verifica a presença de caracteres de controle proibidos (exceto \n, \r, \t)
-/// e caracteres bidirecionais (bidi overrides / invisíveis) que possam ocultar código ou alterar semântica visual.
+/// Verifica a presença de caracteres de controle proibidos (exceto \n, \r, \t),
+/// controles bidirecionais e caracteres invisíveis que possam ocultar conteúdo ou alterar
+/// a semântica visual (bidi, separadores de linha, joiners invisíveis, BOM, bloco Tags).
 pub fn contains_dangerous_control_or_bidi(text: &str) -> bool {
-    for c in text.chars() {
-        if c != '\n' && c != '\r' && c != '\t' && c.is_control() {
-            return true;
-        }
-        match c {
-            '\u{200B}'..='\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}' => {
-                return true;
-            }
-            _ => {}
-        }
-    }
-    false
+    text.chars().any(|c| {
+        (c != '\n' && c != '\r' && c != '\t' && c.is_control())
+            || matches!(
+                c,
+                '\u{061C}'                      // Arabic Letter Mark (bidi)
+                    | '\u{200B}'..='\u{200F}'   // ZWSP, ZWNJ, ZWJ, LRM, RLM
+                    | '\u{2028}'..='\u{2029}'   // Separadores de linha/parágrafo
+                    | '\u{202A}'..='\u{202E}'   // Embeddings/overrides bidi
+                    | '\u{2060}'..='\u{2064}'   // Word joiner e operadores invisíveis
+                    | '\u{2066}'..='\u{206F}'   // Isolates bidi e controles adicionais
+                    | '\u{FEFF}'                // BOM / ZWNBSP
+                    | '\u{E0000}'..='\u{E007F}' // Bloco Tags (texto invisível)
+            )
+    })
 }
 
 /// Higieniza mantendo apenas dígitos decimais.
@@ -450,7 +467,8 @@ pub fn extract_digits(input: &str) -> String {
     input.chars().filter(|c| c.is_ascii_digit()).collect()
 }
 
-/// Validação algorítmica rigorosa de CPF com dois dígitos verificadores (zero alocações de heap).
+/// Validação algorítmica rigorosa de CPF com dois dígitos verificadores
+/// (sem alocação durante a validação; apenas a string formatada final aloca).
 pub fn validate_cpf(raw: &str) -> Result<String, &'static str> {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
@@ -585,7 +603,8 @@ pub fn validate_cnpj(raw: &str) -> Result<String, &'static str> {
         return Err("Dígito verificador do CNPJ inválido.");
     }
 
-    let normalized = std::str::from_utf8(&bytes).unwrap_or_default();
+    let normalized = std::str::from_utf8(&bytes)
+        .map_err(|_| "O CNPJ contém caracteres inválidos.")?;
     Ok(format!(
         "{}.{}.{}/{}-{}",
         &normalized[0..2],
@@ -596,7 +615,7 @@ pub fn validate_cnpj(raw: &str) -> Result<String, &'static str> {
     ))
 }
 
-/// Valida e formata CEP brasileiro (8 dígitos).
+/// Valida e formata CEP brasileiro (8 dígitos, zero alocações intermediárias de heap).
 pub fn validate_cep(raw: &str) -> Result<String, &'static str> {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
@@ -607,17 +626,27 @@ pub fn validate_cep(raw: &str) -> Result<String, &'static str> {
         return Err("O CEP informado excede o limite de tamanho permitido.");
     }
 
+    let mut digits = [0u8; 8];
+    let mut len = 0usize;
+
     for c in trimmed.chars() {
-        if !c.is_ascii_digit() && c != '-' && !c.is_whitespace() {
+        if c.is_ascii_digit() {
+            if len >= 8 {
+                return Err("O CEP deve conter exatamente 8 dígitos.");
+            }
+            digits[len] = c as u8;
+            len += 1;
+        } else if c != '-' && !c.is_whitespace() {
             return Err("O CEP contém caracteres inválidos. Utilize apenas números e hífen.");
         }
     }
 
-    let digits = extract_digits(trimmed);
-    if digits.len() != 8 {
+    if len != 8 {
         return Err("O CEP deve conter exatamente 8 dígitos.");
     }
-    Ok(format!("{}-{}", &digits[0..5], &digits[5..8]))
+
+    let s = std::str::from_utf8(&digits).unwrap_or_default();
+    Ok(format!("{}-{}", &s[0..5], &s[5..8]))
 }
 
 /// Valida data no formato ISO YYYY-MM-DD ou DD/MM/YYYY e retorna formato canônico ISO YYYY-MM-DD.
@@ -639,7 +668,15 @@ pub fn validate_and_normalize_date(raw: &str) -> Result<String, &'static str> {
             return Err("Formato de data inválido. Utilize AAAA-MM-DD ou DD/MM/AAAA.");
         };
 
-        if d.is_empty() || m.is_empty() || d.len() > 2 || m.len() > 2 || y.len() != 4 {
+        if d.is_empty()
+            || m.is_empty()
+            || d.len() > 2
+            || m.len() > 2
+            || y.len() != 4
+            || !d.bytes().all(|b| b.is_ascii_digit())
+            || !m.bytes().all(|b| b.is_ascii_digit())
+            || !y.bytes().all(|b| b.is_ascii_digit())
+        {
             return Err("Formato de data inválido. Utilize AAAA-MM-DD ou DD/MM/AAAA.");
         }
 
@@ -655,8 +692,8 @@ pub fn validate_and_normalize_date(raw: &str) -> Result<String, &'static str> {
     };
 
     let today = chrono::Utc::now().date_naive();
-    if parsed.year() < 1900 || parsed.year() > today.year() {
-        return Err("O ano de nascimento deve ser plausível (entre 1900 e o ano corrente).");
+    if parsed.year() < 1900 {
+        return Err("O ano de nascimento deve ser plausível (a partir de 1900).");
     }
 
     if parsed > today {
@@ -771,6 +808,8 @@ mod tests {
         assert!(validate_and_normalize_date("2001-02-29").is_err());
         assert!(validate_and_normalize_date("2099-01-01").is_err());
         assert!(validate_and_normalize_date("1850-01-01").is_err());
+        assert!(validate_and_normalize_date("+1/+5/1990").is_err());
+        assert!(validate_and_normalize_date("15/+5/1990").is_err());
     }
 
     #[test]
@@ -809,11 +848,64 @@ mod tests {
     }
 
     #[test]
-    fn test_dangerous_control_or_bidi_characters() {
-        assert!(contains_dangerous_control_or_bidi("Texto com \0 byte nulo"));
-        assert!(contains_dangerous_control_or_bidi("Texto com \u{202E} RLO"));
-        assert!(contains_dangerous_control_or_bidi("Texto com \u{200B} ZWSP"));
-        assert!(!contains_dangerous_control_or_bidi("Texto perfeitamente legível com acentuação: José & Cia."));
-        assert!(!contains_dangerous_control_or_bidi("Linha 1\nLinha 2\r\nCom\ttab"));
+    fn test_dangerous_invisible_and_bidi_extended_set() {
+        for s in [
+            "a\u{061C}b",
+            "a\u{2028}b",
+            "a\u{2029}b",
+            "a\u{2060}b",
+            "a\u{FEFF}b",
+            "a\u{E0041}b",
+        ] {
+            assert!(contains_dangerous_control_or_bidi(s), "deveria rejeitar {:?}", s);
+        }
+        assert!(!contains_dangerous_control_or_bidi("José & Cia.\nLinha 2\tTab"));
+    }
+
+    #[test]
+    fn test_zeroize_clears_all_pii_fields_including_username_nationality_country() {
+        let mut profile = UserProfileDto {
+            username: "usuario_privado".to_string(),
+            nationality: "Portuguesa".to_string(),
+            country: "Portugal".to_string(),
+            cpf: "529.982.247-25".to_string(),
+            ..Default::default()
+        };
+        profile.zeroize();
+        assert!(profile.username.is_empty());
+        assert!(profile.nationality.is_empty());
+        assert!(profile.country.is_empty());
+        assert!(profile.cpf.is_empty());
+
+        let mut req = SaveUserProfileRequest {
+            username: Some("usuario_privado".to_string()),
+            nationality: "Portuguesa".to_string(),
+            country: "Portugal".to_string(),
+            ..Default::default()
+        };
+        req.zeroize();
+        assert!(req.username.is_none());
+        assert!(req.nationality.is_empty());
+        assert!(req.country.is_empty());
+    }
+
+    #[test]
+    fn test_profile_dto_tolerates_payload_missing_fields() {
+        let dto: UserProfileDto =
+            serde_json::from_str(r#"{"personType":"PF","username":"abc"}"#)
+                .expect("payload antigo deve ser aceito");
+        assert_eq!(dto.username, "abc");
+        assert_eq!(dto.nationality, "Brasileira");
+        assert!(dto.linked_providers.is_empty());
+    }
+
+    #[test]
+    fn test_save_request_serde_defaults() {
+        let req: SaveUserProfileRequest =
+            serde_json::from_str(r#"{"linkedProviders":["google.com"]}"#).unwrap();
+        assert_eq!(req.person_type, "");
+        assert!(req.linked_providers.is_empty());
+        assert!(req.clear_fields.is_empty());
+        assert_eq!(req.expected_revision, None);
     }
 }

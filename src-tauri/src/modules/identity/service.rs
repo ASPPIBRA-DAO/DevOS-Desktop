@@ -3,6 +3,7 @@
 //! Orquestra validações, criptografia de ponta a ponta (AES-256-GCM com chave derivada
 //! do cofre) e persistência transacional em SQLite.
 
+use std::sync::OnceLock;
 use url::Url;
 use zeroize::Zeroizing;
 
@@ -23,6 +24,11 @@ const MAX_ABOUT_CHARS: usize = 2000;
 const MAX_URL_BYTES: usize = 2048;
 const MAX_EMAIL_CHARS: usize = 254;
 const MAX_LEGACY_JSON_BYTES: usize = 64 * 1024;
+const MAX_CLEAR_FIELDS: usize = 32;
+
+/// Pior caso do payload ≈ 35 KB (texto + 7 URLs × 2 KiB + chaves).
+/// Capacidade de 64 KB elimina realocações de heap contendo PII em claro.
+const PAYLOAD_BUF_CAPACITY: usize = 64 * 1024;
 
 const RESERVED_USERNAMES: &[&str] = &[
     "admin", "administrator", "root", "devos", "system", "support", "dao", "asppibra", "moderator",
@@ -132,8 +138,8 @@ pub fn normalize_username(raw: &str) -> Result<String, IdentityError> {
     Ok(result)
 }
 
-/// Valida URLs externas com HTTPS estrito, rejeitando esquemas perigosos (javascript:, data:, file:),
-/// credenciais embutidas, portas personalizadas, endereços IP e domínios locais/privados (defesa anti-SSRF).
+/// Valida URLs externas com HTTPS estrito, rejeitando esquemas perigosos,
+/// credenciais embutidas, portas personalizadas, endereços IP e domínios locais/privados (anti-SSRF).
 fn parse_safe_https_url(raw: &str, field_label: &str) -> Result<Url, IdentityError> {
     let trimmed = raw.trim();
     if trimmed.len() > MAX_URL_BYTES {
@@ -143,9 +149,25 @@ fn parse_safe_https_url(raw: &str, field_label: &str) -> Result<Url, IdentityErr
         )));
     }
 
+    if contains_dangerous_control_or_bidi(trimmed)
+        || trimmed.chars().any(|c| c == '\n' || c == '\r' || c == '\t')
+    {
+        return Err(IdentityError::Validation(format!(
+            "{} contém caracteres de controle ou bidirecionais proibidos.",
+            field_label
+        )));
+    }
+
     let parsed = Url::parse(trimmed).map_err(|_| {
         IdentityError::Validation(format!("{} inválida ou malformada.", field_label))
     })?;
+
+    if parsed.as_str().len() > MAX_URL_BYTES {
+        return Err(IdentityError::Validation(format!(
+            "{} excede o limite permitido de {} bytes após normalização.",
+            field_label, MAX_URL_BYTES
+        )));
+    }
 
     if parsed.scheme() != "https" {
         return Err(IdentityError::Validation(format!(
@@ -171,21 +193,29 @@ fn parse_safe_https_url(raw: &str, field_label: &str) -> Result<Url, IdentityErr
     match parsed.host() {
         Some(url::Host::Domain(domain)) => {
             let d_lower = domain.to_ascii_lowercase();
-            // Rejeita domínios sem ponto (ex: localhost, intranet)
             if !d_lower.contains('.') || d_lower.starts_with('.') || d_lower.ends_with('.') {
                 return Err(IdentityError::Validation(format!(
                     "{} deve conter um nome de domínio qualificado válido (FQDN).",
                     field_label
                 )));
             }
-            // Rejeita TLDs locais / reservados para SSRF
-            if d_lower.ends_with(".local")
-                || d_lower.ends_with(".localhost")
-                || d_lower.ends_with(".internal")
-                || d_lower.ends_with(".onion")
-                || d_lower.ends_with(".test")
-                || d_lower.ends_with(".example")
-            {
+            const BLOCKED_SUFFIXES: &[&str] = &[
+                ".local",
+                ".localhost",
+                ".localdomain",
+                ".internal",
+                ".intranet",
+                ".home.arpa",
+                ".arpa",
+                ".lan",
+                ".home",
+                ".corp",
+                ".onion",
+                ".test",
+                ".example",
+                ".invalid",
+            ];
+            if BLOCKED_SUFFIXES.iter().any(|s| d_lower.ends_with(s)) {
                 return Err(IdentityError::Validation(format!(
                     "O domínio '{}' em {} não é permitido (endereço local ou reservado).",
                     domain, field_label
@@ -261,18 +291,29 @@ pub fn sanitize_social_url(
     Ok(Some(parsed.to_string()))
 }
 
-fn validate_max_chars(value: &str, max: usize, label: &str) -> Result<(), IdentityError> {
-    if value.trim().chars().count() > max {
-        return Err(IdentityError::Validation(format!(
-            "O campo '{}' não pode exceder {} caracteres.",
-            label, max
-        )));
+fn validate_text_field_inner(
+    value: &str,
+    max: usize,
+    label: &str,
+    allow_multiline: bool,
+) -> Result<(), IdentityError> {
+    let trimmed = value.trim();
+    let mut count = 0usize;
+    for c in trimmed.chars() {
+        count += 1;
+        if count > max {
+            return Err(IdentityError::Validation(format!(
+                "O campo '{}' não pode exceder {} caracteres.",
+                label, max
+            )));
+        }
+        if !allow_multiline && (c == '\n' || c == '\r' || c == '\t') {
+            return Err(IdentityError::Validation(format!(
+                "O campo '{}' não permite quebras de linha ou tabulações.",
+                label
+            )));
+        }
     }
-    Ok(())
-}
-
-fn validate_text_field(value: &str, max: usize, label: &str) -> Result<(), IdentityError> {
-    validate_max_chars(value, max, label)?;
     if contains_dangerous_control_or_bidi(value) {
         return Err(IdentityError::Validation(format!(
             "O campo '{}' contém caracteres de controle ou caracteres bidirecionais proibidos.",
@@ -282,28 +323,56 @@ fn validate_text_field(value: &str, max: usize, label: &str) -> Result<(), Ident
     Ok(())
 }
 
+fn validate_text_field(value: &str, max: usize, label: &str) -> Result<(), IdentityError> {
+    validate_text_field_inner(value, max, label, false)
+}
+
+fn validate_multiline_text_field(value: &str, max: usize, label: &str) -> Result<(), IdentityError> {
+    validate_text_field_inner(value, max, label, true)
+}
+
 fn validate_email(raw: &str) -> Result<String, IdentityError> {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
         return Ok(String::new());
     }
     validate_text_field(trimmed, MAX_EMAIL_CHARS, "E-mail")?;
+    let invalid = || IdentityError::Validation("Formato de e-mail inválido.".to_string());
+
     let mut parts = trimmed.split('@');
     let (Some(local), Some(domain), None) = (parts.next(), parts.next(), parts.next()) else {
-        return Err(IdentityError::Validation("Formato de e-mail inválido.".to_string()));
+        return Err(invalid());
     };
-    if local.is_empty()
-        || !domain.contains('.')
-        || domain.starts_with('.')
-        || domain.ends_with('.')
-        || trimmed.chars().any(char::is_whitespace)
-    {
-        return Err(IdentityError::Validation("Formato de e-mail inválido.".to_string()));
+
+    const LOCAL_SPECIALS: &str = "!#$%&'*+/=?^_`{|}~.-";
+    let local_ok = !local.is_empty()
+        && local.chars().count() <= 64
+        && !local.starts_with('.')
+        && !local.ends_with('.')
+        && !local.contains("..")
+        && local
+            .chars()
+            .all(|c| c.is_alphanumeric() || LOCAL_SPECIALS.contains(c));
+
+    let labels: Vec<&str> = domain.split('.').collect();
+    let domain_ok = labels.len() >= 2
+        && domain.chars().count() <= 253
+        && labels.iter().all(|l| {
+            !l.is_empty()
+                && l.chars().count() <= 63
+                && !l.starts_with('-')
+                && !l.ends_with('-')
+                && l.chars().all(|c| c.is_alphanumeric() || c == '-')
+        })
+        && labels.last().is_some_and(|tld| tld.chars().count() >= 2);
+
+    if !local_ok || !domain_ok {
+        return Err(invalid());
     }
-    Ok(trimmed.to_string())
+    Ok(format!("{}@{}", local, domain.to_ascii_lowercase()))
 }
 
-/// Preserva o valor existente caso o novo campo chegue vazio (para transições PF <-> PJ).
+/// Preserva o valor existente caso o novo campo chegue vazio.
 fn resolve_preserved(incoming: &str, existing: Option<&str>) -> String {
     let trimmed = incoming.trim();
     if !trimmed.is_empty() {
@@ -323,13 +392,12 @@ fn resolve_validated<F>(
 where
     F: Fn(&str) -> Result<String, &'static str>,
 {
-    // Se o usuário digitou algo novo no campo, valida o novo valor
-    if !incoming.trim().is_empty() {
-        return validator(incoming.trim())
+    let trimmed = incoming.trim();
+    if !trimmed.is_empty() {
+        return validator(trimmed)
             .map_err(|e| IdentityError::Validation(format!("{} inválido: {}", label, e)));
     }
 
-    // Se veio vazio, reaproveita o existente (se houver)
     let candidate = existing.unwrap_or("").trim();
     if candidate.is_empty() {
         return Ok(String::new());
@@ -338,42 +406,129 @@ where
     validator(candidate).map_err(|e| IdentityError::Validation(format!("{} inválido: {}", label, e)))
 }
 
-fn build_profile_aad() -> Vec<u8> {
-    // Invariante de compatibilidade com a rotação de chaves do Vault em local_database.rs
-    AadDomain::UserProfile {
-        profile_id: 1,
-        vault_instance_id: "default",
+/// Valor novo > valor existente > padrão (nunca sobrescreve silenciosamente dados de estrangeiros).
+fn resolve_with_default(incoming: &str, existing: Option<&str>, default: &str) -> String {
+    let trimmed = incoming.trim();
+    if !trimmed.is_empty() {
+        return trimmed.to_string();
     }
-    .to_canonical_bytes()
+    match existing.map(str::trim) {
+        Some(e) if !e.is_empty() => e.to_string(),
+        _ => default.to_string(),
+    }
+}
+
+fn derive_display_name(
+    person_type: &str,
+    company_name: &str,
+    first_name: &str,
+    last_name: &str,
+    username: &str,
+) -> String {
+    if person_type == PERSON_TYPE_PJ && !company_name.is_empty() {
+        company_name.to_string()
+    } else if !first_name.is_empty() || !last_name.is_empty() {
+        format!("{} {}", first_name, last_name).trim().to_string()
+    } else if !username.is_empty() {
+        username.to_string()
+    } else {
+        "Usuário DevOS".to_string()
+    }
+}
+
+fn build_profile_aad() -> &'static [u8] {
+    static AAD: OnceLock<Vec<u8>> = OnceLock::new();
+    AAD.get_or_init(|| {
+        // Invariante de compatibilidade com a rotação de chaves do Vault em local_database.rs
+        AadDomain::UserProfile {
+            profile_id: 1,
+            vault_instance_id: "default",
+        }
+        .to_canonical_bytes()
+    })
+    .as_slice()
 }
 
 pub struct IdentityService;
 
 impl IdentityService {
+    /// Apaga, em cópia efêmera do perfil existente, os campos explicitamente solicitados em `clear_fields`.
+    fn apply_clear_fields(
+        profile: &mut UserProfileDto,
+        fields: &[String],
+    ) -> Result<(), IdentityError> {
+        if fields.len() > MAX_CLEAR_FIELDS {
+            return Err(IdentityError::Validation(
+                "Lista de campos a limpar excede o limite permitido.".to_string(),
+            ));
+        }
+        for field in fields {
+            let target = match field.as_str() {
+                "firstName" => &mut profile.first_name,
+                "lastName" => &mut profile.last_name,
+                "cpf" => &mut profile.cpf,
+                "rg" => &mut profile.rg,
+                "rgIssuer" => &mut profile.rg_issuer,
+                "cnh" => &mut profile.cnh,
+                "cnhCategory" => &mut profile.cnh_category,
+                "motherName" => &mut profile.mother_name,
+                "fatherName" => &mut profile.father_name,
+                "birthDate" => &mut profile.birth_date,
+                "maritalStatus" => &mut profile.marital_status,
+                "companyName" => &mut profile.company_name,
+                "cnpj" => &mut profile.cnpj,
+                "legalRepresentative" => &mut profile.legal_representative,
+                "legalRepresentativeCpf" => &mut profile.legal_representative_cpf,
+                "occupation" => &mut profile.occupation,
+                "company" => &mut profile.company,
+                "about" => &mut profile.about,
+                "zipCode" => &mut profile.zip_code,
+                "state" => &mut profile.state,
+                "city" => &mut profile.city,
+                "neighborhood" => &mut profile.neighborhood,
+                "address" => &mut profile.address,
+                "addressNumber" => &mut profile.address_number,
+                "complement" => &mut profile.complement,
+                "phoneNumber" => &mut profile.phone_number,
+                _ => {
+                    return Err(IdentityError::Validation(format!(
+                        "Campo informado em 'clearFields' não pode ser limpo: {}",
+                        field
+                    )));
+                }
+            };
+            target.clear();
+        }
+        Ok(())
+    }
+
     /// Higieniza e valida os dados recebidos para o perfil com separação estrita PF / PJ,
-    /// proteção anti-XSS/SSRF/DoS, higiene de caracteres de controle/bidi e preservação segura.
+    /// proteção anti-XSS/SSRF/DoS, higiene de caracteres de controle/bidi/CRLF e direito à eliminação LGPD.
     pub fn sanitize_and_validate(
         req: &SaveUserProfileRequest,
         existing: Option<&UserProfileDto>,
     ) -> Result<UserProfileDto, IdentityError> {
+        // Cópia efêmera (zeroizada no drop) do perfil existente, com campos listados em `clear_fields` já limpos
+        let mut scratch = Zeroizing::new(existing.cloned().unwrap_or_default());
+        Self::apply_clear_fields(&mut scratch, &req.clear_fields)?;
+        let existing = existing.map(|_| &*scratch);
+
         let raw_person = req.person_type.trim();
         let person_type = if raw_person.is_empty() {
             existing
                 .map(|p| p.person_type.clone())
                 .unwrap_or_else(|| PERSON_TYPE_PF.to_string())
+        } else if raw_person.eq_ignore_ascii_case(PERSON_TYPE_PF) {
+            PERSON_TYPE_PF.to_string()
+        } else if raw_person.eq_ignore_ascii_case(PERSON_TYPE_PJ) {
+            PERSON_TYPE_PJ.to_string()
         } else {
-            match raw_person.to_ascii_uppercase().as_str() {
-                PERSON_TYPE_PF => PERSON_TYPE_PF.to_string(),
-                PERSON_TYPE_PJ => PERSON_TYPE_PJ.to_string(),
-                _ => {
-                    return Err(IdentityError::Validation(
-                        "Tipo de pessoa inválido. Utilize 'PF' ou 'PJ'.".to_string(),
-                    ));
-                }
-            }
+            return Err(IdentityError::Validation(
+                "Tipo de pessoa inválido. Utilize 'PF' ou 'PJ'.".to_string(),
+            ));
         };
 
-        // 1. Limites de tamanho e higiene contra caracteres perigosos (bidi, controle)
+        // 1. Limites de tamanho e higiene contra caracteres perigosos (bidi, controle, CRLF)
         validate_text_field(&req.first_name, MAX_SHORT_FIELD_CHARS, "Nome")?;
         validate_text_field(&req.last_name, MAX_SHORT_FIELD_CHARS, "Sobrenome")?;
         validate_text_field(&req.company_name, MAX_MEDIUM_FIELD_CHARS, "Razão social")?;
@@ -400,15 +555,16 @@ impl IdentityService {
         validate_text_field(&req.complement, MAX_MEDIUM_FIELD_CHARS, "Complemento")?;
         validate_text_field(&req.occupation, MAX_MEDIUM_FIELD_CHARS, "Ocupação")?;
         validate_text_field(&req.company, MAX_MEDIUM_FIELD_CHARS, "Empresa")?;
-        validate_text_field(&req.about, MAX_ABOUT_CHARS, "Sobre")?;
+        validate_multiline_text_field(&req.about, MAX_ABOUT_CHARS, "Sobre")?;
         if let Some(d) = req.display_name.as_deref() {
             validate_text_field(d, MAX_MEDIUM_FIELD_CHARS, "Nome de exibição")?;
         }
 
         // 2. Normalização e validação de identificadores
         let username = match req.username.as_deref().map(str::trim) {
-            Some(u) if !u.is_empty() => normalize_username(u)?,
-            _ => existing.map(|p| p.username.clone()).unwrap_or_default(),
+            Some("") => String::new(),
+            Some(u) => normalize_username(u)?,
+            None => existing.map(|p| p.username.clone()).unwrap_or_default(),
         };
 
         let first_name = resolve_preserved(&req.first_name, existing.map(|p| p.first_name.as_str()));
@@ -418,12 +574,25 @@ impl IdentityService {
 
         let display_name = match req.display_name.as_deref().map(str::trim) {
             Some(d) if !d.is_empty() => d.to_string(),
-            _ if person_type == PERSON_TYPE_PJ && !company_name.is_empty() => company_name.clone(),
-            _ if !first_name.is_empty() || !last_name.is_empty() => {
-                format!("{} {}", first_name, last_name).trim().to_string()
+            Some(_) => {
+                derive_display_name(&person_type, &company_name, &first_name, &last_name, &username)
             }
-            _ if !username.is_empty() => username.clone(),
-            _ => "Usuário DevOS".to_string(),
+            None => existing
+                .filter(|_| req.clear_fields.is_empty())
+                .and_then(|p| {
+                    let previous_auto = derive_display_name(
+                        &p.person_type,
+                        &p.company_name,
+                        &p.first_name,
+                        &p.last_name,
+                        &p.username,
+                    );
+                    (!p.display_name.is_empty() && p.display_name != previous_auto)
+                        .then(|| p.display_name.clone())
+                })
+                .unwrap_or_else(|| {
+                    derive_display_name(&person_type, &company_name, &first_name, &last_name, &username)
+                }),
         };
 
         // 3. Validações estritas de documentos (erros NUNCA engolidos)
@@ -446,15 +615,22 @@ impl IdentityService {
             "CPF do representante",
             validate_cpf,
         )?;
-        let zip_code = validate_cep(&req.zip_code)
-            .map_err(|e| IdentityError::Validation(format!("CEP inválido: {}", e)))?;
-        let email = validate_email(&req.email)?;
+        let zip_code = resolve_validated(
+            &req.zip_code,
+            existing.map(|p| p.zip_code.as_str()),
+            "CEP",
+            validate_cep,
+        )?;
+        let email = if !req.email.trim().is_empty() {
+            validate_email(&req.email)?
+        } else {
+            existing.map(|p| p.email.clone()).unwrap_or_default()
+        };
 
-        // 4. Sanitização estrita de URLs (defesa contra XSS/SSRF/LFI)
+        // 4. Sanitização estrita de URLs
         let website = sanitize_optional_https_url(Some(&req.website), "Website")?
-            .unwrap_or_default();
+            .unwrap_or_else(|| existing.map(|p| p.website.clone()).unwrap_or_default());
 
-        // Preservação de imagens: se None na requisição, preserva existente; se Some("") remove (direito ao esquecimento)
         let photo_url = match &req.photo_url {
             Some(s) if s.trim().is_empty() => None,
             Some(s) => sanitize_optional_https_url(Some(s), "URL da foto")?,
@@ -477,8 +653,6 @@ impl IdentityService {
             None => existing.and_then(|p| p.social_links.clone()),
         };
 
-        // Provedores vinculados (OAuth) são atestados por fluxos criptográficos de autenticação;
-        // o cliente Tauri IPC não pode declarar provedores arbitrariamente pelo formulário de edição
         let linked_providers = existing.map(|p| p.linked_providers.clone()).unwrap_or_default();
 
         let mut profile = UserProfileDto {
@@ -504,11 +678,11 @@ impl IdentityService {
                 existing.map(|p| p.father_name.as_str()),
             ),
             birth_date,
-            nationality: if req.nationality.trim().is_empty() {
-                "Brasileira".to_string()
-            } else {
-                req.nationality.trim().to_string()
-            },
+            nationality: resolve_with_default(
+                &req.nationality,
+                existing.map(|p| p.nationality.as_str()),
+                "Brasileira",
+            ),
             marital_status: resolve_preserved(
                 &req.marital_status,
                 existing.map(|p| p.marital_status.as_str()),
@@ -521,23 +695,38 @@ impl IdentityService {
             ),
             legal_representative_cpf,
             email,
-            phone_number: req.phone_number.trim().to_string(),
-            country: if req.country.trim().is_empty() {
-                "Brasil".to_string()
-            } else {
-                req.country.trim().to_string()
-            },
+            phone_number: resolve_preserved(
+                &req.phone_number,
+                existing.map(|p| p.phone_number.as_str()),
+            ),
+            country: resolve_with_default(
+                &req.country,
+                existing.map(|p| p.country.as_str()),
+                "Brasil",
+            ),
             zip_code,
-            state: req.state.trim().to_string(),
-            city: req.city.trim().to_string(),
-            neighborhood: req.neighborhood.trim().to_string(),
-            address: req.address.trim().to_string(),
-            address_number: req.address_number.trim().to_string(),
-            complement: req.complement.trim().to_string(),
-            occupation: req.occupation.trim().to_string(),
-            company: req.company.trim().to_string(),
+            state: resolve_preserved(&req.state, existing.map(|p| p.state.as_str())),
+            city: resolve_preserved(&req.city, existing.map(|p| p.city.as_str())),
+            neighborhood: resolve_preserved(
+                &req.neighborhood,
+                existing.map(|p| p.neighborhood.as_str()),
+            ),
+            address: resolve_preserved(&req.address, existing.map(|p| p.address.as_str())),
+            address_number: resolve_preserved(
+                &req.address_number,
+                existing.map(|p| p.address_number.as_str()),
+            ),
+            complement: resolve_preserved(
+                &req.complement,
+                existing.map(|p| p.complement.as_str()),
+            ),
+            occupation: resolve_preserved(
+                &req.occupation,
+                existing.map(|p| p.occupation.as_str()),
+            ),
+            company: resolve_preserved(&req.company, existing.map(|p| p.company.as_str())),
             website,
-            about: req.about.trim().to_string(),
+            about: resolve_preserved(&req.about, existing.map(|p| p.about.as_str())),
             is_public: req.is_public,
             completeness_score: 0,
             revision: 0,
@@ -561,7 +750,7 @@ impl IdentityService {
             return Ok(None);
         };
 
-        if record.payload_version > CURRENT_PROFILE_PAYLOAD_VERSION {
+        if record.payload_version == 0 || record.payload_version > CURRENT_PROFILE_PAYLOAD_VERSION {
             return Err(IdentityError::UnsupportedPayloadVersion(
                 record.payload_version,
             ));
@@ -573,11 +762,10 @@ impl IdentityService {
 
         let decrypted_bytes = session.with_dek(|dek| {
             let identity_key = Subkeys::derive_identity_key(dek);
-            VaultCrypto::decrypt_with_aead(&identity_key, &aead, &aad)
-                .map_err(|e| {
-                    log::warn!("[Identity] Falha na decifragem do envelope criptográfico do perfil");
-                    AccessControlError::Crypto(e)
-                })
+            VaultCrypto::decrypt_with_aead(&identity_key, &aead, aad).map_err(|e| {
+                log::warn!("[Identity] Falha na decifragem do envelope criptográfico do perfil");
+                AccessControlError::Crypto(e)
+            })
         })?;
 
         let decrypted_zero = Zeroizing::new(decrypted_bytes);
@@ -595,23 +783,28 @@ impl IdentityService {
     fn save_profile_internal(
         conn: &mut rusqlite::Connection,
         session: &VaultSession,
-        req: SaveUserProfileRequest,
+        req: Zeroizing<SaveUserProfileRequest>,
         existing: Option<&UserProfileDto>,
     ) -> Result<UserProfileDto, IdentityError> {
-        let mut profile = Self::sanitize_and_validate(&req, existing)?;
+        let mut profile = Zeroizing::new(Self::sanitize_and_validate(&req, existing)?);
         let now_rfc3339 = chrono::Utc::now().to_rfc3339();
         profile.updated_at = now_rfc3339.clone();
+        profile.revision = existing
+            .map(|p| p.revision)
+            .unwrap_or(0)
+            .checked_add(1)
+            .ok_or_else(|| IdentityError::Storage("Overflow de revisão do perfil.".to_string()))?;
 
-        // Serialização com buffer Zeroizing pré-alocado para evitar realocações de PII no heap
-        let mut payload_buf = Zeroizing::new(Vec::with_capacity(4096));
-        serde_json::to_writer(&mut *payload_buf, &profile)
+        // Buffer protegido contra realocação que deixaria cópias de PII fora do alcance do zeroize
+        let mut payload_buf = Zeroizing::new(Vec::<u8>::with_capacity(PAYLOAD_BUF_CAPACITY));
+        serde_json::to_writer(&mut *payload_buf, &*profile)
             .map_err(|_| IdentityError::Serialization)?;
 
         let aad = build_profile_aad();
 
         let envelope = session.with_dek(|dek| {
             let identity_key = Subkeys::derive_identity_key(dek);
-            VaultCrypto::encrypt_with_aead(&identity_key, &payload_buf, &aad)
+            VaultCrypto::encrypt_with_aead(&identity_key, &payload_buf, aad)
                 .map_err(AccessControlError::Crypto)
         })?;
 
@@ -633,7 +826,7 @@ impl IdentityService {
             new_revision
         );
 
-        Ok(profile)
+        Ok((*profile).clone())
     }
 
     /// Consulta o perfil do usuário decifrando os dados protegidos pelo cofre.
@@ -641,13 +834,7 @@ impl IdentityService {
         db: &LocalDatabase,
         session: &VaultSession,
     ) -> Result<Option<UserProfileDto>, IdentityError> {
-        if !session.is_unlocked() {
-            return Err(IdentityError::VaultLocked);
-        }
-        let _op_guard = session
-            .acquire_operation()
-            .map_err(|_| IdentityError::VaultLocked)?;
-
+        let _op_guard = session.acquire_operation()?;
         let conn = db.get_connection()?;
         Self::load_profile_with_conn(&conn, session)
     }
@@ -658,15 +845,13 @@ impl IdentityService {
         session: &VaultSession,
         req: SaveUserProfileRequest,
     ) -> Result<UserProfileDto, IdentityError> {
-        if !session.is_unlocked() {
-            return Err(IdentityError::VaultLocked);
-        }
-        let _op_guard = session
-            .acquire_operation()
-            .map_err(|_| IdentityError::VaultLocked)?;
+        let _op_guard = session.acquire_operation()?;
+
+        // PII em claro protegida: zeroizada automaticamente no drop, inclusive nos retornos antecipados
+        let req = Zeroizing::new(req);
 
         let mut conn = db.get_connection()?;
-        let existing = Self::load_profile_with_conn(&conn, session)?;
+        let existing = Zeroizing::new(Self::load_profile_with_conn(&conn, session)?);
 
         // Verificação antecipada de concorrência antes de processar merge
         match (existing.as_ref(), req.expected_revision) {
@@ -694,30 +879,25 @@ impl IdentityService {
         Self::save_profile_internal(&mut conn, session, req, existing.as_ref())
     }
 
-    /// Importa dados legados do localStorage de forma segura, limitada e resiliente (tolerante a erros parciais).
+    /// Importa dados legados do localStorage de forma segura, limitada e resiliente.
     pub fn import_legacy_profile(
         db: &LocalDatabase,
         session: &VaultSession,
         legacy_json: &str,
     ) -> Result<UserProfileDto, IdentityError> {
-        if !session.is_unlocked() {
-            return Err(IdentityError::VaultLocked);
-        }
         if legacy_json.len() > MAX_LEGACY_JSON_BYTES {
             return Err(IdentityError::Validation(
                 "Payload JSON legado excede o limite máximo permitido de 64 KB.".to_string(),
             ));
         }
 
-        let _op_guard = session
-            .acquire_operation()
-            .map_err(|_| IdentityError::VaultLocked)?;
+        let _op_guard = session.acquire_operation()?;
 
         let mut conn = db.get_connection()?;
-        let existing = Self::load_profile_with_conn(&conn, session)?;
+        let mut existing = Zeroizing::new(Self::load_profile_with_conn(&conn, session)?);
 
         // Se o perfil existente já tem revisão >= 1 e campos básicos preenchidos, preserva
-        if let Some(ref profile) = existing {
+        if let Some(ref mut profile) = *existing {
             if profile.revision >= 1 && profile.completeness_score > 0 {
                 log::info!(
                     "[Identity] Perfil existente no cofre preservado durante reconciliação legada."
@@ -728,6 +908,13 @@ impl IdentityService {
 
         let value: serde_json::Value = serde_json::from_str(legacy_json)
             .map_err(|_| IdentityError::Validation("Formato JSON legado inválido.".to_string()))?;
+
+        // JSON válido que não seja objeto (ex.: [], null, 42) não pode gerar perfil vazio
+        if !value.is_object() {
+            return Err(IdentityError::Validation(
+                "O JSON legado deve ser um objeto.".to_string(),
+            ));
+        }
 
         let str_field = |name: &str| -> String {
             value
@@ -746,90 +933,34 @@ impl IdentityService {
                 .map(ToString::to_string)
         };
 
-        // Validação tolerante com descarte de campos inválidos sem abortar a migração
-        let tolerant_cpf = |name: &str| -> String {
-            let val = str_field(name);
-            if val.is_empty() {
-                return String::new();
-            }
-            match validate_cpf(&val) {
-                Ok(v) => v,
-                Err(_) => {
-                    log::warn!(
-                        "[Identity] Campo legado '{}' inválido descartado durante migração",
-                        name
-                    );
-                    String::new()
-                }
-            }
+        let discard = |name: &str| {
+            log::warn!(
+                "[Identity] Campo legado '{}' inválido descartado durante migração",
+                name
+            );
         };
 
-        let tolerant_cnpj = |name: &str| -> String {
-            let val = str_field(name);
-            if val.is_empty() {
-                return String::new();
-            }
-            match validate_cnpj(&val) {
-                Ok(v) => v,
-                Err(_) => {
-                    log::warn!(
-                        "[Identity] Campo legado '{}' inválido descartado durante migração",
-                        name
-                    );
-                    String::new()
+        let tolerant_validated =
+            |name: &str, validator: fn(&str) -> Result<String, &'static str>| -> String {
+                let val = str_field(name);
+                if val.is_empty() {
+                    return String::new();
                 }
-            }
-        };
-
-        let tolerant_date = |name: &str| -> String {
-            let val = str_field(name);
-            if val.is_empty() {
-                return String::new();
-            }
-            match validate_and_normalize_date(&val) {
-                Ok(v) => v,
-                Err(_) => {
-                    log::warn!(
-                        "[Identity] Campo legado '{}' inválido descartado durante migração",
-                        name
-                    );
+                validator(&val).unwrap_or_else(|_| {
+                    discard(name);
                     String::new()
-                }
-            }
-        };
-
-        let tolerant_cep = |name: &str| -> String {
-            let val = str_field(name);
-            if val.is_empty() {
-                return String::new();
-            }
-            match validate_cep(&val) {
-                Ok(v) => v,
-                Err(_) => {
-                    log::warn!(
-                        "[Identity] Campo legado '{}' inválido descartado durante migração",
-                        name
-                    );
-                    String::new()
-                }
-            }
-        };
+                })
+            };
 
         let tolerant_email = |name: &str| -> String {
             let val = str_field(name);
             if val.is_empty() {
                 return String::new();
             }
-            match validate_email(&val) {
-                Ok(v) => v,
-                Err(_) => {
-                    log::warn!(
-                        "[Identity] Campo legado '{}' inválido descartado durante migração",
-                        name
-                    );
-                    String::new()
-                }
-            }
+            validate_email(&val).unwrap_or_else(|_| {
+                discard(name);
+                String::new()
+            })
         };
 
         let tolerant_url = |name: &str| -> Option<String> {
@@ -837,10 +968,7 @@ impl IdentityService {
             match parse_safe_https_url(&val, name) {
                 Ok(u) => Some(u.to_string()),
                 Err(_) => {
-                    log::warn!(
-                        "[Identity] Campo legado '{}' inválido descartado durante migração",
-                        name
-                    );
+                    discard(name);
                     None
                 }
             }
@@ -849,15 +977,31 @@ impl IdentityService {
         let tolerant_text = |name: &str, max: usize| -> String {
             let val = str_field(name);
             if val.chars().count() > max || contains_dangerous_control_or_bidi(&val) {
-                log::warn!(
-                    "[Identity] Campo legado '{}' inválido descartado durante migração",
-                    name
-                );
+                discard(name);
                 String::new()
             } else {
                 val
             }
         };
+
+        let social_links = value.get("socialLinks").and_then(|v| v.as_object()).map(|obj| {
+            let get_social = |key: &str| -> Option<String> {
+                let raw = obj.get(key).and_then(|v| v.as_str()).map(str::trim)?;
+                match sanitize_social_url(key, &Some(raw.to_string())) {
+                    Ok(opt) => opt,
+                    Err(_) => {
+                        discard(key);
+                        None
+                    }
+                }
+            };
+            SocialLinksDto {
+                facebook: get_social("facebook"),
+                instagram: get_social("instagram"),
+                linkedin: get_social("linkedin"),
+                twitter: get_social("twitter"),
+            }
+        });
 
         let req = SaveUserProfileRequest {
             person_type: {
@@ -873,14 +1017,14 @@ impl IdentityService {
             last_name: tolerant_text("lastName", MAX_SHORT_FIELD_CHARS),
             display_name: opt_str_field("displayName")
                 .map(|_| tolerant_text("displayName", MAX_MEDIUM_FIELD_CHARS)),
-            cpf: tolerant_cpf("cpf"),
+            cpf: tolerant_validated("cpf", validate_cpf),
             rg: tolerant_text("rg", 30),
             rg_issuer: tolerant_text("rgIssuer", 30),
             cnh: tolerant_text("cnh", 30),
             cnh_category: tolerant_text("cnhCategory", 10),
             mother_name: tolerant_text("motherName", MAX_MEDIUM_FIELD_CHARS),
             father_name: tolerant_text("fatherName", MAX_MEDIUM_FIELD_CHARS),
-            birth_date: tolerant_date("birthDate"),
+            birth_date: tolerant_validated("birthDate", validate_and_normalize_date),
             nationality: {
                 let n = tolerant_text("nationality", MAX_SHORT_FIELD_CHARS);
                 if n.is_empty() {
@@ -891,9 +1035,9 @@ impl IdentityService {
             },
             marital_status: tolerant_text("maritalStatus", 40),
             company_name: tolerant_text("companyName", MAX_MEDIUM_FIELD_CHARS),
-            cnpj: tolerant_cnpj("cnpj"),
+            cnpj: tolerant_validated("cnpj", validate_cnpj),
             legal_representative: tolerant_text("legalRepresentative", MAX_MEDIUM_FIELD_CHARS),
-            legal_representative_cpf: tolerant_cpf("legalRepresentativeCpf"),
+            legal_representative_cpf: tolerant_validated("legalRepresentativeCpf", validate_cpf),
             email: tolerant_email("email"),
             phone_number: tolerant_text("phoneNumber", 30),
             country: {
@@ -904,7 +1048,7 @@ impl IdentityService {
                     c
                 }
             },
-            zip_code: tolerant_cep("zipCode"),
+            zip_code: tolerant_validated("zipCode", validate_cep),
             state: tolerant_text("state", 40),
             city: tolerant_text("city", MAX_SHORT_FIELD_CHARS),
             neighborhood: tolerant_text("neighborhood", MAX_SHORT_FIELD_CHARS),
@@ -919,11 +1063,28 @@ impl IdentityService {
             is_public: false,
             photo_url: tolerant_url("photoURL"),
             cover_url: tolerant_url("coverURL"),
+            linked_providers: Vec::new(),
+            social_links,
+            clear_fields: Vec::new(),
             expected_revision: existing.as_ref().map(|p| p.revision),
-            ..Default::default()
         };
 
-        Self::save_profile_internal(&mut conn, session, req, existing.as_ref())
+        match Self::save_profile_internal(&mut conn, session, Zeroizing::new(req), existing.as_ref()) {
+            Ok(saved) => Ok(saved),
+            Err(IdentityError::ConcurrencyConflict(_)) => {
+                // Idempotência sob corrida de inicialização: se outra thread/janela já migrou, retorna o perfil persistido
+                if let Some(current) = Self::load_profile_with_conn(&conn, session)? {
+                    if current.revision >= 1 && current.completeness_score > 0 {
+                        return Ok(current);
+                    }
+                }
+                Err(IdentityError::ConcurrencyConflict(format!(
+                    "{}: Conflito concorrente durante migração legada.",
+                    CONCURRENCY_CONFLICT_PREFIX
+                )))
+            }
+            Err(err) => Err(err),
+        }
     }
 }
 
@@ -1145,10 +1306,16 @@ mod tests {
         req.website = "https://localhost/api".to_string();
         assert!(IdentityService::sanitize_and_validate(&req, None).is_err());
 
-        // SSRF: domínio .local / .internal
+        // SSRF: domínio .local / .internal / .home.arpa
         req.website = "https://servidor.local/status".to_string();
         assert!(IdentityService::sanitize_and_validate(&req, None).is_err());
         req.website = "https://servidor.internal/status".to_string();
+        assert!(IdentityService::sanitize_and_validate(&req, None).is_err());
+        req.website = "https://roteador.home.arpa/admin".to_string();
+        assert!(IdentityService::sanitize_and_validate(&req, None).is_err());
+
+        // Quebra de linha / controle em URL
+        req.website = "https://legitimo.com/\nspoof".to_string();
         assert!(IdentityService::sanitize_and_validate(&req, None).is_err());
     }
 
@@ -1163,6 +1330,7 @@ mod tests {
     #[test]
     fn test_pii_redacted_in_debug_formatting() {
         let profile = UserProfileDto {
+            username: "carlos_nome_privado".to_string(),
             first_name: "Carlos".to_string(),
             cpf: "529.982.247-25".to_string(),
             address: "Rua Secreta, 123".to_string(),
@@ -1177,6 +1345,7 @@ mod tests {
         assert!(!debug_output.contains("Carlos"));
         assert!(!debug_output.contains("529.982.247-25"));
         assert!(!debug_output.contains("Rua Secreta"));
+        assert!(!debug_output.contains("carlos_nome_privado"));
         assert!(debug_output.contains("[REDACTED_BY_LGPD]"));
 
         let social_debug = format!("{:?}", profile.social_links.unwrap());
@@ -1310,7 +1479,11 @@ mod tests {
             "photoURL": "data:image/png;base64,iVBORw0KGgo...",
             "zipCode": "01310-100",
             "city": "São Paulo",
-            "state": "SP"
+            "state": "SP",
+            "socialLinks": {
+                "linkedin": "https://www.linkedin.com/in/legado",
+                "twitter": "https://malicioso.com/phishing"
+            }
         }"#;
 
         let migrated = IdentityService::import_legacy_profile(&db, &session, legacy_json)
@@ -1324,15 +1497,154 @@ mod tests {
         assert_eq!(migrated.cpf, "");
         assert_eq!(migrated.birth_date, "");
         assert_eq!(migrated.photo_url, None);
+        // Social link válido migrado, inválido descartado
+        let links = migrated.social_links.expect("Deveria conter social_links");
+        assert_eq!(
+            links.linkedin.as_deref(),
+            Some("https://www.linkedin.com/in/legado")
+        );
+        assert_eq!(links.twitter, None);
     }
 
     #[test]
-    fn test_bidi_and_control_character_rejection_in_profile() {
+    fn test_import_legacy_rejects_non_object_json() {
+        let (db, session, _guard) = setup_test_vault();
+        for payload in ["[]", "null", "\"texto\"", "42"] {
+            let err = IdentityService::import_legacy_profile(&db, &session, payload).unwrap_err();
+            assert!(matches!(err, IdentityError::Validation(_)), "payload: {payload}");
+        }
+        assert!(IdentityService::get_profile(&db, &session).unwrap().is_none());
+    }
+
+    #[test]
+    fn test_clear_fields_erases_only_requested_pii() {
+        let (db, session, _guard) = setup_test_vault();
+        let first = SaveUserProfileRequest {
+            rg: "123456".to_string(),
+            mother_name: "Maria Silva".to_string(),
+            cnpj: "12ABC34501DE35".to_string(),
+            ..sample_req("52998224725")
+        };
+        let saved = IdentityService::save_profile(&db, &session, first).unwrap();
+        assert_eq!(saved.cpf, "529.982.247-25");
+        assert_eq!(saved.rg, "123456");
+
+        let clear = SaveUserProfileRequest {
+            clear_fields: vec!["cpf".to_string(), "rg".to_string()],
+            expected_revision: Some(saved.revision),
+            ..sample_req("")
+        };
+        let updated = IdentityService::save_profile(&db, &session, clear).unwrap();
+        assert_eq!(updated.cpf, "");
+        assert_eq!(updated.rg, "");
+        assert_eq!(updated.mother_name, "Maria Silva");
+        assert_eq!(updated.cnpj, "12.ABC.345/01DE-35"); // Inativo em PF preservado
+
+        let reloaded = IdentityService::get_profile(&db, &session).unwrap().unwrap();
+        assert_eq!(reloaded.cpf, "");
+        assert_eq!(reloaded.rg, "");
+    }
+
+    #[test]
+    fn test_crlf_rejection_in_single_line_text_fields() {
         let mut req = sample_req("52998224725");
-        req.first_name = "Carlos\u{202E}Invertido".to_string();
+        req.first_name = "Carlos\r\nInjetado".to_string();
         let result = IdentityService::sanitize_and_validate(&req, None);
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), IdentityError::Validation(_)));
+
+        // Multiline em `about` deve ser aceito
+        req.first_name = "Carlos".to_string();
+        req.about = "Linha 1\nLinha 2\r\nLinha 3".to_string();
+        assert!(IdentityService::sanitize_and_validate(&req, None).is_ok());
+    }
+
+    #[test]
+    fn test_email_validation_strict() {
+        for bad in [
+            "<script>@x.com",
+            "a\"b@x.com",
+            "a@b",
+            "a@b.c",
+            "a..b@x.com",
+            ".a@x.com",
+            "a.@x.com",
+            "a@-x.com",
+            "a@x..com",
+            "a b@x.com",
+            "a@@x.com",
+            "@x.com",
+        ] {
+            assert!(validate_email(bad).is_err(), "Deveria rejeitar: {bad}");
+        }
+        for good in [
+            "carlos@exemplo.com.br",
+            "a+tag@sub.dominio.io",
+            "contato@empresa.com",
+        ] {
+            assert!(validate_email(good).is_ok(), "Deveria aceitar: {good}");
+        }
+    }
+
+    #[test]
+    fn test_absent_person_type_preserves_existing_and_nationality() {
+        let (db, session, _guard) = setup_test_vault();
+        let pj = SaveUserProfileRequest {
+            person_type: "PJ".to_string(),
+            company_name: "Empresa Teste".to_string(),
+            cnpj: "12ABC34501DE35".to_string(),
+            nationality: "Argentina".to_string(),
+            country: "Argentina".to_string(),
+            ..Default::default()
+        };
+        let saved = IdentityService::save_profile(&db, &session, pj).unwrap();
+        assert_eq!(saved.person_type, "PJ");
+        assert_eq!(saved.nationality, "Argentina");
+
+        let partial: SaveUserProfileRequest = serde_json::from_str(&format!(
+            r#"{{"expectedRevision":{}}}"#,
+            saved.revision
+        ))
+        .unwrap();
+        let updated = IdentityService::save_profile(&db, &session, partial).unwrap();
+        assert_eq!(updated.person_type, "PJ");
+        assert_eq!(updated.nationality, "Argentina");
+        assert_eq!(updated.company_name, "Empresa Teste");
+    }
+
+    #[test]
+    fn test_display_name_custom_preserved_and_auto_follows_rename() {
+        let (db, session, _guard) = setup_test_vault();
+
+        let custom = SaveUserProfileRequest {
+            display_name: Some("Dr. Carlos".to_string()),
+            ..sample_req("52998224725")
+        };
+        let v1 = IdentityService::save_profile(&db, &session, custom).unwrap();
+        assert_eq!(v1.display_name, "Dr. Carlos");
+
+        let omitted = SaveUserProfileRequest {
+            expected_revision: Some(v1.revision),
+            ..sample_req("52998224725")
+        };
+        let v2 = IdentityService::save_profile(&db, &session, omitted).unwrap();
+        assert_eq!(v2.display_name, "Dr. Carlos");
+
+        let reset = SaveUserProfileRequest {
+            display_name: Some(String::new()),
+            expected_revision: Some(v2.revision),
+            ..sample_req("52998224725")
+        };
+        let v3 = IdentityService::save_profile(&db, &session, reset).unwrap();
+        assert_eq!(v3.display_name, "Carlos Silva");
+
+        let rename = SaveUserProfileRequest {
+            first_name: "Carla".to_string(),
+            expected_revision: Some(v3.revision),
+            ..sample_req("52998224725")
+        };
+        let v4 = IdentityService::save_profile(&db, &session, rename).unwrap();
+        assert_eq!(v4.display_name, "Carla Silva");
     }
 
     #[test]
