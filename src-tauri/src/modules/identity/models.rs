@@ -211,7 +211,10 @@ impl Default for UserProfileDto {
 }
 
 /// Projeção pública com allowlist estrita de campos não-sensíveis.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+///
+/// Implementa `Debug` com redação de dados pessoais (`[REDACTED_BY_LGPD]`) e `Zeroize`
+/// para higienização explícita de memória.
+#[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct PublicUserProfileDto {
     pub display_name: String,
@@ -225,6 +228,30 @@ pub struct PublicUserProfileDto {
     pub is_public: bool,
     #[serde(default)]
     pub social_links: Option<SocialLinksDto>,
+}
+
+impl fmt::Debug for PublicUserProfileDto {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PublicUserProfileDto")
+            .field("is_public", &self.is_public)
+            .field("pii_data", &"[REDACTED_BY_LGPD]")
+            .finish()
+    }
+}
+
+impl Zeroize for PublicUserProfileDto {
+    fn zeroize(&mut self) {
+        self.display_name.zeroize();
+        self.username.zeroize();
+        self.occupation.zeroize();
+        self.company.zeroize();
+        self.website.zeroize();
+        self.about.zeroize();
+        self.photo_url.zeroize();
+        self.cover_url.zeroize();
+        self.is_public.zeroize();
+        self.social_links.zeroize();
+    }
 }
 
 impl UserProfileDto {
@@ -470,13 +497,13 @@ pub fn extract_digits(input: &str) -> String {
 /// Validação algorítmica rigorosa de CPF com dois dígitos verificadores
 /// (sem alocação durante a validação; apenas a string formatada final aloca).
 pub fn validate_cpf(raw: &str) -> Result<String, &'static str> {
-    let trimmed = raw.trim();
-    if trimmed.is_empty() {
-        return Ok(String::new());
+    if raw.len() > 64 {
+        return Err("O CPF informado excede o limite de tamanho permitido.");
     }
 
-    if trimmed.len() > 64 {
-        return Err("O CPF informado excede o limite de tamanho permitido.");
+    let trimmed = raw.trim_matches(' ');
+    if trimmed.is_empty() {
+        return Ok(String::new());
     }
 
     let mut nums = [0u32; 11];
@@ -489,7 +516,7 @@ pub fn validate_cpf(raw: &str) -> Result<String, &'static str> {
             }
             nums[len] = (c as u8 - b'0') as u32;
             len += 1;
-        } else if c != '.' && c != '-' && !c.is_whitespace() {
+        } else if c != '.' && c != '-' && c != ' ' {
             return Err(
                 "O CPF contém caracteres inválidos. Utilize apenas números e separadores válidos.",
             );
@@ -541,13 +568,13 @@ pub fn validate_cpf(raw: &str) -> Result<String, &'static str> {
 /// As 12 primeiras posições podem conter dígitos e letras maiúsculas (A-Z).
 /// As 2 posições finais são estritamente os dígitos verificadores numéricos calculados por Módulo 11 (ASCII - 48).
 pub fn validate_cnpj(raw: &str) -> Result<String, &'static str> {
-    let trimmed = raw.trim();
-    if trimmed.is_empty() {
-        return Ok(String::new());
+    if raw.len() > 64 {
+        return Err("O CNPJ informado excede o limite de tamanho permitido.");
     }
 
-    if trimmed.len() > 64 {
-        return Err("O CNPJ informado excede o limite de tamanho permitido.");
+    let trimmed = raw.trim_matches(' ');
+    if trimmed.is_empty() {
+        return Ok(String::new());
     }
 
     let mut bytes = [0u8; 14];
@@ -560,7 +587,7 @@ pub fn validate_cnpj(raw: &str) -> Result<String, &'static str> {
             }
             bytes[len] = (c as u8).to_ascii_uppercase();
             len += 1;
-        } else if c != '.' && c != '/' && c != '-' && !c.is_whitespace() {
+        } else if c != '.' && c != '/' && c != '-' && c != ' ' {
             return Err(
                 "O CNPJ contém caracteres inválidos. Utilize apenas letras, números e separadores válidos.",
             );
@@ -617,13 +644,13 @@ pub fn validate_cnpj(raw: &str) -> Result<String, &'static str> {
 
 /// Valida e formata CEP brasileiro (8 dígitos, zero alocações intermediárias de heap).
 pub fn validate_cep(raw: &str) -> Result<String, &'static str> {
-    let trimmed = raw.trim();
-    if trimmed.is_empty() {
-        return Ok(String::new());
+    if raw.len() > 32 {
+        return Err("O CEP informado excede o limite de tamanho permitido.");
     }
 
-    if trimmed.len() > 32 {
-        return Err("O CEP informado excede o limite de tamanho permitido.");
+    let trimmed = raw.trim_matches(' ');
+    if trimmed.is_empty() {
+        return Ok(String::new());
     }
 
     let mut digits = [0u8; 8];
@@ -636,7 +663,7 @@ pub fn validate_cep(raw: &str) -> Result<String, &'static str> {
             }
             digits[len] = c as u8;
             len += 1;
-        } else if c != '-' && !c.is_whitespace() {
+        } else if c != '-' && c != ' ' {
             return Err("O CEP contém caracteres inválidos. Utilize apenas números e hífen.");
         }
     }
@@ -651,13 +678,13 @@ pub fn validate_cep(raw: &str) -> Result<String, &'static str> {
 
 /// Valida data no formato ISO YYYY-MM-DD ou DD/MM/YYYY e retorna formato canônico ISO YYYY-MM-DD.
 pub fn validate_and_normalize_date(raw: &str) -> Result<String, &'static str> {
-    let trimmed = raw.trim();
-    if trimmed.is_empty() {
-        return Ok(String::new());
+    if raw.len() > 32 {
+        return Err("Formato de data inválido. Utilize AAAA-MM-DD ou DD/MM/AAAA.");
     }
 
-    if trimmed.len() > 32 {
-        return Err("Formato de data inválido. Utilize AAAA-MM-DD ou DD/MM/AAAA.");
+    let trimmed = raw.trim_matches(' ');
+    if trimmed.is_empty() {
+        return Ok(String::new());
     }
 
     let parsed = if trimmed.contains('/') {
@@ -907,5 +934,51 @@ mod tests {
         assert!(req.linked_providers.is_empty());
         assert!(req.clear_fields.is_empty());
         assert_eq!(req.expected_revision, None);
+    }
+
+    #[test]
+    fn test_public_projection_redacts_debug_and_zeroizes() {
+        let profile = UserProfileDto {
+            is_public: true,
+            display_name: "Carlos Silva".to_string(),
+            username: "carlos_privado".to_string(),
+            occupation: "Engenheiro".to_string(),
+            company: "ASPPIBRA".to_string(),
+            website: "https://carlos.dev".to_string(),
+            about: "Bio".to_string(),
+            photo_url: Some("https://carlos.dev/avatar.png".to_string()),
+            ..Default::default()
+        };
+
+        let mut public_proj = profile.to_public_projection().expect("Deve gerar projeção");
+        let debug_str = format!("{:?}", public_proj);
+        assert!(!debug_str.contains("Carlos Silva"));
+        assert!(!debug_str.contains("carlos_privado"));
+        assert!(!debug_str.contains("https://carlos.dev"));
+        assert!(debug_str.contains("[REDACTED_BY_LGPD]"));
+
+        public_proj.zeroize();
+        assert!(public_proj.display_name.is_empty());
+        assert!(public_proj.username.is_empty());
+        assert!(public_proj.photo_url.is_none());
+    }
+
+    #[test]
+    fn test_document_validators_reject_control_whitespace_and_oversized_padding() {
+        // Rejeita quebras de linha e separadores Unicode em documentos
+        assert!(validate_cpf("529.982\r\n.247-25").is_err());
+        assert!(validate_cpf("529.982.247-25\r\n").is_err());
+        assert!(validate_cnpj("12.ABC.345\n/01DE-35").is_err());
+        assert!(validate_cep("01310\t-100").is_err());
+
+        // Rejeita em O(1) strings gigantes com padding de espaços antes de trim()
+        let huge_cpf = format!("{}52998224725", " ".repeat(1024));
+        assert!(validate_cpf(&huge_cpf).is_err());
+        let huge_cnpj = format!("{}12ABC34501DE35", " ".repeat(1024));
+        assert!(validate_cnpj(&huge_cnpj).is_err());
+        let huge_cep = format!("{}01310100", " ".repeat(1024));
+        assert!(validate_cep(&huge_cep).is_err());
+        let huge_date = format!("{}1990-01-15", " ".repeat(1024));
+        assert!(validate_and_normalize_date(&huge_date).is_err());
     }
 }
