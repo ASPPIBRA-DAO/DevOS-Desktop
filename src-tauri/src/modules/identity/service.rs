@@ -5,7 +5,7 @@
 
 use std::sync::OnceLock;
 use url::Url;
-use zeroize::Zeroizing;
+use zeroize::{Zeroize, Zeroizing};
 
 use super::models::{
     calculate_completeness_score, contains_dangerous_control_or_bidi, validate_and_normalize_date,
@@ -84,17 +84,25 @@ impl From<AccessControlError> for IdentityError {
 }
 
 /// Normaliza e valida o username: apenas [a-z0-9_], sem duplicados nas extremidades,
-/// comprimento entre 3 e 30 caracteres. Rejeita usernames reservados.
+/// comprimento entre 3 e 30 caracteres. Rejeita usernames reservados e caracteres de controle/bidi.
 pub fn normalize_username(raw: &str) -> Result<String, IdentityError> {
-    let trimmed = raw.trim();
-    if trimmed.is_empty() {
-        return Ok(String::new());
-    }
-
-    if trimmed.len() > 128 {
+    if raw.len() > 128 {
         return Err(IdentityError::Validation(
             "O username informado excede o limite máximo de 128 bytes.".to_string(),
         ));
+    }
+
+    if contains_dangerous_control_or_bidi(raw)
+        || raw.chars().any(|c| c == '\n' || c == '\r' || c == '\t')
+    {
+        return Err(IdentityError::Validation(
+            "O username contém caracteres de controle ou bidirecionais proibidos.".to_string(),
+        ));
+    }
+
+    let trimmed = raw.trim_matches(' ');
+    if trimmed.is_empty() {
+        return Ok(String::new());
     }
 
     let mut result = String::with_capacity(30);
@@ -141,22 +149,23 @@ pub fn normalize_username(raw: &str) -> Result<String, IdentityError> {
 /// Valida URLs externas com HTTPS estrito, rejeitando esquemas perigosos,
 /// credenciais embutidas, portas personalizadas, endereços IP e domínios locais/privados (anti-SSRF).
 fn parse_safe_https_url(raw: &str, field_label: &str) -> Result<Url, IdentityError> {
-    let trimmed = raw.trim();
-    if trimmed.len() > MAX_URL_BYTES {
+    if raw.len() > MAX_URL_BYTES {
         return Err(IdentityError::Validation(format!(
             "{} excede o limite permitido de {} bytes.",
             field_label, MAX_URL_BYTES
         )));
     }
 
-    if contains_dangerous_control_or_bidi(trimmed)
-        || trimmed.chars().any(|c| c == '\n' || c == '\r' || c == '\t')
+    if contains_dangerous_control_or_bidi(raw)
+        || raw.chars().any(|c| c == '\n' || c == '\r' || c == '\t')
     {
         return Err(IdentityError::Validation(format!(
             "{} contém caracteres de controle ou bidirecionais proibidos.",
             field_label
         )));
     }
+
+    let trimmed = raw.trim_matches(' ');
 
     let parsed = Url::parse(trimmed).map_err(|_| {
         IdentityError::Validation(format!("{} inválida ou malformada.", field_label))
@@ -269,10 +278,28 @@ fn sanitize_optional_https_url(
     value: Option<&str>,
     field_label: &str,
 ) -> Result<Option<String>, IdentityError> {
-    let Some(raw) = value.map(str::trim).filter(|s| !s.is_empty()) else {
+    let Some(raw) = value else {
         return Ok(None);
     };
-    let parsed = parse_safe_https_url(raw, field_label)?;
+    if raw.len() > MAX_URL_BYTES {
+        return Err(IdentityError::Validation(format!(
+            "{} excede o limite permitido de {} bytes.",
+            field_label, MAX_URL_BYTES
+        )));
+    }
+    if contains_dangerous_control_or_bidi(raw)
+        || raw.chars().any(|c| c == '\n' || c == '\r' || c == '\t')
+    {
+        return Err(IdentityError::Validation(format!(
+            "{} contém caracteres de controle ou bidirecionais proibidos.",
+            field_label
+        )));
+    }
+    let trimmed = raw.trim_matches(' ');
+    if trimmed.is_empty() {
+        return Ok(None);
+    }
+    let parsed = parse_safe_https_url(trimmed, field_label)?;
     Ok(Some(parsed.to_string()))
 }
 
@@ -281,11 +308,29 @@ pub fn sanitize_social_url(
     platform: &str,
     value: &Option<String>,
 ) -> Result<Option<String>, IdentityError> {
-    let Some(raw_value) = value.as_deref().map(str::trim).filter(|s| !s.is_empty()) else {
+    let Some(raw_value) = value.as_deref() else {
         return Ok(None);
     };
+    if raw_value.len() > MAX_URL_BYTES {
+        return Err(IdentityError::Validation(format!(
+            "URL de rede social excede o limite permitido de {} bytes.",
+            MAX_URL_BYTES
+        )));
+    }
+    if contains_dangerous_control_or_bidi(raw_value)
+        || raw_value.chars().any(|c| c == '\n' || c == '\r' || c == '\t')
+    {
+        return Err(IdentityError::Validation(
+            "URL de rede social contém caracteres de controle ou bidirecionais proibidos."
+                .to_string(),
+        ));
+    }
+    let trimmed = raw_value.trim_matches(' ');
+    if trimmed.is_empty() {
+        return Ok(None);
+    }
 
-    let parsed = parse_safe_https_url(raw_value, "URL de rede social")?;
+    let parsed = parse_safe_https_url(trimmed, "URL de rede social")?;
 
     let allowed_hosts: &[&str] = match platform {
         "facebook" => &[
@@ -338,20 +383,21 @@ fn validate_text_field_inner(
         )));
     }
 
+    if !allow_multiline && value.chars().any(|c| c == '\n' || c == '\r' || c == '\t') {
+        return Err(IdentityError::Validation(format!(
+            "O campo '{}' não permite quebras de linha ou tabulações.",
+            label
+        )));
+    }
+
     let trimmed = value.trim();
     let mut count = 0usize;
-    for c in trimmed.chars() {
+    for _ in trimmed.chars() {
         count += 1;
         if count > max {
             return Err(IdentityError::Validation(format!(
                 "O campo '{}' não pode exceder {} caracteres.",
                 label, max
-            )));
-        }
-        if !allow_multiline && (c == '\n' || c == '\r' || c == '\t') {
-            return Err(IdentityError::Validation(format!(
-                "O campo '{}' não permite quebras de linha ou tabulações.",
-                label
             )));
         }
     }
@@ -367,11 +413,11 @@ fn validate_multiline_text_field(value: &str, max: usize, label: &str) -> Result
 }
 
 fn validate_email(raw: &str) -> Result<String, IdentityError> {
-    let trimmed = raw.trim();
+    validate_text_field(raw, MAX_EMAIL_CHARS, "E-mail")?;
+    let trimmed = raw.trim_matches(' ');
     if trimmed.is_empty() {
         return Ok(String::new());
     }
-    validate_text_field(trimmed, MAX_EMAIL_CHARS, "E-mail")?;
     let invalid = || IdentityError::Validation("Formato de e-mail inválido.".to_string());
 
     let mut parts = trimmed.split('@');
@@ -440,14 +486,13 @@ fn resolve_validated<F>(
 where
     F: Fn(&str) -> Result<String, &'static str>,
 {
-    let trimmed = incoming.trim();
-    if !trimmed.is_empty() {
-        return validator(trimmed)
+    if !incoming.trim_matches(' ').is_empty() {
+        return validator(incoming)
             .map_err(|e| IdentityError::Validation(format!("{} inválido: {}", label, e)));
     }
 
-    let candidate = existing.unwrap_or("").trim();
-    if candidate.is_empty() {
+    let candidate = existing.unwrap_or("");
+    if candidate.trim_matches(' ').is_empty() {
         return Ok(String::new());
     }
 
@@ -629,8 +674,7 @@ impl IdentityService {
         }
 
         // 2. Normalização e validação de identificadores
-        let username = match req.username.as_deref().map(str::trim) {
-            Some("") => String::new(),
+        let username = match req.username.as_deref() {
             Some(u) => normalize_username(u)?,
             None => existing.map(|p| p.username.clone()).unwrap_or_default(),
         };
@@ -679,8 +723,9 @@ impl IdentityService {
             "CEP",
             validate_cep,
         )?;
-        let email = if !req.email.trim().is_empty() {
-            validate_email(&req.email)?
+        let validated_email = validate_email(&req.email)?;
+        let email = if !validated_email.is_empty() {
+            validated_email
         } else {
             existing.map(|p| p.email.clone()).unwrap_or_default()
         };
@@ -690,13 +735,11 @@ impl IdentityService {
             .unwrap_or_else(|| existing.map(|p| p.website.clone()).unwrap_or_default());
 
         let photo_url = match &req.photo_url {
-            Some(s) if s.trim().is_empty() => None,
             Some(s) => sanitize_optional_https_url(Some(s), "URL da foto")?,
             None => existing.and_then(|p| p.photo_url.clone()),
         };
 
         let cover_url = match &req.cover_url {
-            Some(s) if s.trim().is_empty() => None,
             Some(s) => sanitize_optional_https_url(Some(s), "URL da capa")?,
             None => existing.and_then(|p| p.cover_url.clone()),
         };
@@ -912,12 +955,6 @@ impl IdentityService {
         let mut conn = db.get_connection()?;
         let existing = Zeroizing::new(Self::load_profile_with_conn(&conn, session)?);
 
-        // Verificação antecipada centralizada antes de processar merge e criptografia
-        IdentityRepository::verify_and_next_revision(
-            existing.as_ref().map(|p| p.revision),
-            req.expected_revision,
-        )?;
-
         Self::save_profile_internal(&mut conn, session, &req, existing.as_ref())
     }
 
@@ -948,8 +985,35 @@ impl IdentityService {
             }
         }
 
-        let value: serde_json::Value = serde_json::from_str(legacy_json)
+        struct ZeroizingJsonValue(serde_json::Value);
+        impl ZeroizingJsonValue {
+            fn zeroize_recursive(val: &mut serde_json::Value) {
+                match val {
+                    serde_json::Value::String(s) => s.zeroize(),
+                    serde_json::Value::Array(arr) => {
+                        for item in arr {
+                            Self::zeroize_recursive(item);
+                        }
+                    }
+                    serde_json::Value::Object(map) => {
+                        for (_, v) in map.iter_mut() {
+                            Self::zeroize_recursive(v);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        impl Drop for ZeroizingJsonValue {
+            fn drop(&mut self) {
+                Self::zeroize_recursive(&mut self.0);
+            }
+        }
+
+        let parsed_value: serde_json::Value = serde_json::from_str(legacy_json)
             .map_err(|_| IdentityError::Validation("Formato JSON legado inválido.".to_string()))?;
+        let value_guard = ZeroizingJsonValue(parsed_value);
+        let value = &value_guard.0;
 
         // JSON válido que não seja objeto (ex.: [], null, 42) não pode gerar perfil vazio
         if !value.is_object() {
@@ -958,21 +1022,19 @@ impl IdentityService {
             ));
         }
 
-        let str_field = |name: &str| -> String {
+        let str_slice = |name: &str| -> &str {
             value
                 .get(name)
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .trim()
-                .to_string()
         };
-        let opt_str_field = |name: &str| -> Option<String> {
+        let opt_str_slice = |name: &str| -> Option<&str> {
             value
                 .get(name)
                 .and_then(|v| v.as_str())
                 .map(str::trim)
                 .filter(|s| !s.is_empty())
-                .map(ToString::to_string)
         };
 
         let discard = |name: &str| {
@@ -984,30 +1046,30 @@ impl IdentityService {
 
         let tolerant_validated =
             |name: &str, validator: fn(&str) -> Result<String, &'static str>| -> String {
-                let val = str_field(name);
+                let val = str_slice(name);
                 if val.is_empty() {
                     return String::new();
                 }
-                validator(&val).unwrap_or_else(|_| {
+                validator(val).unwrap_or_else(|_| {
                     discard(name);
                     String::new()
                 })
             };
 
         let tolerant_email = |name: &str| -> String {
-            let val = str_field(name);
+            let val = str_slice(name);
             if val.is_empty() {
                 return String::new();
             }
-            validate_email(&val).unwrap_or_else(|_| {
+            validate_email(val).unwrap_or_else(|_| {
                 discard(name);
                 String::new()
             })
         };
 
         let tolerant_url = |name: &str| -> Option<String> {
-            let val = opt_str_field(name)?;
-            match parse_safe_https_url(&val, name) {
+            let val = opt_str_slice(name)?;
+            match parse_safe_https_url(val, name) {
                 Ok(u) => Some(u.to_string()),
                 Err(_) => {
                     discard(name);
@@ -1017,22 +1079,22 @@ impl IdentityService {
         };
 
         let tolerant_text = |name: &str, max: usize| -> String {
-            let val = str_field(name);
-            if validate_text_field(&val, max, name).is_err() {
+            let val = str_slice(name);
+            if validate_text_field(val, max, name).is_err() {
                 discard(name);
                 String::new()
             } else {
-                val
+                val.to_string()
             }
         };
 
         let tolerant_multiline_text = |name: &str, max: usize| -> String {
-            let val = str_field(name);
-            if validate_multiline_text_field(&val, max, name).is_err() {
+            let val = str_slice(name);
+            if validate_multiline_text_field(val, max, name).is_err() {
                 discard(name);
                 String::new()
             } else {
-                val
+                val.to_string()
             }
         };
 
@@ -1044,7 +1106,7 @@ impl IdentityService {
                     .map(str::trim)
                     .filter(|s| !s.is_empty())?
                     .to_string();
-                let candidate = Some(raw);
+                let candidate = Zeroizing::new(Some(raw));
                 match sanitize_social_url(key, &candidate) {
                     Ok(opt) => opt,
                     Err(_) => {
@@ -1063,14 +1125,16 @@ impl IdentityService {
 
         let req = Zeroizing::new(SaveUserProfileRequest {
             person_type: {
-                let p = str_field("personType");
+                let p = str_slice("personType");
                 if p.eq_ignore_ascii_case(PERSON_TYPE_PJ) {
                     PERSON_TYPE_PJ.to_string()
-                } else {
+                } else if p.eq_ignore_ascii_case(PERSON_TYPE_PF) {
                     PERSON_TYPE_PF.to_string()
+                } else {
+                    String::new()
                 }
             },
-            username: opt_str_field("username").and_then(|u| normalize_username(&u).ok()),
+            username: opt_str_slice("username").and_then(|u| normalize_username(u).ok()),
             first_name: tolerant_text("firstName", MAX_SHORT_FIELD_CHARS),
             last_name: tolerant_text("lastName", MAX_SHORT_FIELD_CHARS),
             display_name: {
@@ -1085,14 +1149,7 @@ impl IdentityService {
             mother_name: tolerant_text("motherName", MAX_MEDIUM_FIELD_CHARS),
             father_name: tolerant_text("fatherName", MAX_MEDIUM_FIELD_CHARS),
             birth_date: tolerant_validated("birthDate", validate_and_normalize_date),
-            nationality: {
-                let n = tolerant_text("nationality", MAX_SHORT_FIELD_CHARS);
-                if n.is_empty() {
-                    "Brasileira".to_string()
-                } else {
-                    n
-                }
-            },
+            nationality: tolerant_text("nationality", MAX_SHORT_FIELD_CHARS),
             marital_status: tolerant_text("maritalStatus", 40),
             company_name: tolerant_text("companyName", MAX_MEDIUM_FIELD_CHARS),
             cnpj: tolerant_validated("cnpj", validate_cnpj),
@@ -1100,14 +1157,7 @@ impl IdentityService {
             legal_representative_cpf: tolerant_validated("legalRepresentativeCpf", validate_cpf),
             email: tolerant_email("email"),
             phone_number: tolerant_text("phoneNumber", 30),
-            country: {
-                let c = tolerant_text("country", MAX_SHORT_FIELD_CHARS);
-                if c.is_empty() {
-                    "Brasil".to_string()
-                } else {
-                    c
-                }
-            },
+            country: tolerant_text("country", MAX_SHORT_FIELD_CHARS),
             zip_code: tolerant_validated("zipCode", validate_cep),
             state: tolerant_text("state", 40),
             city: tolerant_text("city", MAX_SHORT_FIELD_CHARS),
@@ -1121,8 +1171,8 @@ impl IdentityService {
             about: tolerant_multiline_text("about", MAX_ABOUT_CHARS),
             // Privacidade por padrão: preserva flag existente se já houver perfil no cofre, senão false
             is_public: existing.as_ref().is_some_and(|p| p.is_public),
-            photo_url: tolerant_url("photoURL"),
-            cover_url: tolerant_url("coverURL"),
+            photo_url: tolerant_url("photoURL").or_else(|| tolerant_url("photoUrl")),
+            cover_url: tolerant_url("coverURL").or_else(|| tolerant_url("coverUrl")),
             linked_providers: Vec::new(),
             social_links,
             clear_fields: Vec::new(),
@@ -1861,5 +1911,78 @@ mod tests {
         req.first_name = format!("{}Ana", " ".repeat(1024));
         let err = IdentityService::sanitize_and_validate(&req, None).unwrap_err();
         assert!(matches!(err, IdentityError::Validation(_)));
+    }
+
+    #[test]
+    fn test_boundary_crlf_and_bidi_in_username_and_single_line_fields_rejected() {
+        // Quebras de linha ou tabulações nas extremidades de campos single-line não podem passar pelo trim()
+        for bad_name in ["Carlos\r\n", "\r\nCarlos", "\tCarlos", "\r\n"] {
+            let mut req = sample_req("52998224725");
+            req.first_name = bad_name.to_string();
+            assert!(
+                IdentityService::sanitize_and_validate(&req, None).is_err(),
+                "Deveria rejeitar first_name com CRLF/Tab nas bordas: {bad_name:?}"
+            );
+        }
+
+        // E-mail com CRLF nas bordas ou apenas CRLF deve falhar
+        for bad_email in ["carlos@exemplo.com\r\n", "\r\ncarlos@exemplo.com", "\r\n"] {
+            let mut req = sample_req("52998224725");
+            req.email = bad_email.to_string();
+            assert!(
+                IdentityService::sanitize_and_validate(&req, None).is_err(),
+                "Deveria rejeitar email com CRLF: {bad_email:?}"
+            );
+        }
+
+        // Username com caracteres de controle, null byte, bidi ou CRLF deve falhar (e não virar '_')
+        for bad_user in [
+            "carlos\0silva",
+            "carlos\u{202E}silva",
+            "carlos\r\nsilva",
+            "carlos_silva\r\n",
+            "\tcarlos_silva",
+        ] {
+            assert!(
+                normalize_username(bad_user).is_err(),
+                "Deveria rejeitar username com controle/bidi: {bad_user:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_legacy_migration_preserves_existing_foreign_nationality_and_supports_camelcase_urls() {
+        let (db, session, _guard) = setup_test_vault();
+
+        // Perfil inicial com score 0 (apenas nacionalidade/país estrangeiros e tipo PJ sem documentos)
+        let init_req = SaveUserProfileRequest {
+            person_type: "PJ".to_string(),
+            nationality: "Portuguesa".to_string(),
+            country: "Portugal".to_string(),
+            ..Default::default()
+        };
+        let init_saved = IdentityService::save_profile(&db, &session, init_req).unwrap();
+        assert_eq!(init_saved.completeness_score, 0);
+
+        // JSON legado sem nationality/country/personType e usando photoUrl/coverUrl em camelCase
+        let legacy_json = r#"{
+            "companyName": " Lusitana Tech Lda ",
+            "photoUrl": "https://storage.devos.app/photo.png",
+            "coverUrl": "https://storage.devos.app/cover.png"
+        }"#;
+
+        let migrated = IdentityService::import_legacy_profile(&db, &session, legacy_json).unwrap();
+        assert_eq!(migrated.person_type, "PJ");
+        assert_eq!(migrated.nationality, "Portuguesa");
+        assert_eq!(migrated.country, "Portugal");
+        assert_eq!(migrated.company_name, "Lusitana Tech Lda");
+        assert_eq!(
+            migrated.photo_url.as_deref(),
+            Some("https://storage.devos.app/photo.png")
+        );
+        assert_eq!(
+            migrated.cover_url.as_deref(),
+            Some("https://storage.devos.app/cover.png")
+        );
     }
 }
