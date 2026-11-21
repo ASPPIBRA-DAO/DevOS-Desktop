@@ -4,9 +4,13 @@
 //! persistência criptográfica em cofre local SQLite e sincronização com sessão ativa.
 
 pub mod models;
-pub mod repository;
+pub(crate) mod repository;
 pub mod service;
 
-pub use models::*;
-pub use repository::*;
-pub use service::*;
+pub use models::{
+    calculate_completeness_score, contains_dangerous_control_or_bidi, extract_digits,
+    validate_and_normalize_date, validate_cep, validate_cnpj, validate_cpf, PublicUserProfileDto,
+    SaveUserProfileRequest, SocialLinksDto, UserProfileDto, CURRENT_PROFILE_PAYLOAD_VERSION,
+    PERSON_TYPE_PF, PERSON_TYPE_PJ,
+};
+pub use service::{normalize_username, sanitize_social_url, IdentityError, IdentityService};

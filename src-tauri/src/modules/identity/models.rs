@@ -2,7 +2,13 @@
 //!
 //! Não registrar dados pessoais nos logs do sistema (LGPD / Privacidade em primeiro lugar).
 
+use std::fmt;
+
+use chrono::Datelike;
 use serde::{Deserialize, Serialize};
+use zeroize::Zeroize;
+
+pub const CURRENT_PROFILE_PAYLOAD_VERSION: u32 = 1;
 
 /// Tipo de pessoa jurídica ou física.
 pub const PERSON_TYPE_PF: &str = "PF";
@@ -13,7 +19,7 @@ fn default_person_type() -> String {
 }
 
 /// DTO canônico de presenças sociais digitais cifrado no cofre.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct SocialLinksDto {
     #[serde(default)]
@@ -26,8 +32,32 @@ pub struct SocialLinksDto {
     pub twitter: Option<String>,
 }
 
+impl fmt::Debug for SocialLinksDto {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SocialLinksDto")
+            .field("facebook", &self.facebook.as_ref().map(|_| "[REDACTED]"))
+            .field("instagram", &self.instagram.as_ref().map(|_| "[REDACTED]"))
+            .field("linkedin", &self.linkedin.as_ref().map(|_| "[REDACTED]"))
+            .field("twitter", &self.twitter.as_ref().map(|_| "[REDACTED]"))
+            .finish()
+    }
+}
+
+impl Zeroize for SocialLinksDto {
+    fn zeroize(&mut self) {
+        self.facebook.zeroize();
+        self.instagram.zeroize();
+        self.linkedin.zeroize();
+        self.twitter.zeroize();
+    }
+}
+
 /// DTO canônico do Perfil do Usuário e Qualificação Civil exposto via Tauri IPC.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+///
+/// Implementa `Debug` com redação estrita de PII (`[REDACTED_BY_LGPD]`) e trait `Zeroize` para
+/// higienização explícita de memória. O trait `Drop` não é derivado para permitir sintaxe funcional
+/// de atualização (`..Default::default()`) sem violação de regras de movimentação do compilador (E0509).
+#[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct UserProfileDto {
     pub person_type: String,
@@ -75,6 +105,58 @@ pub struct UserProfileDto {
     pub linked_providers: Vec<String>,
     #[serde(default)]
     pub social_links: Option<SocialLinksDto>,
+}
+
+impl fmt::Debug for UserProfileDto {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("UserProfileDto")
+            .field("person_type", &self.person_type)
+            .field("username", &self.username)
+            .field("is_public", &self.is_public)
+            .field("completeness_score", &self.completeness_score)
+            .field("revision", &self.revision)
+            .field("updated_at", &self.updated_at)
+            .field("pii_data", &"[REDACTED_BY_LGPD]")
+            .finish()
+    }
+}
+
+impl Zeroize for UserProfileDto {
+    fn zeroize(&mut self) {
+        self.first_name.zeroize();
+        self.last_name.zeroize();
+        self.display_name.zeroize();
+        self.cpf.zeroize();
+        self.rg.zeroize();
+        self.rg_issuer.zeroize();
+        self.cnh.zeroize();
+        self.cnh_category.zeroize();
+        self.mother_name.zeroize();
+        self.father_name.zeroize();
+        self.birth_date.zeroize();
+        self.marital_status.zeroize();
+        self.company_name.zeroize();
+        self.cnpj.zeroize();
+        self.legal_representative.zeroize();
+        self.legal_representative_cpf.zeroize();
+        self.email.zeroize();
+        self.phone_number.zeroize();
+        self.zip_code.zeroize();
+        self.state.zeroize();
+        self.city.zeroize();
+        self.neighborhood.zeroize();
+        self.address.zeroize();
+        self.address_number.zeroize();
+        self.complement.zeroize();
+        self.occupation.zeroize();
+        self.company.zeroize();
+        self.website.zeroize();
+        self.about.zeroize();
+        self.photo_url.zeroize();
+        self.cover_url.zeroize();
+        self.linked_providers.zeroize();
+        self.social_links.zeroize();
+    }
 }
 
 impl Default for UserProfileDto {
@@ -126,9 +208,6 @@ impl Default for UserProfileDto {
 }
 
 /// Projeção pública com allowlist estrita de campos não-sensíveis.
-///
-/// Dados como CPF, filiação, data de nascimento, RG, CNPJ e endereço residencial
-/// NUNCA são expostos em projeções públicas, mesmo que `is_public` seja true.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct PublicUserProfileDto {
@@ -168,7 +247,7 @@ impl UserProfileDto {
 }
 
 /// Payload de requisição para salvar ou atualizar o perfil.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SaveUserProfileRequest {
     #[serde(default = "default_person_type")]
@@ -250,6 +329,55 @@ pub struct SaveUserProfileRequest {
     pub expected_revision: Option<u64>,
 }
 
+impl fmt::Debug for SaveUserProfileRequest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SaveUserProfileRequest")
+            .field("person_type", &self.person_type)
+            .field("is_public", &self.is_public)
+            .field("expected_revision", &self.expected_revision)
+            .field("pii_data", &"[REDACTED_BY_LGPD]")
+            .finish()
+    }
+}
+
+impl Zeroize for SaveUserProfileRequest {
+    fn zeroize(&mut self) {
+        self.first_name.zeroize();
+        self.last_name.zeroize();
+        self.display_name.zeroize();
+        self.cpf.zeroize();
+        self.rg.zeroize();
+        self.rg_issuer.zeroize();
+        self.cnh.zeroize();
+        self.cnh_category.zeroize();
+        self.mother_name.zeroize();
+        self.father_name.zeroize();
+        self.birth_date.zeroize();
+        self.marital_status.zeroize();
+        self.company_name.zeroize();
+        self.cnpj.zeroize();
+        self.legal_representative.zeroize();
+        self.legal_representative_cpf.zeroize();
+        self.email.zeroize();
+        self.phone_number.zeroize();
+        self.zip_code.zeroize();
+        self.state.zeroize();
+        self.city.zeroize();
+        self.neighborhood.zeroize();
+        self.address.zeroize();
+        self.address_number.zeroize();
+        self.complement.zeroize();
+        self.occupation.zeroize();
+        self.company.zeroize();
+        self.website.zeroize();
+        self.about.zeroize();
+        self.photo_url.zeroize();
+        self.cover_url.zeroize();
+        self.linked_providers.zeroize();
+        self.social_links.zeroize();
+    }
+}
+
 impl Default for SaveUserProfileRequest {
     fn default() -> Self {
         Self {
@@ -297,80 +425,95 @@ impl Default for SaveUserProfileRequest {
 }
 
 // ----------------------------------------------------------------------
-// Rotinas de Validação de Documentos Oficiais Brasileiros
+// Rotinas de Validação de Documentos Oficiais Brasileiros & Sanitização
 // ----------------------------------------------------------------------
+
+/// Verifica a presença de caracteres de controle proibidos (exceto \n, \r, \t)
+/// e caracteres bidirecionais (bidi overrides / invisíveis) que possam ocultar código ou alterar semântica visual.
+pub fn contains_dangerous_control_or_bidi(text: &str) -> bool {
+    for c in text.chars() {
+        if c != '\n' && c != '\r' && c != '\t' && c.is_control() {
+            return true;
+        }
+        match c {
+            '\u{200B}'..='\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}' => {
+                return true;
+            }
+            _ => {}
+        }
+    }
+    false
+}
 
 /// Higieniza mantendo apenas dígitos decimais.
 pub fn extract_digits(input: &str) -> String {
     input.chars().filter(|c| c.is_ascii_digit()).collect()
 }
 
-/// Validação algorítmica rigorosa de CPF com dois dígitos verificadores.
-///
-/// Rejeita caracteres inválidos antes de normalizar, valida formato,
-/// sequências repetidas e calcula os dois dígitos verificadores (Módulo 11).
+/// Validação algorítmica rigorosa de CPF com dois dígitos verificadores (zero alocações de heap).
 pub fn validate_cpf(raw: &str) -> Result<String, &'static str> {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
         return Ok(String::new());
     }
 
-    // 1. Rejeita caracteres proibidos antes de normalizar
+    if trimmed.len() > 64 {
+        return Err("O CPF informado excede o limite de tamanho permitido.");
+    }
+
+    let mut nums = [0u32; 11];
+    let mut len = 0usize;
+
     for c in trimmed.chars() {
-        if !c.is_ascii_digit() && c != '.' && c != '-' && !c.is_whitespace() {
+        if c.is_ascii_digit() {
+            if len >= 11 {
+                return Err("O CPF deve conter exatamente 11 dígitos numéricos.");
+            }
+            nums[len] = (c as u8 - b'0') as u32;
+            len += 1;
+        } else if c != '.' && c != '-' && !c.is_whitespace() {
             return Err(
                 "O CPF contém caracteres inválidos. Utilize apenas números e separadores válidos.",
             );
         }
     }
 
-    let digits = extract_digits(trimmed);
-    if digits.len() != 11 {
+    if len != 11 {
         return Err("O CPF deve conter exatamente 11 dígitos numéricos.");
     }
 
-    // 2. Rejeita sequências de dígitos todos iguais (00000000000, 11111111111, etc.)
-    let first = digits.as_bytes()[0];
-    if digits.bytes().all(|b| b == first) {
+    if nums.iter().all(|&d| d == nums[0]) {
         return Err("O CPF informado é inválido (dígitos repetidos).");
     }
 
-    let nums: Vec<u32> = digits
-        .chars()
-        .map(|c| c.to_digit(10).unwrap_or(0))
-        .collect();
-
-    // 3. Primeiro dígito verificador
+    // Primeiro dígito verificador
     let sum1: u32 = nums[0..9]
         .iter()
         .enumerate()
         .map(|(idx, &val)| val * (10 - idx as u32))
         .sum();
     let mod1 = (sum1 * 10) % 11;
-    let expected_d1 = if mod1 == 10 || mod1 == 11 { 0 } else { mod1 };
+    let expected_d1 = if mod1 == 10 { 0 } else { mod1 };
     if expected_d1 != nums[9] {
         return Err("Dígito verificador do CPF inválido.");
     }
 
-    // 4. Segundo dígito verificador
+    // Segundo dígito verificador
     let sum2: u32 = nums[0..10]
         .iter()
         .enumerate()
         .map(|(idx, &val)| val * (11 - idx as u32))
         .sum();
     let mod2 = (sum2 * 10) % 11;
-    let expected_d2 = if mod2 == 10 || mod2 == 11 { 0 } else { mod2 };
+    let expected_d2 = if mod2 == 10 { 0 } else { mod2 };
     if expected_d2 != nums[10] {
         return Err("Dígito verificador do CPF inválido.");
     }
 
-    // Retorna formatado XXX.XXX.XXX-XX
     Ok(format!(
-        "{}.{}.{}-{}",
-        &digits[0..3],
-        &digits[3..6],
-        &digits[6..9],
-        &digits[9..11]
+        "{}{}{}.{}{}{}.{}{}{}-{}{}",
+        nums[0], nums[1], nums[2], nums[3], nums[4], nums[5], nums[6], nums[7], nums[8], nums[9],
+        nums[10]
     ))
 }
 
@@ -378,83 +521,71 @@ pub fn validate_cpf(raw: &str) -> Result<String, &'static str> {
 ///
 /// Aceita o formato numérico legado (14 dígitos) e o novo formato alfanumérico em vigência em 2026.
 /// As 12 primeiras posições podem conter dígitos e letras maiúsculas (A-Z).
-/// As 2 posições finais são estritamente os dígitos verificadores calculados por Módulo 11
-/// utilizando a conversão `ASCII(C) - 48`.
+/// As 2 posições finais são estritamente os dígitos verificadores numéricos calculados por Módulo 11 (ASCII - 48).
 pub fn validate_cnpj(raw: &str) -> Result<String, &'static str> {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
         return Ok(String::new());
     }
 
-    // 1. Rejeita caracteres inválidos antes de normalizar
+    if trimmed.len() > 64 {
+        return Err("O CNPJ informado excede o limite de tamanho permitido.");
+    }
+
+    let mut bytes = [0u8; 14];
+    let mut len = 0usize;
+
     for c in trimmed.chars() {
-        if !c.is_ascii_alphanumeric() && c != '.' && c != '/' && c != '-' && !c.is_whitespace() {
+        if c.is_ascii_alphanumeric() {
+            if len >= 14 {
+                return Err("O CNPJ deve conter exatamente 14 posições alfanuméricas.");
+            }
+            bytes[len] = (c as u8).to_ascii_uppercase();
+            len += 1;
+        } else if c != '.' && c != '/' && c != '-' && !c.is_whitespace() {
             return Err(
                 "O CNPJ contém caracteres inválidos. Utilize apenas letras, números e separadores válidos.",
             );
         }
     }
 
-    // 2. Normaliza para maiúsculas e remove separadores permitidos
-    let normalized: String = trimmed
-        .chars()
-        .filter(|c| c.is_ascii_alphanumeric())
-        .map(|c| c.to_ascii_uppercase())
-        .collect();
-
-    if normalized.len() != 14 {
+    if len != 14 {
         return Err("O CNPJ deve conter exatamente 14 posições alfanuméricas.");
     }
 
-    // 3. Os dois últimos caracteres devem ser estritamente dígitos decimais
-    let bytes = normalized.as_bytes();
     if !bytes[12].is_ascii_digit() || !bytes[13].is_ascii_digit() {
-        return Err(
-            "Os dois últimos caracteres do CNPJ devem ser dígitos verificadores numéricos.",
-        );
+        return Err("Os dois últimos caracteres do CNPJ devem ser dígitos verificadores numéricos.");
     }
 
-    // 4. Rejeita sequências de todos os caracteres idênticos (ex: 00000000000000, AAAAAAAAAAAAAA)
-    let first = bytes[0];
-    if bytes.iter().all(|&b| b == first) {
+    if bytes.iter().all(|&b| b == bytes[0]) {
         return Err("O CNPJ informado é inválido (todos os caracteres idênticos).");
     }
 
-    // 5. Converte cada caractere das 12 primeiras posições para o valor numérico oficial (ASCII - 48)
-    let values: Vec<u32> = bytes[0..12].iter().map(|&b| (b as u32) - 48).collect();
+    let mut values = [0u32; 12];
+    for (dst, &b) in values.iter_mut().zip(bytes[0..12].iter()) {
+        *dst = (b as u32) - 48;
+    }
 
-    // 6. Cálculo do 1º Dígito Verificador (pesos: 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2)
-    let weights1: [u32; 12] = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
-    let sum1: u32 = values
-        .iter()
-        .zip(weights1.iter())
-        .map(|(&v, &w)| v * w)
-        .sum();
+    // 1º Dígito Verificador (pesos: 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2)
+    const WEIGHTS1: [u32; 12] = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+    let sum1: u32 = values.iter().zip(WEIGHTS1).map(|(&v, w)| v * w).sum();
     let rem1 = sum1 % 11;
     let expected_d1 = if rem1 < 2 { 0 } else { 11 - rem1 };
-    let actual_d1 = (bytes[12] - b'0') as u32;
-
-    if expected_d1 != actual_d1 {
+    if expected_d1 != (bytes[12] - b'0') as u32 {
         return Err("Dígito verificador do CNPJ inválido.");
     }
 
-    // 7. Cálculo do 2º Dígito Verificador (pesos: 6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2)
-    let weights2: [u32; 12] = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3];
-    let sum2: u32 = values
-        .iter()
-        .zip(weights2.iter())
-        .map(|(&v, &w)| v * w)
-        .sum::<u32>()
+    // 2º Dígito Verificador (pesos: 6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3)
+    const WEIGHTS2: [u32; 12] = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3];
+    let sum2: u32 = values.iter().zip(WEIGHTS2).map(|(&v, w)| v * w).sum::<u32>()
         + (expected_d1 * 2);
     let rem2 = sum2 % 11;
     let expected_d2 = if rem2 < 2 { 0 } else { 11 - rem2 };
-    let actual_d2 = (bytes[13] - b'0') as u32;
-
-    if expected_d2 != actual_d2 {
+    if expected_d2 != (bytes[13] - b'0') as u32 {
         return Err("Dígito verificador do CNPJ inválido.");
     }
 
-    // Retorna formatado no padrão oficial XX.XXX.XXX/XXXX-XX
+    let normalized = std::str::from_utf8(&bytes).unwrap_or_default();
     Ok(format!(
         "{}.{}.{}/{}-{}",
         &normalized[0..2],
@@ -472,6 +603,10 @@ pub fn validate_cep(raw: &str) -> Result<String, &'static str> {
         return Ok(String::new());
     }
 
+    if trimmed.len() > 32 {
+        return Err("O CEP informado excede o limite de tamanho permitido.");
+    }
+
     for c in trimmed.chars() {
         if !c.is_ascii_digit() && c != '-' && !c.is_whitespace() {
             return Err("O CEP contém caracteres inválidos. Utilize apenas números e hífen.");
@@ -485,43 +620,42 @@ pub fn validate_cep(raw: &str) -> Result<String, &'static str> {
     Ok(format!("{}-{}", &digits[0..5], &digits[5..8]))
 }
 
-/// Valida data no formato ISO YYYY-MM-DD ou converte de DD/MM/YYYY.
-///
-/// Valida calendário gregoriano (incluindo anos bissextos), ano plausível (1900 até o ano corrente)
-/// e rejeita datas futuras.
+/// Valida data no formato ISO YYYY-MM-DD ou DD/MM/YYYY e retorna formato canônico ISO YYYY-MM-DD.
 pub fn validate_and_normalize_date(raw: &str) -> Result<String, &'static str> {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
         return Ok(String::new());
     }
 
-    // Se estiver no formato legível DD/MM/YYYY, converter
-    let candidate = if trimmed.contains('/') {
-        let parts: Vec<&str> = trimmed.split('/').collect();
-        if parts.len() == 3 && parts[0].len() <= 2 && parts[1].len() <= 2 && parts[2].len() == 4 {
-            let day: u32 = parts[0].parse().map_err(|_| "Dia inválido na data.")?;
-            let month: u32 = parts[1].parse().map_err(|_| "Mês inválido na data.")?;
-            let year: i32 = parts[2].parse().map_err(|_| "Ano inválido na data.")?;
-            format!("{:04}-{:02}-{:02}", year, month, day)
-        } else {
+    if trimmed.len() > 32 {
+        return Err("Formato de data inválido. Utilize AAAA-MM-DD ou DD/MM/AAAA.");
+    }
+
+    let parsed = if trimmed.contains('/') {
+        let mut parts = trimmed.split('/');
+        let (Some(d), Some(m), Some(y), None) =
+            (parts.next(), parts.next(), parts.next(), parts.next())
+        else {
+            return Err("Formato de data inválido. Utilize AAAA-MM-DD ou DD/MM/AAAA.");
+        };
+
+        if d.is_empty() || m.is_empty() || d.len() > 2 || m.len() > 2 || y.len() != 4 {
             return Err("Formato de data inválido. Utilize AAAA-MM-DD ou DD/MM/AAAA.");
         }
+
+        let day: u32 = d.parse().map_err(|_| "Dia inválido na data.")?;
+        let month: u32 = m.parse().map_err(|_| "Mês inválido na data.")?;
+        let year: i32 = y.parse().map_err(|_| "Ano inválido na data.")?;
+
+        chrono::NaiveDate::from_ymd_opt(year, month, day)
+            .ok_or("Data inválida ou inexistente no calendário gregoriano.")?
     } else {
-        trimmed.to_string()
+        chrono::NaiveDate::parse_from_str(trimmed, "%Y-%m-%d")
+            .map_err(|_| "Data inválida ou inexistente no calendário gregoriano.")?
     };
 
-    let parsed = chrono::NaiveDate::parse_from_str(&candidate, "%Y-%m-%d")
-        .map_err(|_| "Data inválida ou inexistente no calendário gregoriano.")?;
-
-    let year = parsed.format("%Y").to_string().parse::<i32>().unwrap_or(0);
     let today = chrono::Utc::now().date_naive();
-    let current_year = today
-        .format("%Y")
-        .to_string()
-        .parse::<i32>()
-        .unwrap_or(2026);
-
-    if year < 1900 || year > current_year {
+    if parsed.year() < 1900 || parsed.year() > today.year() {
         return Err("O ano de nascimento deve ser plausível (entre 1900 e o ano corrente).");
     }
 
@@ -529,85 +663,38 @@ pub fn validate_and_normalize_date(raw: &str) -> Result<String, &'static str> {
         return Err("A data de nascimento não pode ser posterior à data atual.");
     }
 
-    Ok(candidate)
+    Ok(parsed.format("%Y-%m-%d").to_string())
 }
 
 /// Calcula a taxa de completude dos dados cadastrais (0 a 100%).
-///
-/// Tanto para PF quanto para PJ, a soma dos pesos atinge exatamente 100%.
 pub fn calculate_completeness_score(profile: &UserProfileDto) -> u32 {
+    let filled = |s: &str| !s.trim().is_empty();
     let mut score = 0u32;
 
     if profile.person_type == PERSON_TYPE_PJ {
-        // Pessoa Jurídica (Total: 100)
-        if !profile.company_name.trim().is_empty() {
-            score += 20;
-        }
-        if !profile.cnpj.trim().is_empty() {
-            score += 20;
-        }
-        if !profile.legal_representative.trim().is_empty() {
-            score += 15;
-        }
-        if !profile.legal_representative_cpf.trim().is_empty() {
-            score += 10;
-        }
-        if !profile.email.trim().is_empty() {
-            score += 10;
-        }
-        if !profile.phone_number.trim().is_empty() {
-            score += 5;
-        }
-        if !profile.zip_code.trim().is_empty() {
-            score += 5;
-        }
-        if !profile.city.trim().is_empty() && !profile.state.trim().is_empty() {
-            score += 5;
-        }
-        if !profile.address.trim().is_empty() {
-            score += 5;
-        }
-        if !profile.occupation.trim().is_empty() {
-            score += 5;
-        }
+        if filled(&profile.company_name) { score += 20; }
+        if filled(&profile.cnpj) { score += 20; }
+        if filled(&profile.legal_representative) { score += 15; }
+        if filled(&profile.legal_representative_cpf) { score += 10; }
+        if filled(&profile.email) { score += 10; }
+        if filled(&profile.phone_number) { score += 5; }
+        if filled(&profile.zip_code) { score += 5; }
+        if filled(&profile.city) && filled(&profile.state) { score += 5; }
+        if filled(&profile.address) { score += 5; }
+        if filled(&profile.occupation) { score += 5; }
     } else {
-        // Pessoa Física (Total: 100)
-        if !profile.first_name.trim().is_empty() {
-            score += 10;
-        }
-        if !profile.last_name.trim().is_empty() {
-            score += 10;
-        }
-        if !profile.cpf.trim().is_empty() {
-            score += 20;
-        }
-        if !profile.birth_date.trim().is_empty() {
-            score += 10;
-        }
-        if !profile.rg.trim().is_empty() || !profile.cnh.trim().is_empty() {
-            score += 10;
-        }
-        if !profile.mother_name.trim().is_empty() {
-            score += 5;
-        }
-        if !profile.email.trim().is_empty() {
-            score += 10;
-        }
-        if !profile.phone_number.trim().is_empty() {
-            score += 5;
-        }
-        if !profile.zip_code.trim().is_empty() {
-            score += 5;
-        }
-        if !profile.city.trim().is_empty() && !profile.state.trim().is_empty() {
-            score += 5;
-        }
-        if !profile.address.trim().is_empty() {
-            score += 5;
-        }
-        if !profile.occupation.trim().is_empty() || !profile.about.trim().is_empty() {
-            score += 5;
-        }
+        if filled(&profile.first_name) { score += 10; }
+        if filled(&profile.last_name) { score += 10; }
+        if filled(&profile.cpf) { score += 20; }
+        if filled(&profile.birth_date) { score += 10; }
+        if filled(&profile.rg) || filled(&profile.cnh) { score += 10; }
+        if filled(&profile.mother_name) { score += 5; }
+        if filled(&profile.email) { score += 10; }
+        if filled(&profile.phone_number) { score += 5; }
+        if filled(&profile.zip_code) { score += 5; }
+        if filled(&profile.city) && filled(&profile.state) { score += 5; }
+        if filled(&profile.address) { score += 5; }
+        if filled(&profile.occupation) || filled(&profile.about) { score += 5; }
     }
 
     score.min(100)
@@ -619,30 +706,21 @@ mod tests {
 
     #[test]
     fn test_cpf_validation() {
-        // CPF válido com e sem máscara
         let valid_cpf = "52998224725";
         assert!(validate_cpf(valid_cpf).is_ok());
         assert_eq!(validate_cpf(valid_cpf).unwrap(), "529.982.247-25");
         assert_eq!(validate_cpf("529.982.247-25").unwrap(), "529.982.247-25");
 
-        // CPF inválido (todos iguais)
         assert!(validate_cpf("11111111111").is_err());
         assert!(validate_cpf("00000000000").is_err());
-
-        // CPF com dígito errado
         assert!(validate_cpf("52998224726").is_err());
-
-        // CPF com caracteres indevidos
         assert!(validate_cpf("529.982.247-2A").is_err());
         assert!(validate_cpf("529@982.247-25").is_err());
-
-        // CPF vazio aceito em rascunho
         assert_eq!(validate_cpf("").unwrap(), "");
     }
 
     #[test]
     fn test_cnpj_numeric_validation() {
-        // CNPJ numérico legado válido (Banco do Brasil: 00.000.000/0001-91)
         let valid_cnpj = "00000000000191";
         assert!(validate_cnpj(valid_cnpj).is_ok());
         assert_eq!(validate_cnpj(valid_cnpj).unwrap(), "00.000.000/0001-91");
@@ -651,19 +729,13 @@ mod tests {
             "00.000.000/0001-91"
         );
 
-        // CNPJ numérico com dígito errado
         assert!(validate_cnpj("00000000000192").is_err());
         assert!(validate_cnpj("11111111111111").is_err());
-
-        // CNPJ vazio
         assert_eq!(validate_cnpj("").unwrap(), "");
     }
 
     #[test]
     fn test_cnpj_alphanumeric_validation() {
-        // CNPJ alfanumérico oficial (IN RFB nº 2.229/2024):
-        // 12 primeiras posições: "12ABC34501DE"
-        // DVs matemáticos: 35
         let valid_alpha = "12ABC34501DE35";
         assert!(validate_cnpj(valid_alpha).is_ok());
         assert_eq!(validate_cnpj(valid_alpha).unwrap(), "12.ABC.345/01DE-35");
@@ -672,19 +744,13 @@ mod tests {
             "12.ABC.345/01DE-35"
         );
 
-        // Alfanumérico com DVs errados
         assert!(validate_cnpj("12ABC34501DE36").is_err());
-
-        // Caracteres proibidos (símbolos fora do padrão)
         assert!(validate_cnpj("12.ABC.345/01DE-3@").is_err());
-
-        // Todos idênticos
         assert!(validate_cnpj("AAAAAAAAAAAAAA").is_err());
     }
 
     #[test]
     fn test_date_validation_leap_year_and_future() {
-        // Data válida normal
         assert_eq!(
             validate_and_normalize_date("1985-05-15").unwrap(),
             "1985-05-15"
@@ -693,8 +759,6 @@ mod tests {
             validate_and_normalize_date("15/05/1985").unwrap(),
             "1985-05-15"
         );
-
-        // Ano bissexto válido (2000 é bissexto)
         assert_eq!(
             validate_and_normalize_date("2000-02-29").unwrap(),
             "2000-02-29"
@@ -704,19 +768,13 @@ mod tests {
             "2000-02-29"
         );
 
-        // Ano não-bissexto inválido (2001-02-29 não existe)
         assert!(validate_and_normalize_date("2001-02-29").is_err());
-
-        // Data futura deve ser rejeitada
         assert!(validate_and_normalize_date("2099-01-01").is_err());
-
-        // Ano anterior a 1900 rejeitado
         assert!(validate_and_normalize_date("1850-01-01").is_err());
     }
 
     #[test]
     fn test_completeness_scores_reach_exact_100() {
-        // Teste PF completo
         let mut pf = UserProfileDto::default();
         pf.person_type = "PF".to_string();
         pf.first_name = "Ana".to_string();
@@ -734,7 +792,6 @@ mod tests {
         pf.occupation = "Engenheira".to_string();
         assert_eq!(calculate_completeness_score(&pf), 100);
 
-        // Teste PJ completo
         let mut pj = UserProfileDto::default();
         pj.person_type = "PJ".to_string();
         pj.company_name = "Minha Empresa Ltda".to_string();
@@ -749,5 +806,14 @@ mod tests {
         pj.address = "Av Paulista 1000".to_string();
         pj.occupation = "Desenvolvimento de Software (CNAE 6201-5)".to_string();
         assert_eq!(calculate_completeness_score(&pj), 100);
+    }
+
+    #[test]
+    fn test_dangerous_control_or_bidi_characters() {
+        assert!(contains_dangerous_control_or_bidi("Texto com \0 byte nulo"));
+        assert!(contains_dangerous_control_or_bidi("Texto com \u{202E} RLO"));
+        assert!(contains_dangerous_control_or_bidi("Texto com \u{200B} ZWSP"));
+        assert!(!contains_dangerous_control_or_bidi("Texto perfeitamente legível com acentuação: José & Cia."));
+        assert!(!contains_dangerous_control_or_bidi("Linha 1\nLinha 2\r\nCom\ttab"));
     }
 }
