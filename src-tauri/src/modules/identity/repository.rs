@@ -21,6 +21,43 @@ pub struct StoredProfileRecord {
 pub struct IdentityRepository;
 
 impl IdentityRepository {
+    /// Valida a regra inviolável de concorrência otimista e calcula a próxima revisão.
+    ///
+    /// 1. Se o registro já existe (`Some(current)`), `expected_revision` é obrigatório e deve ser igual a `current`.
+    /// 2. Se o registro não existe (`None`), `expected_revision` só pode ser `None` ou `Some(0)`.
+    pub fn verify_and_next_revision(
+        current_revision: Option<u64>,
+        expected_revision: Option<u64>,
+    ) -> Result<u64, StorageError> {
+        match (current_revision, expected_revision) {
+            (Some(current), Some(expected)) if current == expected => {}
+            (Some(current), None) => {
+                return Err(StorageError::InvalidData(format!(
+                    "{}: Revisão esperada não informada para perfil existente (revisão atual: {}).",
+                    CONCURRENCY_CONFLICT_PREFIX, current
+                )));
+            }
+            (Some(current), Some(expected)) => {
+                return Err(StorageError::InvalidData(format!(
+                    "{}: O perfil foi atualizado concorrentemente (revisão atual: {}, informada: {}).",
+                    CONCURRENCY_CONFLICT_PREFIX, current, expected
+                )));
+            }
+            (None, None) | (None, Some(0)) => {}
+            (None, Some(expected)) => {
+                return Err(StorageError::InvalidData(format!(
+                    "{}: Nenhum perfil existente para a revisão esperada informada ({}).",
+                    CONCURRENCY_CONFLICT_PREFIX, expected
+                )));
+            }
+        }
+
+        current_revision
+            .unwrap_or(0)
+            .checked_add(1)
+            .ok_or_else(|| StorageError::InvalidData("Overflow de revisão do perfil.".to_string()))
+    }
+
     /// Carrega o registro criptografado único do usuário (id = 1).
     pub fn get_profile_record(
         conn: &Connection,
@@ -64,30 +101,8 @@ impl IdentityRepository {
             )
             .optional()?;
 
-        // Regra Inviolável de Concorrência Otimista:
-        // 1. Se registro já existe, expected_revision é OBRIGATÓRIO e deve ser igual ao atual.
-        // 2. Se registro não existe, expected_revision só pode ser None ou Some(0).
-        match (current_revision, expected_revision) {
-            (Some(current), Some(expected)) if current == expected => {}
-            (Some(current), other) => {
-                return Err(StorageError::InvalidData(format!(
-                    "{}: O perfil foi atualizado concorrentemente (revisão atual: {}, informada: {:?}).",
-                    CONCURRENCY_CONFLICT_PREFIX, current, other
-                )));
-            }
-            (None, None) | (None, Some(0)) => {}
-            (None, Some(expected)) => {
-                return Err(StorageError::InvalidData(format!(
-                    "{}: Nenhum perfil existente para a revisão esperada informada ({}).",
-                    CONCURRENCY_CONFLICT_PREFIX, expected
-                )));
-            }
-        }
-
-        let next_revision = current_revision
-            .unwrap_or(0)
-            .checked_add(1)
-            .ok_or_else(|| StorageError::InvalidData("Overflow de revisão do perfil.".to_string()))?;
+        let next_revision =
+            Self::verify_and_next_revision(current_revision, expected_revision)?;
 
         tx.execute(
             "INSERT INTO user_profiles (id, encrypted_envelope, payload_version, revision, created_at, updated_at)
